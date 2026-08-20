@@ -20,6 +20,10 @@ login_logoff() {
     printf "[%s] %s — sessao expirada, reconectando...\n" "$TWM_TAG" "$TWM_USER"
     rm -f "$TMP_COOKIE"
 
+    # Mesmo motivo do do_login: a sessao precisa passar pela pagina de
+    # login antes do POST, senao o servidor recusa a credencial correta.
+    run_curl "${URL}/?sign_in=1" > /dev/null 2>&1
+
     cript_file="$TMP/cript_file"
     [ ! -f "$cript_file" ] && return 1
 

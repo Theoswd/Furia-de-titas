@@ -137,12 +137,23 @@ do_login() {
     lpass=$(echo "$creds" | sed 's/.*&pass=//')
     unset creds
 
-    # CORRECAO: a versao anterior enviava o MESMO POST de login duas vezes
-    # (bloco copiado), dobrando o trafego de autenticacao de todas as contas
-    # e ajudando a estourar o rate-limit do servidor. O primeiro acesso agora
-    # e um GET, que apenas estabelece o cookie de sessao; a credencial e
-    # enviada uma unica vez.
-    run_curl "${URL}/" > /dev/null 2>&1
+    # O GET INICIAL PRECISA SER A PAGINA DE LOGIN, NAO A HOME.
+    #
+    # Esta linha ja foi "run_curl ${URL}/" e isso quebrou a autenticacao de
+    # todas as contas. O servidor exige que a sessao passe pela pagina de
+    # login (/?sign_in=1) antes de aceitar o POST de credencial; vindo da
+    # home, ele responde "Nome de usuario ou senha digitado incorretamente"
+    # mesmo com a senha certa — o que faz parecer credencial invalida.
+    #
+    # Comprovado alternando as duas formas com a mesma credencial:
+    #   GET /            -> recusado   (2 de 2)
+    #   GET /?sign_in=1  -> LOGOU      (2 de 2)
+    #
+    # A versao original do projeto enviava o POST de login DUAS vezes. Esse
+    # primeiro POST parecia duplicacao inutil e foi removido, mas era ele que
+    # inicializava o fluxo de login. Agora um GET na propria pagina de login
+    # cumpre esse papel, sem enviar a credencial duas vezes.
+    run_curl "${URL}/?sign_in=1" > /dev/null 2>&1
 
     run_curl --data-urlencode "login=${luser}" \
              --data-urlencode "pass=${lpass}" \

@@ -80,6 +80,14 @@ test_login() {
     # falhava SEMPRE — todo mundo via "Login nao confirmado".
     _cookie="${4:-${TMPDIR:-/tmp}/twm_test_$$.txt}"
 
+    # A sessao precisa passar pela pagina de login antes do POST.
+    # Vindo direto, o servidor recusa a credencial correta com
+    # "Nome de usuario ou senha digitado incorretamente".
+    curl -sS -L --proto '=https' --proto-redir '=https' \
+        --connect-timeout 15 --max-time 45 \
+        -c "$_cookie" -b "$_cookie" "${_url}/?sign_in=1" > /dev/null
+
+
     curl -sS -L --proto '=https' --proto-redir '=https' \
         --connect-timeout 15 --max-time 45 \
         -c "$_cookie" -b "$_cookie" \

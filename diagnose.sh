@@ -74,7 +74,7 @@ else printf "${R}FALHOU (HTTP %s)${N}\n" "$code"
 
 # ---- 2. cookie de sessao
 printf "2) Cookie de sessao... "
-curl -s -o /dev/null -A "$UA" -c "$CK" --max-time 25 "$URL/" 2>/dev/null
+curl -s -o /dev/null -A "$UA" -c "$CK" -b "$CK" --max-time 25 "$URL/?sign_in=1" 2>/dev/null
 if grep -q PHPSESSID "$CK" 2>/dev/null; then printf "${G}recebido${N}\n"
 else printf "${R}NAO recebido${N}\n"; printf "   O servidor nao criou sessao. Indicio de bloqueio de IP.\n"; fi
 
