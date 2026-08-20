@@ -222,19 +222,40 @@ Testado em **Ubuntu 26.04 LTS sobre WSL2**, com `/bin/sh` apontando para **dash*
 sudo apt update && sudo apt install -y git curl jq util-linux procps
 ```
 
-**2. Baixe e prepare**
+**2. Vá para a sua pasta pessoal**
+
+> **Importante — no WSL, não instale em pasta do Windows.** O terminal costuma abrir em `/mnt/c/...` (o disco do Windows visto de dentro do Linux). Dois problemas surgem daí:
+>
+> - **erro na instalação:** pastas do sistema como `/mnt/c/Windows/System32` são somente leitura, e o `git clone` falha com `could not create work tree dir: Permission denied`;
+> - **suas credenciais ficam desprotegidas:** o WSL **não aplica permissões POSIX** em `/mnt/c`. Um `chmod 600` no `accounts.conf` é silenciosamente ignorado e o arquivo permanece `777` — legível e gravável por qualquer um. Testado e confirmado.
+>
+> A pasta pessoal do Linux (`~`, ou seja `/home/seu-usuario`) fica no sistema de arquivos ext4 real, onde as permissões funcionam. É lá que o bot deve ficar.
+
+```bash
+cd ~
+```
+
+**3. Baixe e prepare**
 
 ```bash
 git clone https://github.com/Theoswd/TitasWar-Sung-Jinwoo.git && cd TitasWar-Sung-Jinwoo && chmod +x play.sh setup.sh stop.sh worker.sh twm.sh
 ```
 
-**3. Verifique a integridade**
+**4. Verifique a integridade**
 
 ```bash
 sha256sum -c .integrity --quiet && echo "Scripts íntegros"
 ```
 
-**4. Cadastre e rode**
+Confirme também que as permissões estão sendo aplicadas de verdade:
+
+```bash
+touch .permcheck && chmod 600 .permcheck && ls -l .permcheck && rm .permcheck
+```
+
+Deve mostrar `-rw-------`. Se mostrar `-rwxrwxrwx`, você está numa pasta do Windows — volte ao passo 2.
+
+**5. Cadastre e rode**
 
 ```bash
 ./setup.sh
@@ -365,6 +386,28 @@ cd ~/TitasWar-Sung-Jinwoo && sha256sum -c .integrity --quiet && echo "Nenhum scr
 ---
 
 ## Solução de problemas
+
+<details>
+<summary><b>"could not create work tree dir: Permission denied" ao clonar</b></summary>
+
+Você está tentando instalar numa pasta do Windows (o terminal do WSL costuma abrir em `/mnt/c/Windows/System32`, que é somente leitura).
+
+Vá para a sua pasta pessoal do Linux e repita:
+
+```bash
+cd ~ && git clone https://github.com/Theoswd/TitasWar-Sung-Jinwoo.git && cd TitasWar-Sung-Jinwoo && chmod +x play.sh setup.sh stop.sh worker.sh twm.sh
+```
+
+Isto não é só sobre o erro: em `/mnt/c` o WSL **não aplica permissões POSIX**, então o `chmod 600` do `accounts.conf` seria ignorado e suas credenciais ficariam com acesso liberado. Instale sempre em `~`.
+
+Para conferir onde você está:
+
+```bash
+pwd
+```
+
+Deve começar com `/home/`, não com `/mnt/`.
+</details>
 
 <details>
 <summary><b>"Login nao confirmado automaticamente" ao cadastrar</b></summary>
