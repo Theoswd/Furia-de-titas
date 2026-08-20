@@ -247,40 +247,80 @@ printf "Parar tudo:    ${CYAN}./stop.sh${RESET}\n\n"
 if [ -t 1 ]; then HAS_TTY=1; else HAS_TTY=0; fi
 [ "$HAS_TTY" = 0 ] && echo "[monitor] supervisionando $n conta(s); painel oculto (sem terminal)"
 
-LINHA="━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+# Cores
+C_RESET='\033[0m';   C_DIM='\033[2m';      C_BOLD='\033[1m'
+C_CYAN='\033[1;36m'; C_GREEN='\033[1;32m'; C_YELLOW='\033[1;33m'
+C_RED='\033[1;31m';  C_MAG='\033[1;35m';   C_WHITE='\033[1;37m'
+C_GOLD='\033[0;33m'; C_GRAY='\033[0;37m';  C_BLUE='\033[1;34m'
 
-# Emoji conforme o estado do worker
-estado_emoji() {
+# Emoji ou ASCII.
+#
+# Muitos terminais (Windows Terminal sem fonte de emoji, consoles antigos)
+# desenham quadrados no lugar dos simbolos. Por isso o padrao e ASCII com
+# cor, que funciona em qualquer lugar. Para ligar os emoji:
+#     TWM_EMOJI=1 ./play.sh
+if [ "${TWM_EMOJI:-0}" = "1" ]; then
+    I_HP="❤️ "; I_EN="⚡ "; I_LV="⭐ "; I_GO="🪙 "; I_SI="🥈 "
+    I_TIT="🎮 "; I_ACT="📋 "; I_MON="💰 "; I_ARROW="▸"
+    S_ON="🟢"; S_WAIT="🟡"; S_ERR="🔴"; S_OFF="⚫"; S_UNK="⚪"
+    A_ARENA="⚔️  Arena"; A_CAR="🎖️  Carreira"; A_CAVE="⛏️  Caverna"
+    A_CAMP="🗺️  Campanha"; A_COL="🏛️  Coliseu"; A_CLAN="🛡️  Clã"
+    A_KING="👑  Rei"; A_TRADE="💱  Troca"; A_QUEST="📜  Missões"
+    A_REL="💎  Relíquias"; A_ALT="🔥  Altares"; A_LEAG="🏆  Liga"
+    A_EV="🎉  Evento"; A_IDLE="💤  Aguardando"; A_NONE="—"
+else
+    I_HP="HP"; I_EN="EN"; I_LV="LV"; I_GO="OU"; I_SI="PR"
+    I_TIT=""; I_ACT=""; I_MON=""; I_ARROW="->"
+    S_ON="[on]"; S_WAIT="[..]"; S_ERR="[ER]"; S_OFF="[--]"; S_UNK="[??]"
+    A_ARENA="Arena"; A_CAR="Carreira"; A_CAVE="Caverna"
+    A_CAMP="Campanha"; A_COL="Coliseu"; A_CLAN="Cla"
+    A_KING="Rei"; A_TRADE="Troca"; A_QUEST="Missoes"
+    A_REL="Reliquias"; A_ALT="Altares"; A_LEAG="Liga"
+    A_EV="Evento"; A_IDLE="Aguardando"; A_NONE="-"
+fi
+
+LINHA="--------------------------------------------------------------------"
+
+estado_cor() {
     case "$1" in
-        running)                          echo "🟢" ;;
-        starting|loading|login_retry|restarting) echo "🟡" ;;
-        dead)                             echo "🔴" ;;
-        stopped)                          echo "⚫" ;;
-        *)                                echo "⚪" ;;
+        running)                                echo "$C_GREEN" ;;
+        starting|loading|login_retry|restarting) echo "$C_YELLOW" ;;
+        dead)                                   echo "$C_RED" ;;
+        stopped)                                echo "$C_GRAY" ;;
+        *)                                      echo "$C_GRAY" ;;
+    esac
+}
+estado_simbolo() {
+    case "$1" in
+        running)                                echo "$S_ON" ;;
+        starting|loading|login_retry|restarting) echo "$S_WAIT" ;;
+        dead)                                   echo "$S_ERR" ;;
+        stopped)                                echo "$S_OFF" ;;
+        *)                                      echo "$S_UNK" ;;
     esac
 }
 
 # Descobre o que a conta esta fazendo agora, a partir do log
 atividade_de() {
     _lg="$1"
-    [ -f "$_lg" ] || { echo "—"; return; }
-    _l=`tail -n 25 "$_lg" 2>/dev/null | grep -iE "Arena|Career|Carreira|Cave|Caverna|Campaign|Campanha|Coliseu|Coliseum|Clan|King|Rei|Trade|Missions|Quest|Relic|Altars|League|Liga|Event|aguardando" | tail -n 1`
+    [ -f "$_lg" ] || { echo "$A_NONE"; return; }
+    _l=`tail -n 25 "$_lg" 2>/dev/null | grep -iE "Arena|Career|Carreira|Cave|Caverna|Campaign|Campanha|Coliseu|Coliseum|Clan|King|Rei|Trade|Troca|Missions|Quest|Relic|Altars|League|Liga|Event|aguardando" | tail -n 1`
     case "$_l" in
-        *Arena*|*arena*)             echo "⚔️  Arena" ;;
-        *Career*|*Carreira*)         echo "🎖️  Carreira" ;;
-        *Cave*|*Caverna*|*caverna*)  echo "⛏️  Caverna" ;;
-        *Campaign*|*Campanha*)       echo "🗺️  Campanha" ;;
-        *Colise*|*colise*)           echo "🏛️  Coliseu" ;;
-        *Clan*|*clan*)               echo "🛡️  Clã" ;;
-        *King*|*Rei*)                echo "👑  Rei" ;;
-        *Trade*|*Troca*)             echo "💱  Troca" ;;
-        *Quest*|*Mission*|*Missao*)  echo "📜  Missões" ;;
-        *Relic*|*Reliquia*)          echo "💎  Relíquias" ;;
-        *Altars*|*Altares*)          echo "🔥  Altares" ;;
-        *League*|*Liga*)             echo "🏆  Liga" ;;
-        *Event*|*Evento*)            echo "🎉  Evento" ;;
-        *aguardando*)                echo "💤  Aguardando" ;;
-        *)                           echo "—" ;;
+        *Arena*|*arena*)             echo "$A_ARENA" ;;
+        *Career*|*Carreira*)         echo "$A_CAR" ;;
+        *Cave*|*Caverna*|*caverna*)  echo "$A_CAVE" ;;
+        *Campaign*|*Campanha*)       echo "$A_CAMP" ;;
+        *Colise*|*colise*)           echo "$A_COL" ;;
+        *Clan*|*clan*)               echo "$A_CLAN" ;;
+        *King*|*Rei*)                echo "$A_KING" ;;
+        *Trade*|*Troca*)             echo "$A_TRADE" ;;
+        *Quest*|*Mission*|*Missao*)  echo "$A_QUEST" ;;
+        *Relic*|*Reliquia*)          echo "$A_REL" ;;
+        *Altars*|*Altares*)          echo "$A_ALT" ;;
+        *League*|*Liga*)             echo "$A_LEAG" ;;
+        *Event*|*Evento*)            echo "$A_EV" ;;
+        *aguardando*)                echo "$A_IDLE" ;;
+        *)                           echo "$A_NONE" ;;
     esac
     unset _lg _l
 }
@@ -317,7 +357,6 @@ while true; do
         [ "$status" = "running" ] && n_on=$((n_on + 1)) || n_off=$((n_off + 1))
         idx=$((idx + 1))
 
-        # Dados gravados pelo worker (sem requisicao extra aqui)
         nome="$user"; hp="-"; mp="-"; ene="-"; lvl="-"; ouro="-"; prata="-"
         if [ -s "$acc_dir/stats" ]; then
             IFS='|' read -r nome hp mp ene lvl ouro prata _ts < "$acc_dir/stats"
@@ -326,26 +365,38 @@ while true; do
         case "$ouro"  in ''|*[!0-9]*) ;; *) tot_ouro=$((tot_ouro + ouro)) ;; esac
         case "$prata" in ''|*[!0-9]*) ;; *) tot_prata=$((tot_prata + prata)) ;; esac
 
-        em=$(estado_emoji "$status")
-        LISTA="${LISTA}$(printf ' %2s %s %-18.18s ❤️ %-7s ⚡ %-6s ⭐ %-4s 🪙 %-8s 🥈 %s' \
-              "$idx" "$em" "$nome" "$hp" "$ene" "$lvl" "$ouro" "$prata")
+        cor=$(estado_cor "$status")
+        sim=$(estado_simbolo "$status")
+        LISTA="${LISTA}$(printf "%b%2s %s %b%-18.18s %b%s %-7s %b%s %-6s %b%s %-4s %b%s %-8s %b%s %s%b" \
+            "$C_DIM" "$idx" "$C_RESET" \
+            "$cor$sim $C_WHITE" "$nome" \
+            "$C_RED" "$I_HP" "$hp" \
+            "$C_YELLOW" "$I_EN" "$ene" \
+            "$C_MAG" "$I_LV" "$lvl" \
+            "$C_GOLD" "$I_GO" "$ouro" \
+            "$C_GRAY" "$I_SI" "$prata" "$C_RESET")
 "
-        ATIV="${ATIV}$(printf '    %-18.18s ▸ %s' "$nome" "$(atividade_de "$acc_dir/twm.log")")
+        ATIV="${ATIV}$(printf "    %b%-18.18s %b%s %b%s%b" \
+            "$C_WHITE" "$nome" "$C_DIM" "$I_ARROW" "$C_CYAN" "$(atividade_de "$acc_dir/twm.log")" "$C_RESET")
 "
     done 3< "$ACCOUNTS_FILE"
 
     if [ "$HAS_TTY" = 1 ]; then
-        printf '%s\n' "$LINHA"
-        printf '  🎮 TWM Multi-contas · BR%*s%s\n' 28 '' "$agora"
-        printf '%s\n' "$LINHA"
-        printf '%s' "$LISTA"
-        printf '%s\n' "$LINHA"
-        printf '  📋 ATIVIDADE EM CONJUNTO\n'
-        printf '%s' "$ATIV"
-        printf '%s\n' "$LINHA"
-        printf '  🟢 %s online   🔴 %s parada(s)      💰 Ouro %s   🥈 Prata %s\n' \
-               "$n_on" "$n_off" "$tot_ouro" "$tot_prata"
-        printf '%s\n' "$LINHA"
+        printf "%b%s%b\n" "$C_BLUE" "$LINHA" "$C_RESET"
+        printf "  %b%sTWM Multi-contas%b %b· BR%b%*s%b%s%b\n" \
+               "$C_CYAN$C_BOLD" "$I_TIT" "$C_RESET" "$C_DIM" "$C_RESET" 26 '' "$C_WHITE" "$agora" "$C_RESET"
+        printf "%b%s%b\n" "$C_BLUE" "$LINHA" "$C_RESET"
+        printf "%b" "$LISTA"
+        printf "%b%s%b\n" "$C_BLUE" "$LINHA" "$C_RESET"
+        printf "  %b%sATIVIDADE EM CONJUNTO%b\n" "$C_CYAN$C_BOLD" "$I_ACT" "$C_RESET"
+        printf "%b" "$ATIV"
+        printf "%b%s%b\n" "$C_BLUE" "$LINHA" "$C_RESET"
+        printf "  %b%s %s online%b   %b%s %s parada(s)%b      %b%sOuro %s%b   %b%sPrata %s%b\n" \
+               "$C_GREEN" "$S_ON" "$n_on" "$C_RESET" \
+               "$C_RED" "$S_ERR" "$n_off" "$C_RESET" \
+               "$C_GOLD" "$I_MON" "$tot_ouro" "$C_RESET" \
+               "$C_GRAY" "" "$tot_prata" "$C_RESET"
+        printf "%b%s%b\n" "$C_BLUE" "$LINHA" "$C_RESET"
     fi
 
     _i=0

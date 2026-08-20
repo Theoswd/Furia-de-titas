@@ -94,6 +94,34 @@ printf "[%s] %s — iniciando (modo %s)\n" "$TWM_TAG" "$TWM_USER" "$RUN"
 
 # Login com retry — delay crescente com jitter, nunca mata o worker
 do_login() {
+    # REAPROVEITA A SESSAO EXISTENTE.
+    #
+    # O servidor manda Set-Cookie: PHPSESSID com Max-Age de 30 dias.
+    # A versao anterior fazia um POST de login a cada inicializacao,
+    # mesmo com a sessao ainda valida no cookie.txt. Com varias contas
+    # reiniciando, isso gerava rajadas de autenticacao do mesmo IP — e o
+    # servidor passa a recusar com a MESMA mensagem de "senha incorreta",
+    # o que faz o problema parecer credencial errada quando nao e.
+    #
+    # Testar a sessao custa uma requisicao GET; autenticar custa duas e
+    # conta para o limite. Na pratica isso elimina quase todos os logins.
+    if [ -s "$TMP_COOKIE" ]; then
+        PAGE=$(run_curl "${URL}/user")
+        if is_logged_in "$PAGE"; then
+            ACC=$(extract_username "$PAGE")
+            [ -z "$ACC" ] && ACC="$TWM_USER"
+            export ACC
+            fetch_max_hp 2>/dev/null
+            parse_status "$PAGE"
+            messages_info
+            printf "[%s] %s — sessao reaproveitada (sem novo login)
+" "$TWM_TAG" "$ACC"
+            unset PAGE
+            return 0
+        fi
+        unset PAGE
+    fi
+
     cript_file="$TMP/cript_file"
     if [ ! -s "$cript_file" ]; then
         printf "[%s] %s — ERRO: sem credenciais\n" "$TWM_TAG" "$TWM_USER"
@@ -161,8 +189,13 @@ while true; do
     [ -n "$TWM_STATUS_FILE" ] && echo "login_retry" > "$TWM_STATUS_FILE"
     sleep "$_wait"
 
-    [ "$login_delay" -lt 300 ] && login_delay=$((login_delay * 2))
-    [ "$login_delay" -gt 300 ] && login_delay=300
+    # Teto maior apos varias falhas seguidas. O servidor penaliza
+    # tentativas repetidas do mesmo IP e responde com a mesma mensagem
+    # de "senha incorreta", entao insistir de 5 em 5 minutos mantem a
+    # punicao ativa. A partir da 4a falha o intervalo sobe para 15 min.
+    if [ "$login_try" -ge 4 ]; then _cap=900; else _cap=300; fi
+    [ "$login_delay" -lt "$_cap" ] && login_delay=$((login_delay * 2))
+    [ "$login_delay" -gt "$_cap" ] && login_delay=$_cap
     rm -f "$TMP_COOKIE"
 done
 
