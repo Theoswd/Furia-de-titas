@@ -588,10 +588,24 @@ Apaga todos os dados de execução, mas **mantém** as contas cadastradas:
 
 ## Desinstalar
 
-Remove o bot e **todos** os dados, inclusive as contas cadastradas.
+O script de desinstalação remove **tudo**: processos em execução, o serviço do systemd (se instalado), os dados das contas em `~/.twm`, instalações antigas e o próprio diretório do bot. Ele mostra o que será apagado e exige que você digite `REMOVER` para confirmar.
 
 ```bash
-cd ~ && rm -rf TitasWar-Sung-Jinwoo ~/.twm
+cd ~/TitasWar-Sung-Jinwoo && ./uninstall.sh
+```
+
+> Isso apaga o `accounts.conf` — as contas cadastradas se perdem e precisarão ser cadastradas de novo. **Suas contas no jogo não são afetadas**, apenas o cadastro local.
+
+Se preferir fazer na mão, o equivalente completo é:
+
+```bash
+pkill -f twm.sh; pkill -f worker.sh; pkill -f play.sh; sudo systemctl stop twm 2>/dev/null; sudo systemctl disable twm 2>/dev/null; sudo rm -f /etc/systemd/system/twm.service; cd ~ && rm -rf TitasWar-Sung-Jinwoo ~/.twm ~/twm ~/.multcf
+```
+
+Os pacotes instalados (`git`, `curl`, `jq`) ficam no sistema por serem utilitários comuns. Para removê-los também:
+
+```bash
+sudo apt remove --purge jq
 ```
 
 ---
@@ -604,7 +618,8 @@ TitasWar-Sung-Jinwoo/
 ├── worker.sh        Supervisiona uma conta (reinicia o twm.sh se cair)
 ├── twm.sh           Loop de jogo de uma conta (login + ciclo principal)
 ├── setup.sh         Menu de cadastro/remoção/teste de contas
-├── stop.sh          Encerra todos os workers
+├── stop.sh          Encerra todos os workers e o monitor
+├── uninstall.sh     Remove o bot e todos os dados do sistema
 ├── diagnose.sh      Diagnostica falha de login de uma conta
 ├── install-service.sh  Instala como servico do systemd (VPS/Linux)
 │

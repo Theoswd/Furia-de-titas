@@ -61,6 +61,17 @@ for pid_file in "$STATUS_DIR"/*.pid; do
     rm -f "$pid_file"
 done
 
+# CORRECAO: o stop.sh encerrava os workers mas NAO o proprio play.sh,
+# que continua rodando como monitor e relancando workers. Cada ./play.sh
+# deixava mais um monitor vivo, e varios supervisores concorriam pelas
+# mesmas contas. Agora o orquestrador tambem e encerrado.
+for p in $(pgrep -f "$TWMDIR/play.sh" 2>/dev/null); do
+    [ "$p" = "$$" ] && continue
+    kill -TERM "$p" 2>/dev/null
+done
+sleep 1
+pkill -KILL -f "$TWMDIR/play.sh" 2>/dev/null
+
 # Rede de seguranca para orfaos de execucoes antigas (antes do setsid).
 pkill -f "$TWMDIR/twm.sh" 2>/dev/null
 pkill -f "$TWMDIR/worker.sh" 2>/dev/null
