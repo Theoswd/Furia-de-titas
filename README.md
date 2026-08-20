@@ -1,264 +1,251 @@
-# TWM — Titans War Macro
+# Fúria de Titãs
 
-Bot multi-contas para **[Titans War BR](https://furiadetitas.net)**, rodando em segundo plano no Termux, WSL, Linux ou VPS. Cada conta roda isolada em seu próprio processo, com cookie, configuração e log próprios.
+Bot multi-contas para **[Fúria de Titãs](https://furiadetitas.net)**.
 
-**Autoria: Stephenn Curry** · Licença CC0 1.0 (domínio público)
-
----
-
-## Antes de instalar
-
-**Automação viola os termos de uso do jogo e pode resultar em banimento das suas contas.** Não existe configuração que elimine esse risco. Você assume essa decisão.
-
-- use uma **senha exclusiva** para as contas do jogo;
-- não compartilhe backups da pasta do bot nem de `~/.twm`;
-- comece com poucas contas e observe alguns dias antes de escalar.
+**Autoria: Stephenn Curry** · Licença CC0 1.0
 
 ---
 
-## O que o bot faz
+## Aviso
 
-### Ordem de prioridade dos eventos
-
-Quando um evento está no horário, ele vem antes de qualquer rotina comum:
-
-1. **Torneio dos Clãs**
-2. **Altares dos Deuses**
-3. **Vale dos Imortais**
-4. **Rei dos Imortais**
-5. **Coliseu do Clã**
-
-### Fora dos horários de evento
-
-| Atividade | Quando |
-|---|---|
-| **Missões do Clã** | prioridade máxima — verificadas antes de qualquer atividade |
-| **Arena** | a cada 30 minutos |
-| **Caverna** | sempre que disponível |
-| **Carreira** | sempre que disponível |
-| **Campanha** | sempre que disponível |
-| **Cabana do Sábio** | missões, coleções e relíquias |
-| **Liga dos Favoritos** | conforme configuração |
-| **Masmorra do Clã** | a cada 8 h — o bot calcula o próximo horário após cada ataque |
-| **Troca prata → ouro** | conforme configuração |
-| **Coliseu** | todas as contas, das **00:30 às 04:30** |
-
-### Regras de combinação
-
-O bot **verifica as missões do clã antes** de iniciar Caverna, Carreira, Arena, Liga, elixir e coleta de pedras/evas. Se houver missão que aquela atividade completa, ele executa as duas em conjunto em vez de gastar a atividade à toa.
-
-Também **apoia missões de outros membros** que estejam perto de concluir. O gasto de ouro em ajuda é limitado a **uma vez** por ciclo.
-
-### Regras de ouro
-
-- Missão parada com **mais de 1200 de ouro** disponível: o bot força a conclusão usando ouro.
-- Ajuda a missão de companheiro: pode consumir ouro **uma única vez**.
-
-### Batalhas
-
-Sempre usa **elixir** e **bênção** antes de entrar.
-
-### Liderança de clã
-
-Se a conta for **líder**, o bot mantém a **estátua do clã** ativa com bônus de ouro e bônus de prata.
-
-### Descanso
-
-Entre ciclos, as contas ficam na **página inicial** — não em páginas de combate ou de evento.
-
----
-## Requisitos
-
-- conta no Titans War BR com **level 16+** e 50 pontos de treinamento para algumas batalhas;
-- conexão estável;
-- um destes ambientes:
-
-| Ambiente | Observação |
-|---|---|
-| **Termux** (Android) | instale **[pela F-Droid](https://f-droid.org/packages/com.termux/)** — a versão da Play Store não funciona |
-| **VPS Linux** | melhor opção para uso 24/7, com serviço systemd |
-| **Ubuntu / Debian / WSL** | testado e verificado |
+Automação viola os termos de uso do jogo e pode resultar em **banimento das contas**. Você assume esse risco.
 
 ---
 
-## Instalação
+## Instalação — Termux (Android)
 
-### Termux
+Instale o Termux **[pela F-Droid](https://f-droid.org/packages/com.termux/)**. A versão da Play Store não funciona.
+
+**1.** Atualize os pacotes:
 
 ```bash
 pkg update && pkg upgrade -y
 ```
 
+**2.** Instale as dependências:
+
 ```bash
 pkg install git curl wget jq util-linux -y
 ```
+
+**3.** Impeça o Android de encerrar o bot:
 
 ```bash
 termux-wake-lock
 ```
 
-> Vá também em **Configurações do Android → Bateria → Termux** e marque **"Sem restrições"**. Sem isso o Android encerra o bot com a tela desligada.
+> Vá também em **Configurações → Bateria → Termux** e marque **"Sem restrições"**.
+
+**4.** Baixe o bot:
 
 ```bash
-cd ~ && git clone https://github.com/Theoswd/TitasWar-Sung-Jinwoo.git && cd TitasWar-Sung-Jinwoo
+cd ~ && git clone https://github.com/Theoswd/Furia-de-titas.git && cd Furia-de-titas
 ```
+
+**5.** Verifique a integridade:
 
 ```bash
-sha256sum -c .integrity --quiet && echo "Scripts íntegros"
+sha256sum -c .integrity --quiet && echo "Scripts integros"
 ```
 
-### Ubuntu, Debian, WSL ou VPS
-
-```bash
-sudo apt update && sudo apt install -y git curl jq util-linux procps
-```
-
-```bash
-cd ~ && git clone https://github.com/Theoswd/TitasWar-Sung-Jinwoo.git && cd TitasWar-Sung-Jinwoo
-```
-
-> **No WSL, instale sempre em `~`, nunca em `/mnt/c`.** Em pastas do Windows o Linux não aplica permissões POSIX: o `chmod 600` do `accounts.conf` é ignorado e suas credenciais ficam com acesso liberado. Confira com `pwd` — deve começar com `/home/`.
-
-```bash
-sha256sum -c .integrity --quiet && echo "Scripts íntegros"
-```
-
----
-
-## Uso
-
-**Cadastrar contas** — pede usuário e senha (a senha não aparece na tela) e testa o login antes de salvar:
+**6.** Cadastre as contas:
 
 ```bash
 ./setup.sh
 ```
 
-**Iniciar:**
+**7.** Inicie:
 
 ```bash
 ./play.sh
 ```
 
-**Modos:**
+---
 
-| Comando | Efeito |
-|---|---|
-| `./play.sh` | rotina completa, seguindo a agenda |
-| `./play.sh -cv` | foco exclusivo na caverna |
-| `./play.sh -cl` | prioriza o coliseu |
+## Instalação — WSL (Windows)
 
-**Parar tudo:**
+**1.** Instale as dependências:
 
 ```bash
-./stop.sh
+sudo apt update && sudo apt install -y git curl jq util-linux procps
 ```
 
-**Log de uma conta:**
+**2.** Vá para a pasta pessoal do Linux:
 
 ```bash
-tail -f ~/.twm/BR_NomeConta/twm.log
+cd ~
 ```
+
+> **Nunca instale em `/mnt/c`.** Em pastas do Windows o Linux não aplica permissões, e o arquivo de credenciais fica com acesso liberado. Confira com `pwd` — deve começar com `/home/`.
+
+**3.** Baixe o bot:
+
+```bash
+git clone https://github.com/Theoswd/Furia-de-titas.git && cd Furia-de-titas
+```
+
+**4.** Verifique a integridade:
+
+```bash
+sha256sum -c .integrity --quiet && echo "Scripts integros"
+```
+
+**5.** Cadastre as contas:
+
+```bash
+./setup.sh
+```
+
+**6.** Inicie:
+
+```bash
+./play.sh
+```
+
+> Para o bot continuar rodando depois de fechar o terminal, use `tmux`:
+>
+> ```bash
+> sudo apt install -y tmux && tmux new -s twm
+> ```
+>
+> Rode o `./play.sh` dentro da sessão e saia com **Ctrl+B** depois **D**. Para voltar: `tmux attach -t twm`.
 
 ---
 
-## O painel
+## Instalação — iSH (iPhone / iPad)
 
-```
---------------------------------------------------------------------
-  TWM Multi-contas · BR                                     18:38:12
---------------------------------------------------------------------
- 1 [on] Grimlock           HP 65312   EN 2125   LV 90   OU 402   PR 408,1M
- 2 [on] Aro Borne          HP 37328   EN 2110   LV 87   OU 674   PR 673M
- 3 [on] Abyssal Draco      HP 602     EN 1410   LV 40   OU 51    PR 20M
---------------------------------------------------------------------
-  ATIVIDADE EM CONJUNTO
-    Grimlock           -> Arena
-    Aro Borne          -> Caverna
-    Abyssal Draco      -> Missões
---------------------------------------------------------------------
-  [on] 3 online   [ER] 0 parada(s)     Próximo: Torneio dos Clãs  18:55 BRT  (em 17m)
---------------------------------------------------------------------
-```
-
-Verde = online, amarelo = conectando, vermelho = erro. O rodapé mostra o próximo evento agendado, sempre em horário de Brasília.
-
-Emoji no lugar do ASCII (exige fonte com emoji no terminal):
+**1.** Instale as dependências:
 
 ```bash
-TWM_EMOJI=1 ./play.sh
+apk update && apk add git curl jq tzdata bash
 ```
+
+**2.** Baixe o bot:
+
+```bash
+cd ~ && git clone https://github.com/Theoswd/Furia-de-titas.git && cd Furia-de-titas
+```
+
+**3.** Verifique a integridade:
+
+```bash
+sha256sum -c .integrity --quiet && echo "Scripts integros"
+```
+
+**4.** Cadastre as contas:
+
+```bash
+./setup.sh
+```
+
+**5.** Inicie:
+
+```bash
+./play.sh
+```
+
+> **O iOS suspende aplicativos em segundo plano.** O bot para quando você sai do iSH ou bloqueia a tela, e não há como evitar isso. A emulação também é lenta. Para uso contínuo, prefira Termux ou WSL.
 
 ---
 
-## Rodar como serviço (VPS/Linux)
-
-Inicia sozinho no boot e reinicia se cair:
-
-```bash
-./install-service.sh && sudo systemctl start twm
-```
+## Comandos
 
 | O quê | Comando |
 |---|---|
-| Estado | `systemctl status twm` |
-| Log ao vivo | `journalctl -u twm -f` |
-| Parar | `sudo systemctl stop twm` |
-
----
-## Diagnóstico
-
-Quando uma conta não loga, este comando mostra exatamente o que o servidor responde (a senha nunca é exibida):
-
-```bash
-./diagnose.sh
-```
-
-```bash
-./diagnose.sh 2
-```
-
-| Conclusão | Significa |
-|---|---|
-| **LOGIN FUNCIONOU** | sessão ativa; se o bot discorda, é falha de detecção |
-| **O SERVIDOR RECUSOU** | senha errada, conta suspensa, ou o nome não é o de login |
-| **Formulário sem erro** | sessão descartada — indício de bloqueio de IP |
+| Iniciar | `./play.sh` |
+| Parar tudo | `./stop.sh` |
+| Cadastrar contas | `./setup.sh` |
+| Diagnosticar login | `./diagnose.sh` |
+| Ver log de uma conta | `tail -f ~/.twm/BR_NomeConta/twm.log` |
 
 ---
 
-## Segurança
+## Atualização
 
-**Onde ficam as credenciais.** Em `accounts.conf`, na pasta do bot, codificadas em base64.
+**A atualização automática está desativada de propósito.** A versão anterior baixava e sobrescrevia os scripts sozinha, todo dia, a partir de um repositório de terceiro, sem verificar assinatura nem integridade — isso é execução de código arbitrário no seu aparelho. Além disso, o download não checava falhas: uma resposta de erro do servidor podia **truncar seus arquivos**.
 
-> **Base64 não é criptografia** — é reversível por qualquer um com acesso ao arquivo. A proteção real vem das permissões: `600` no arquivo, `700` em `~/.twm`.
-
-**Para onde a senha vai.** Apenas para `furiadetitas.net`. O código restringe o destino a um único domínio, sem caso genérico — não existe entrada de dados que faça a senha ir para outro lugar. Nenhum terceiro recebe nada.
-
-**Atualização automática desativada.** Atualizar é manual e revisável:
+Atualize sempre manualmente:
 
 ```bash
-./stop.sh && git pull && sha256sum -c .integrity --quiet && ./play.sh
+cd ~/Furia-de-titas && ./stop.sh && git pull && sha256sum -c .integrity --quiet && ./play.sh
 ```
 
-**Verificar integridade a qualquer momento:**
+Para revisar o que mudou **antes** de aplicar:
 
 ```bash
-sha256sum -c .integrity --quiet && echo "Nenhum script foi alterado"
+cd ~/Furia-de-titas && git fetch && git log --oneline HEAD..origin/main
 ```
 
-O `.gitignore` impede que `accounts.conf`, cookies e logs sejam enviados caso você publique um fork. Nunca remova essas linhas.
+---
+
+## Integridade
+
+O arquivo `.integrity` guarda a soma SHA-256 de cada script. Serve para confirmar que nenhum arquivo foi alterado — por atualização malfeita, edição acidental ou modificação de terceiro.
+
+Verifique a qualquer momento:
+
+```bash
+cd ~/Furia-de-titas && sha256sum -c .integrity --quiet && echo "Nenhum script foi alterado"
+```
+
+Se aparecer alguma linha de erro, um script está diferente do publicado. Nesse caso, restaure:
+
+```bash
+cd ~/Furia-de-titas && git checkout -- . && git pull
+```
+
+Se você mesmo editar algum script, gere um novo baseline:
+
+```bash
+cd ~/Furia-de-titas && sha256sum *.sh | sort -k2 > .integrity
+```
 
 ---
 
 ## Solução de problemas
 
 <details>
-<summary><b>A conta fica presa em "login..."</b></summary>
+<summary><b>A conta não loga / fica presa em "login..."</b></summary>
+
+Rode o diagnóstico. Ele mostra o que o servidor responde e **nunca exibe a senha**:
+
+```bash
+./diagnose.sh
+```
+
+Depois com o número da conta:
 
 ```bash
 ./diagnose.sh 1
 ```
 
-O intervalo entre tentativas dobra a cada falha (30s → 60s → … → 15 min). Se persistir, a senha provavelmente mudou: recadastre pelo `./setup.sh`.
+| Resultado | Significa |
+|---|---|
+| **LOGIN FUNCIONOU** | a sessão está ativa |
+| **O SERVIDOR RECUSOU** | senha errada, conta suspensa, ou o nome não é o de login |
+| **Formulário sem erro** | sessão descartada — indício de bloqueio de IP |
+
+O intervalo entre tentativas dobra a cada falha, até 15 minutos.
+</details>
+
+<details>
+<summary><b>"could not create work tree dir: Permission denied"</b></summary>
+
+Você está numa pasta do Windows. Vá para a pasta do Linux:
+
+```bash
+cd ~ && git clone https://github.com/Theoswd/Furia-de-titas.git && cd Furia-de-titas
+```
+</details>
+
+<details>
+<summary><b>"Your local changes would be overwritten by merge"</b></summary>
+
+Descarte as alterações locais e atualize:
+
+```bash
+cd ~/Furia-de-titas && git checkout -- . && git pull
+```
 </details>
 
 <details>
@@ -274,24 +261,22 @@ E em **Configurações → Bateria → Termux**, marque **"Sem restrições"**.
 <details>
 <summary><b>Emoji aparecem como quadrados</b></summary>
 
-A fonte do terminal não os suporta. Use o modo padrão (ASCII colorido), sem a variável `TWM_EMOJI`.
+A fonte do terminal não os suporta. Use o modo padrão, sem a variável `TWM_EMOJI`.
 </details>
 
 <details>
-<summary><b>"could not create work tree dir: Permission denied"</b></summary>
-
-Você está numa pasta do Windows. Vá para a pasta do Linux:
+<summary><b>Contas duplicadas ou processos travados</b></summary>
 
 ```bash
-cd ~ && git clone https://github.com/Theoswd/TitasWar-Sung-Jinwoo.git
+./stop.sh && pkill -f twm.sh && ./play.sh
 ```
 </details>
 
 <details>
-<summary><b>Recomeçar do zero mantendo as contas</b></summary>
+<summary><b>Recomeçar do zero mantendo as contas cadastradas</b></summary>
 
 ```bash
-./stop.sh && rm -rf ~/.twm && ./play.sh
+cd ~/Furia-de-titas && ./stop.sh && rm -rf ~/.twm && ./play.sh
 ```
 </details>
 
@@ -299,49 +284,24 @@ cd ~ && git clone https://github.com/Theoswd/TitasWar-Sung-Jinwoo.git
 
 ## Desinstalar
 
-Remove processos, serviço, dados das contas e o próprio diretório. Pede confirmação digitando `REMOVER`:
+Remove **tudo**: processos, serviço, dados das contas e o próprio diretório. Pede confirmação digitando `REMOVER`:
 
 ```bash
-./uninstall.sh
+cd ~/Furia-de-titas && ./uninstall.sh
 ```
 
-> Apaga o `accounts.conf`. As contas **no jogo** não são afetadas, apenas o cadastro local.
+Para remover na mão, sem o script — este comando apaga **todas as pastas** do bot:
 
----
-
-## Estrutura
-
-```
-play.sh            Orquestrador: sobe um worker por conta e monitora
-worker.sh          Supervisiona uma conta, reinicia o twm.sh se cair
-twm.sh             Login e loop principal de uma conta
-setup.sh           Cadastro de contas
-stop.sh            Encerra workers e monitor
-diagnose.sh        Diagnóstico de login
-install-service.sh Instala como serviço do systemd
-uninstall.sh       Remove tudo do sistema
-
-run.sh             Agenda: o que executar em cada horário
-crono.sh           Pausa entre ciclos e rotina start()
-info.sh            Requisições HTTP, leitura de status, timeouts
-function.sh        Configuração por conta
-session_check.sh   Detecção de sessão
-loginlogoff.sh     Reconexão quando a sessão expira
-
-arena.sh  cave.sh  career.sh  campaign.sh  coliseum.sh  king.sh
-clanid.sh  clanfight.sh  clandmg.sh  clancoliseum.sh  altars.sh
-flagfight.sh  undying.sh  league.sh  trade.sh  allies.sh
-check.sh  specialevent.sh  language.sh
+```bash
+pkill -f twm.sh; pkill -f worker.sh; pkill -f play.sh; sudo systemctl stop twm 2>/dev/null; sudo systemctl disable twm 2>/dev/null; sudo rm -f /etc/systemd/system/twm.service; cd ~ && rm -rf Furia-de-titas ~/.twm ~/twm ~/twm_ANTIGO_NAO_USAR ~/.multcf
 ```
 
-Os dados de execução ficam fora do repositório, em `~/.twm/BR_<conta>/` — um diretório por conta.
+> Isso apaga as contas cadastradas. As contas **no jogo** não são afetadas.
 
 ---
 
 <div align="center">
 
-**Stephenn Curry**
-
-Licença CC0 1.0 — domínio público
+**Stephenn Curry** · CC0 1.0
 
 </div>

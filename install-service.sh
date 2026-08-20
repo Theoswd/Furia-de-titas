@@ -63,7 +63,7 @@ case "$_ok" in y|Y) ;; *) printf "Cancelado.\n"; exit 1 ;; esac
 sudo tee "$UNIT" > /dev/null <<UNITEOF
 [Unit]
 Description=TWM - Titans War Macro (multi-contas)
-Documentation=https://github.com/Theoswd/TitasWar-Sung-Jinwoo
+Documentation=https://github.com/Theoswd/Furia-de-titas
 After=network-online.target
 Wants=network-online.target
 
