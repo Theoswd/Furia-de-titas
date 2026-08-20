@@ -261,7 +261,7 @@ C_GOLD='\033[0;33m'; C_GRAY='\033[0;37m';  C_BLUE='\033[1;34m'
 #     TWM_EMOJI=1 ./play.sh
 if [ "${TWM_EMOJI:-0}" = "1" ]; then
     I_HP="❤️ "; I_EN="⚡ "; I_LV="⭐ "; I_GO="🪙 "; I_SI="🥈 "
-    I_TIT="🎮 "; I_ACT="📋 "; I_MON="💰 "; I_ARROW="▸"
+    I_TIT="🎮 "; I_ACT="📋 "; I_EVT="⏰ "; I_ARROW="▸"
     S_ON="🟢"; S_WAIT="🟡"; S_ERR="🔴"; S_OFF="⚫"; S_UNK="⚪"
     A_ARENA="⚔️  Arena"; A_CAR="🎖️  Carreira"; A_CAVE="⛏️  Caverna"
     A_CAMP="🗺️  Campanha"; A_COL="🏛️  Coliseu"; A_CLAN="🛡️  Clã"
@@ -270,7 +270,7 @@ if [ "${TWM_EMOJI:-0}" = "1" ]; then
     A_EV="🎉  Evento"; A_IDLE="💤  Aguardando"; A_NONE="—"
 else
     I_HP="HP"; I_EN="EN"; I_LV="LV"; I_GO="OU"; I_SI="PR"
-    I_TIT=""; I_ACT=""; I_MON=""; I_ARROW="->"
+    I_TIT=""; I_ACT=""; I_EVT=""; I_ARROW="->"
     S_ON="[on]"; S_WAIT="[..]"; S_ERR="[ER]"; S_OFF="[--]"; S_UNK="[??]"
     A_ARENA="Arena"; A_CAR="Carreira"; A_CAVE="Caverna"
     A_CAMP="Campanha"; A_COL="Coliseu"; A_CLAN="Cla"
@@ -281,19 +281,59 @@ fi
 
 LINHA="--------------------------------------------------------------------"
 
-# Converte "408,1M" / "12K" / "396" em inteiro, para os totais.
-para_num() {
-    _v=`printf %s "$1" | tr -d " "`
-    case "$_v" in
-        *K|*k) _m=1000 ;;
-        *M|*m) _m=1000000 ;;
-        *B|*b) _m=1000000000 ;;
-        *)     _m=1 ;;
-    esac
-    _d=`printf %s "$_v" | tr "," "." | tr -cd "0-9."`
-    [ -z "$_d" ] && { echo 0; return; }
-    awk -v d="$_d" -v m="$_m" 'BEGIN{ printf "%.0f", d*m }'
+# Agenda de eventos, extraida do case de horarios do run.sh.
+# Horarios em America/Bahia (BRT), que e o fuso usado pelos workers.
+EVENTOS="0005|Coliseu
+0925|Evento especial
+0955|Imortais
+1010|Batalha de Bandeiras
+1028|Coliseu do Cla
+1055|Batalha de Clas
+1225|Rei dos Imortais
+1355|Altares
+1458|Coliseu do Cla
+1555|Imortais
+1610|Batalha de Bandeiras
+1625|Rei dos Imortais
+1855|Batalha de Clas
+2055|Altares
+2125|Evento especial
+2155|Imortais
+2225|Rei dos Imortais"
+
+# Devolve: "Nome  HH:MM BRT  (em Xh Ym)"
+proximo_evento() {
+    _agora=`TZ=America/Bahia date +%H%M`
+    _ai=`printf %s "$_agora" | sed "s/^0*//"`; [ -z "$_ai" ] && _ai=0
+    _pn=""; _pt=""
+    # IFS so de nova linha: sem isto o "for" divide tambem nos espacos
+    # e nomes como "Coliseu do Cla" viram tres iteracoes.
+    _oifs=$IFS
+    IFS="
+"
+    for _e in $EVENTOS; do
+        _t=${_e%%|*}; _n=${_e#*|}
+        _ti=`printf %s "$_t" | sed "s/^0*//"`; [ -z "$_ti" ] && _ti=0
+        if [ "$_ti" -gt "$_ai" ]; then _pn=$_n; _pt=$_t; break; fi
+    done
+    IFS=$_oifs
+    # Nenhum restante hoje: o proximo e o primeiro de amanha.
+    if [ -z "$_pt" ]; then
+        _pe=`printf %s "$EVENTOS" | head -n1`
+        _pt=${_pe%%|*}; _pn=${_pe#*|}
+        _ti=`printf %s "$_pt" | sed "s/^0*//"`; [ -z "$_ti" ] && _ti=0
+        _falta=$(( (24*60) - (_ai/100*60 + _ai%100) + (_ti/100*60 + _ti%100) ))
+    else
+        _falta=$(( (_ti/100*60 + _ti%100) - (_ai/100*60 + _ai%100) ))
+    fi
+    _hh=`printf %s "$_pt" | cut -c1-2`; _mm=`printf %s "$_pt" | cut -c3-4`
+    if [ "$_falta" -ge 60 ]; then
+        printf "%s  %s:%s BRT  (em %dh%02dm)" "$_pn" "$_hh" "$_mm" $((_falta/60)) $((_falta%60))
+    else
+        printf "%s  %s:%s BRT  (em %dm)" "$_pn" "$_hh" "$_mm" "$_falta"
+    fi
 }
+
 
 estado_cor() {
     case "$1" in
@@ -343,7 +383,7 @@ while true; do
     [ "$HAS_TTY" = 1 ] && clear
     agora=$(date +%H:%M:%S)
 
-    tot_ouro=0; tot_prata=0; n_on=0; n_off=0; idx=0
+    n_on=0; n_off=0; idx=0
     LISTA=""; ATIV=""
 
     while IFS='|' read -r srv user _enc <&3; do
@@ -376,8 +416,6 @@ while true; do
             IFS='|' read -r nome hp mp ene lvl ouro prata _ts < "$acc_dir/stats"
             [ -z "$nome" ] && nome="$user"
         fi
-        [ "$ouro"  != "-" ] && tot_ouro=$((tot_ouro + $(para_num "$ouro")))
-        [ "$prata" != "-" ] && tot_prata=$((tot_prata + $(para_num "$prata")))
 
         cor=$(estado_cor "$status")
         sim=$(estado_simbolo "$status")
@@ -405,11 +443,10 @@ while true; do
         printf "  %b%sATIVIDADE EM CONJUNTO%b\n" "$C_CYAN$C_BOLD" "$I_ACT" "$C_RESET"
         printf "%b" "$ATIV"
         printf "%b%s%b\n" "$C_BLUE" "$LINHA" "$C_RESET"
-        printf "  %b%s %s online%b   %b%s %s parada(s)%b      %b%sOuro %s%b   %b%sPrata %s%b\n" \
+        printf "  %b%s %s online%b   %b%s %s parada(s)%b     %b%sProximo: %s%b\n" \
                "$C_GREEN" "$S_ON" "$n_on" "$C_RESET" \
                "$C_RED" "$S_ERR" "$n_off" "$C_RESET" \
-               "$C_GOLD" "$I_MON" "$tot_ouro" "$C_RESET" \
-               "$C_GRAY" "" "$tot_prata" "$C_RESET"
+               "$C_YELLOW" "$I_EVT" "$(proximo_evento)" "$C_RESET"
         printf "%b%s%b\n" "$C_BLUE" "$LINHA" "$C_RESET"
     fi
 
