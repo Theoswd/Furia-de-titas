@@ -22,7 +22,7 @@ twm_play() {
             # CORRECAO (seguranca — SEC-01): a chamada automatica a update()
             # foi REMOVIDA daqui. Ela baixava e sobrescrevia play.sh, twm.sh,
             # info.sh e outros a partir de um repositorio de TERCEIRO
-            # (hugoviegas/TitansWarPro), sem assinatura, sem checksum e sem
+            # de terceiro, sem assinatura, sem checksum e sem
             # curl --fail — ou seja, execucao de codigo arbitrario diaria, e
             # substituicao dos arquivos do modelo multi-contas pelos do modelo
             # de conta unica. Para atualizar, use "git pull" revisando o diff.

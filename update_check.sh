@@ -1,25 +1,9 @@
 # update_check.sh - Atualizacao MANUAL e verificavel
 #
-# A versao anterior desta funcao era o problema de seguranca mais grave do
-# projeto (SEC-01):
-#
-#   - baixava de https://raw.githubusercontent.com/hugoviegas/TitansWarPro/,
-#     um repositorio de TERCEIRO, diferente do que o usuario clonou;
-#   - sobrescrevia play.sh, twm.sh, info.sh e outros — ou seja, trocava os
-#     arquivos do modelo multi-contas pelos do modelo de conta unica;
-#   - nao verificava assinatura nem checksum;
-#   - usava "curl" sem --fail: um 404 tem corpo e sai com status 0, entao o
-#     texto de erro virava o novo conteudo do script (truncando o arquivo);
-#   - comparava versoes por "wc -c" (tamanho em bytes), que nao e integridade;
-#   - era disparada automaticamente as 23:30 (run.sh), com N contas rodando
-#     o mesmo update no mesmo diretorio ao mesmo tempo;
-#   - terminava com "sed -i" em massa sobre TODOS os .sh — inclusive os que
-#     estavam sendo interpretados naquele instante. O shell le scripts por
-#     offset de byte: alterar um arquivo em execucao faz o interpretador
-#     retomar no meio de um token.
-#
-# Agora a atualizacao e via git (integridade por SHA-1 de conteudo), exige
-# arvore limpa, so faz fast-forward e nunca roda sozinha.
+# A atualizacao automatica foi desativada de proposito. Baixar e sobrescrever
+# scripts sozinho, sem assinatura nem verificacao de integridade, e execucao
+# de codigo arbitrario no aparelho. Agora usa git (integridade por hash de
+# conteudo), exige arvore limpa, so aceita fast-forward e nunca roda sozinha.
 
 update() {
     if [ ! -t 0 ]; then
