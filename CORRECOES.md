@@ -268,6 +268,29 @@ Não matava nada — mas quem instalasse numa pasta chamada `twm` mataria **toda
 
 ---
 
+### 3.12 Portabilidade: `base64 -w 0` não existe no BusyBox · `setup.sh`
+
+```sh
+encoded=$(printf "login=%s&pass=%s" "$user" "$pass" | base64 -w 0)
+```
+
+A opção `-w` é do GNU coreutils. O **BusyBox não a implementa** — e BusyBox é o que o Alpine Linux usa, que por sua vez é o que o **iSH** (iOS) roda. Nesses ambientes o cadastro de contas falharia.
+
+**Correção:** `| base64 | tr -d '[:space:]'`, que produz saída idêntica e funciona em GNU coreutils, BusyBox e toybox. Verificado: as duas formas geram exatamente a mesma string.
+
+---
+
+## 3-A. Plataformas verificadas
+
+| Ambiente | Como foi verificado | Resultado |
+|---|---|---|
+| **Ubuntu 26.04 LTS / WSL2** (`/bin/sh` = dash) | executado | clone, integridade, sintaxe dos 33 scripts sob dash, carregamento dos 26 módulos, pausa do laço, 4 servidores por rede, encerramento por grupo de processos — **8/8** |
+| **Termux** (Android) | ambiente alvo original | scripts passam em `sh -n`; verificação final de `setsid`/`pid_max` pendente no aparelho |
+| **iSH / Alpine** (iOS) | auditoria de código contra o BusyBox | compatível após 3.12; **não executado** — sem dispositivo para teste |
+
+Uma descoberta do teste no WSL merece registro: o `pid_max` daquele sistema é **4194304**, ou seja, PIDs de **7 dígitos**. Isso confirma na prática o problema descrito em 2.6 — a regex `[0-9]{2,6}` truncaria o PID e o `kill` atingiria outro processo. Eu havia classificado esse risco como teórico por não ter conseguido confirmar; ele é real.
+
+---
 ## 4. Servidores
 
 Os 13 domínios foram resolvidos e testados individualmente pelo `<title>` da página.

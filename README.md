@@ -84,14 +84,21 @@ Resumo do que mudou na prática. O detalhamento técnico está em **[CORRECOES.m
 ---
 ## Requisitos
 
-- **Android** com **[Termux](https://f-droid.org/packages/com.termux/)** instalado **pela F-Droid**
-  (a versão da Play Store está desatualizada e **não funciona** com pacotes atuais);
 - conta no Titans War com **level 16+** e **50 pontos de treinamento** para algumas batalhas;
-- conexão de internet estável.
+- conexão de internet estável;
+- um dos ambientes abaixo:
+
+| Ambiente | Observação |
+|---|---|
+| **Termux** (Android) | recomendado — instale **[pela F-Droid](https://f-droid.org/packages/com.termux/)**; a versão da Play Store está desatualizada e **não funciona** com pacotes atuais |
+| **Ubuntu / Debian / WSL / VPS** | testado e verificado — veja **[Rodando em outros sistemas](#rodando-em-outros-sistemas)** |
+| **iSH** (iPhone/iPad) | funciona, mas o iOS suspende o app em segundo plano — leia as ressalvas na mesma seção |
+
+O guia principal abaixo usa o **Termux**. Para os demais ambientes, os passos equivalentes estão em [Rodando em outros sistemas](#rodando-em-outros-sistemas).
 
 ---
 
-## Instalação — passo a passo
+## Instalação no Termux — passo a passo
 
 Cada bloco abaixo é um comando. Cole um de cada vez no Termux e pressione **ENTER**.
 
@@ -191,6 +198,97 @@ O bot sobe um processo por conta, com um intervalo de alguns segundos entre elas
 | `./play.sh` | Modo padrão — executa todas as tarefas conforme o horário |
 | `./play.sh -cv` | Modo caverna — foca exclusivamente na caverna |
 | `./play.sh -cl` | Modo coliseu — prioriza o coliseu |
+
+---
+## Rodando em outros sistemas
+
+O bot é escrito em shell POSIX puro e não depende do Termux para funcionar — as únicas chamadas específicas do Termux (`termux-wake-lock`) são silenciadas quando não existem. Abaixo, o estado de cada plataforma.
+
+| Plataforma | Estado | Roda em segundo plano |
+|---|---|---|
+| **Termux** (Android) | recomendado | sim, com `termux-wake-lock` |
+| **Ubuntu / Debian / WSL** | **testado — 8/8** | sim |
+| **iSH** (iPhone/iPad) | funciona com ressalvas sérias | **não de forma confiável** |
+
+---
+
+### Ubuntu, Debian e WSL
+
+Testado em **Ubuntu 26.04 LTS sobre WSL2**, com `/bin/sh` apontando para **dash** (o shell POSIX mais estrito). Todos os 33 scripts passam, os módulos carregam, a pausa do laço principal funciona, os 4 servidores respondem e o encerramento por grupo de processos funciona.
+
+**1. Instale as dependências**
+
+```bash
+sudo apt update && sudo apt install -y git curl jq util-linux procps
+```
+
+**2. Baixe e prepare**
+
+```bash
+git clone https://github.com/Theoswd/TitasWar-Sung-Jinwoo.git && cd TitasWar-Sung-Jinwoo && chmod +x play.sh setup.sh stop.sh worker.sh twm.sh
+```
+
+**3. Verifique a integridade**
+
+```bash
+sha256sum -c .integrity --quiet && echo "Scripts íntegros"
+```
+
+**4. Cadastre e rode**
+
+```bash
+./setup.sh
+```
+
+```bash
+./play.sh
+```
+
+> **Atenção no WSL:** a distribuição é encerrada pouco depois que o último processo termina. Os workers são lançados desanexados e mantêm a distribuição viva, mas fechar todos os terminais é um risco desnecessário. O jeito robusto é usar `tmux`:
+>
+> ```bash
+> sudo apt install -y tmux && tmux new -s twm
+> ```
+>
+> Rode `./play.sh` dentro da sessão e desconecte com **Ctrl+B** seguido de **D**. Para voltar: `tmux attach -t twm`.
+
+Em servidor Linux comum (VPS), o mesmo procedimento vale e é ainda mais estável — sem gerenciamento de bateria interferindo.
+
+---
+
+### iSH (iPhone / iPad)
+
+O **[iSH](https://ish.app/)** é um emulador x86 que roda **Alpine Linux** no iOS. O código é compatível, mas **o iOS é o problema**, não o bot.
+
+**Instalação:**
+
+```bash
+apk update && apk add git curl jq tzdata bash
+```
+
+```bash
+git clone https://github.com/Theoswd/TitasWar-Sung-Jinwoo.git && cd TitasWar-Sung-Jinwoo && chmod +x play.sh setup.sh stop.sh worker.sh twm.sh
+```
+
+```bash
+./setup.sh
+```
+
+```bash
+./play.sh
+```
+
+**Antes de tentar, entenda as três limitações — nenhuma tem solução dentro do bot:**
+
+1. **O iOS suspende aplicativos em segundo plano.** Esta é a limitação decisiva. O iSH tenta contornar mantendo uma sessão de áudio silenciosa, mas o sistema encerra o app de qualquer forma depois de um tempo variável. Na prática, o bot **para quando você sai do app ou bloqueia a tela**, e não há como garantir o contrário. Um bot que existe para rodar sozinho perde boa parte do sentido nessa condição.
+
+2. **Emulação x86 é lenta.** O iSH interpreta instruções x86 em cima do ARM do iPhone. Cada requisição envolve iniciar um processo `curl` novo, e o bot faz dezenas por ciclo. Espere lentidão perceptível e consumo alto de bateria.
+
+3. **BusyBox no lugar do GNU.** O Alpine usa BusyBox, cuja implementação de vários comandos é reduzida. O código foi ajustado para isso — a codificação em base64, por exemplo, deixou de usar a opção `-w 0`, que **não existe** no BusyBox e faria o cadastro de contas falhar. Se encontrar outra incompatibilidade, [abra uma issue](https://github.com/Theoswd/TitasWar-Sung-Jinwoo/issues) com a mensagem de erro.
+
+> **Transparência:** não tenho um dispositivo iOS para testar. A compatibilidade acima vem de auditoria do código contra o comportamento conhecido do BusyBox, não de execução real. As instruções do Ubuntu/WSL, essas sim, foram executadas e verificadas. Se você testar no iSH, relate o resultado numa issue — bom ou ruim.
+
+**Alternativa melhor para quem só tem iPhone:** rode em uma VPS Linux barata (há opções por poucos dólares ao mês) e acesse por SSH pelo celular com o [Termius](https://termius.com/) ou similar. O bot fica de pé 24 h por dia, sem depender do seu aparelho estar ligado, com tela acesa ou com bateria.
 
 ---
 ## Acompanhando as contas

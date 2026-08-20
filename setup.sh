@@ -150,7 +150,7 @@ add_account() {
     fi
 
     if test_login "$(server_scheme "$srv")://$url" "$user" "$pass"; then
-        encoded=$(printf "login=%s&pass=%s" "$user" "$pass" | base64 -w 0)
+        encoded=$(printf "login=%s&pass=%s" "$user" "$pass" | base64 | tr -d '[:space:]')
         printf "%s|%s|%s\n" "$srv" "$user" "$encoded" >> "$ACCOUNTS_FILE"
         chmod 600 "$ACCOUNTS_FILE" 2>/dev/null
         printf "${GREEN}[OK] Conta [%s] %s adicionada!${RESET}\n" "$tag" "$user"
@@ -161,7 +161,7 @@ add_account() {
         read -r force
         case "$force" in
             y|Y)
-                encoded=$(printf "login=%s&pass=%s" "$user" "$pass" | base64 -w 0)
+                encoded=$(printf "login=%s&pass=%s" "$user" "$pass" | base64 | tr -d '[:space:]')
                 printf "%s|%s|%s\n" "$srv" "$user" "$encoded" >> "$ACCOUNTS_FILE"
                 chmod 600 "$ACCOUNTS_FILE" 2>/dev/null
                 printf "${GOLD}Conta salva sem validacao.${RESET}\n"
