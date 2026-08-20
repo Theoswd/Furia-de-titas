@@ -139,6 +139,9 @@ do_login() {
         ACC=$(extract_username "$PAGE")
         [ -z "$ACC" ] && ACC="$TWM_USER"
         export ACC
+        # HP maximo muda pouco: busca uma vez por login, para o percentual.
+        fetch_max_hp 2>/dev/null
+        parse_status "$PAGE"
         printf "[%s] %s — login OK\n" "$TWM_TAG" "$ACC"
         unset PAGE
         return 0

@@ -1,4 +1,9 @@
 #!/bin/sh
+
+# CORRECAO: versionNum era definido apenas DENTRO de script_slogan(),
+# funcao que nunca e chamada no fluxo do worker. Resultado: o messages_info
+# imprimia "TWM - Titans War Macro v | ..." com a versao vazia.
+versionNum="3.9.28"
 # shellcheck disable=SC2034
 colors() {
     BLACK_BLACK='\033[00;30m'
@@ -23,7 +28,7 @@ colors() {
 }
 
 script_slogan() {
-    versionNum="3.9.28"
+    :  # valor definido no topo do arquivo
     printf "TWM - Titans War Macro v%s\n" "$versionNum"
 }
 
@@ -175,9 +180,50 @@ hpmp() {
     fi
 }
 
+# Le nome, HP e MP a partir de uma pagina /user JA baixada.
+#
+# CORRECAO: o hpmp() antigo so era chamado pelo undying.sh e lia de um
+# arquivo ($TMP/SRC) que raramente continha a pagina certa, com regexes que
+# nao batem mais com o HTML atual. Por isso a linha de status saia como
+# "HP:  (%) | MP:  (%)". Estrutura real da pagina:
+#   health.png' alt='hp'/> <span class='white'>65312</span> | <img
+#   src='/images/icon/mana.png' alt='mp'/> 470</span>
+parse_status() {
+    _pg="$1"
+    [ -n "$_pg" ] || return 1
+
+    NOWHP=`printf '%s' "$_pg" \
+        | grep -o -E "health\.png' alt='hp'/> <span[^>]*>[0-9]{1,9}" \
+        | grep -o -E '[0-9]{1,9}$' | head -n1`
+    NOWMP=`printf '%s' "$_pg" \
+        | grep -o -E "mana\.png' alt='mp'/>[^0-9<]{0,4}[0-9]{1,9}" \
+        | grep -o -E '[0-9]{1,9}$' | head -n1`
+
+    if [ -n "$NOWHP" ] && [ -n "$FIXHP" ] && [ "$FIXHP" -gt 0 ] 2>/dev/null; then
+        HPPER=`awk -v a="$NOWHP" -v b="$FIXHP" 'BEGIN{printf "%.0f", a/b*100}'`
+    else
+        HPPER=""
+    fi
+    unset _pg
+}
+
+# Busca o HP maximo em /train. Muda pouco, entao basta chamar no login.
+fetch_max_hp() {
+    _t=`run_curl "${URL}/train" 2>/dev/null`
+    FIXHP=`printf '%s' "$_t" | grep -o -E '\([0-9]{1,9}\)' | head -n1 | tr -d '()'`
+    unset _t
+}
+
+# Monta a linha de status. Imprime o que existe; nao inventa campo vazio.
 messages_info() {
-    printf "TWM - Titans War Macro v%s | %s\n" "$versionNum" "$ACC" > "$TMP/msg_file"
-    printf "HP: %s (%s%%) | MP: %s (%s%%)\n" "$NOWHP" "$HPPER" "$NOWMP" "$MPPER" >> "$TMP/msg_file"
+    _a="${ACC:-$TWM_USER}"
+    printf "TWM v%s | %s\n" "${versionNum:-?}" "$_a" > "$TMP/msg_file"
+    if [ -n "$HPPER" ]; then
+        printf "HP: %s (%s%%) | MP: %s\n" "${NOWHP:-?}" "$HPPER" "${NOWMP:-?}" >> "$TMP/msg_file"
+    else
+        printf "HP: %s | MP: %s\n" "${NOWHP:-?}" "${NOWMP:-?}" >> "$TMP/msg_file"
+    fi
+    unset _a
 }
 
 player_stats() {

@@ -7,6 +7,10 @@ login_logoff() {
     if is_logged_in "$PAGE"; then
         _acc=`extract_username "$PAGE"`
         [ -n "$_acc" ] && ACC=`echo "$_acc" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'`
+        # A pagina /user ja esta em maos: aproveita para atualizar HP/MP
+        # antes de descarta-la. Antes o PAGE era descartado aqui e o
+        # messages_info imprimia campos vazios.
+        parse_status "$PAGE"
         unset _acc PAGE
         messages_info
         clan_id
@@ -40,6 +44,10 @@ login_logoff() {
 
     if is_logged_in "$PAGE"; then
         printf "[%s] %s — reconectado\n" "$TWM_TAG" "$TWM_USER"
+        _acc=`extract_username "$PAGE"`
+        [ -n "$_acc" ] && ACC=`echo "$_acc" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'`
+        parse_status "$PAGE"
+        unset _acc
         messages_info
         clan_id
         return 0
