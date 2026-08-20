@@ -144,10 +144,22 @@ grep -qE "name='pass'" "$RESP" 2>/dev/null && FORM=1
 PAGE="${TMPDIR:-/tmp}/diag_user_$$.html"
 curl -s -L -A "$UA" -c "$CK" -b "$CK" --max-time 30 "$URL/user" -o "$PAGE" 2>/dev/null
 LOGGED=0
-grep -qiE "class='white'|\[level|/logout" "$PAGE" 2>/dev/null && LOGGED=1
+# CORRECAO: o marcador era class='white'|[level|/logout. O primeiro casa
+# com numeros de status e o segundo nao existe neste HTML. Agora usa o
+# icone de level, que so aparece em pagina logada.
+grep -qE "icon/level\.png|/logout" "$PAGE" 2>/dev/null && LOGGED=1
 
 printf "\n${C}=== CONCLUSAO ===${N}\n"
-if [ "$AUTHERR" = 1 ]; then
+# CORRECAO DE ORDEM: antes o AUTHERR (heuristica de mensagem de erro) era
+# testado primeiro e mascarava um login bem-sucedido, chegando a reportar
+# "RECUSOU" para uma conta que estava logada. A checagem da sessao real
+# em /user e evidencia direta e passa a ter prioridade.
+if [ "$LOGGED" = 1 ]; then
+    printf "${G}LOGIN FUNCIONOU.${N}
+"
+    printf "  A pagina /user mostra sessao ativa para esta conta.
+"
+elif [ "$AUTHERR" = 1 ]; then
     printf "${R}O SERVIDOR RECUSOU a credencial.${N}\n"
     printf "  Mensagem encontrada na resposta:\n"
     grep -oE "error\.png[^<]*<[^>]*>[^<]{0,90}" "$RESP" | head -2 | sed "s/.*alt=''\/>//" | sed "s/^/    > /"
@@ -156,11 +168,6 @@ if [ "$AUTHERR" = 1 ]; then
     printf "    2. Conta banida ou suspensa\n"
     printf "    3. O nome de usuario nao e exatamente o de login\n"
     printf "\n  Teste a MESMA senha no navegador em %s\n" "$URL"
-elif [ "$LOGGED" = 1 ]; then
-    printf "${G}LOGIN FUNCIONOU.${N}\n"
-    printf "  A pagina /user mostra sinais de sessao ativa.\n"
-    printf "  Se o bot mesmo assim diz que falhou, o problema esta na\n"
-    printf "  DETECCAO de sessao, nao no login. Reporte com esta saida.\n"
 elif [ "$FORM" = 1 ]; then
     printf "${Y}Ainda aparece o formulario de login, mas SEM mensagem de erro.${N}\n"
     printf "  Isso normalmente indica bloqueio de IP ou sessao descartada.\n"
