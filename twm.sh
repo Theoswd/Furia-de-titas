@@ -142,6 +142,11 @@ do_login() {
         # HP maximo muda pouco: busca uma vez por login, para o percentual.
         fetch_max_hp 2>/dev/null
         parse_status "$PAGE"
+        # Grava a linha de status ja no login. Antes o msg_file so era
+        # escrito dentro de start(), que roda apenas em minutos
+        # especificos — entao o func_cat nao tinha o que exibir por
+        # muito tempo, ou exibia um arquivo antigo.
+        messages_info
         printf "[%s] %s — login OK\n" "$TWM_TAG" "$ACC"
         unset PAGE
         return 0
