@@ -244,15 +244,21 @@ printf "\n${GREEN}%s worker(s) iniciado(s).${RESET}\n\n" "$n"
 printf "Log de conta:  ${CYAN}tail -f ~/.twm/BR_NomeConta/twm.log${RESET}\n"
 printf "Parar tudo:    ${CYAN}./stop.sh${RESET}\n\n"
 # Monitor — reabre accounts.conf a cada ciclo via fd3
+# Painel so faz sentido com terminal. Sob systemd (ou qualquer saida
+# redirecionada) ele seria reimpresso a cada 20s no journal; nesse caso
+# o laco continua supervisionando e relancando workers, em silencio.
+if [ -t 1 ]; then HAS_TTY=1; else HAS_TTY=0; fi
+[ "$HAS_TTY" = 0 ] && echo "[monitor] supervisionando $n conta(s); painel oculto (sem terminal)"
+
 W="======================================"
 
 while true; do
     [ -t 1 ] && clear
     now=$(date +%H:%M:%S)
 
-    printf "╔%s╗\n" "$W"
-    printf "║  TWM Multi-contas        %s  ║\n" "$now"
-    printf "╠%s╣\n" "$W"
+    [ "$HAS_TTY" = 1 ] && printf "╔%s╗\n" "$W"
+    [ "$HAS_TTY" = 1 ] && printf "║  TWM Multi-contas        %s  ║\n" "$now"
+    [ "$HAS_TTY" = 1 ] && printf "╠%s╣\n" "$W"
 
     while IFS='|' read -r srv user _enc <&3; do
         srv=$(clean_field "$srv")
@@ -289,11 +295,11 @@ while true; do
         esac
 
         entry=$(printf "[%s] %-16s %-10s" "$tag" "$user" "$label")
-        printf "║  %b* %s\033[00m  ║\n" "$col" "$entry"
+        [ "$HAS_TTY" = 1 ] && printf "║  %b* %s\033[00m  ║\n" "$col" "$entry"
 
     done 3< "$ACCOUNTS_FILE"
 
-    printf "╚%s╝\n" "$W"
+    [ "$HAS_TTY" = 1 ] && printf "╚%s╝\n" "$W"
 
     _i=0
     while [ "$_i" -lt 20 ]; do

@@ -91,7 +91,7 @@ Resumo do que mudou na prática. O detalhamento técnico está em **[CORRECOES.m
 | Ambiente | Observação |
 |---|---|
 | **Termux** (Android) | recomendado — instale **[pela F-Droid](https://f-droid.org/packages/com.termux/)**; a versão da Play Store está desatualizada e **não funciona** com pacotes atuais |
-| **Ubuntu / Debian / WSL / VPS** | testado e verificado — veja **[Rodando em outros sistemas](#rodando-em-outros-sistemas)** |
+| **VPS Linux / Ubuntu / Debian / WSL** | testado e verificado — veja **[Rodando em outros sistemas](#rodando-em-outros-sistemas)** |
 | **iSH** (iPhone/iPad) | funciona, mas o iOS suspende o app em segundo plano — leia as ressalvas na mesma seção |
 
 O guia principal abaixo usa o **Termux**. Para os demais ambientes, os passos equivalentes estão em [Rodando em outros sistemas](#rodando-em-outros-sistemas).
@@ -207,6 +207,7 @@ O bot é escrito em shell POSIX puro e não depende do Termux para funcionar —
 | Plataforma | Estado | Roda em segundo plano |
 |---|---|---|
 | **Termux** (Android) | recomendado | sim, com `termux-wake-lock` |
+| **VPS Linux** | **recomendado para uso 24/7** — com serviço systemd | sim, sempre |
 | **Ubuntu / Debian / WSL** | **testado — 8/8** | sim |
 | **iSH** (iPhone/iPad) | funciona com ressalvas sérias | **não de forma confiável** |
 
@@ -277,6 +278,88 @@ Em servidor Linux comum (VPS), o mesmo procedimento vale e é ainda mais estáve
 
 ---
 
+### VPS Linux — a melhor opção
+
+Um servidor Linux é o ambiente ideal: fica de pé 24 horas, não depende do seu aparelho estar ligado, não sofre com gerenciamento de bateria, e permite instalar o bot como **serviço do systemd** — que inicia sozinho no boot e reinicia se o processo cair.
+
+**Consumo de recursos.** Cada conta ocupa dois processos de shell, com cerca de **2 MB** de memória residente cada, mais um `curl` transitório. Entre os ciclos as contas ficam dormindo, então o uso de CPU é próximo de zero. Um VPS modesto de **1 núcleo e 1 GB** já roda dezenas de contas com folga; o gargalo real nunca é o servidor, e sim quantas contas o jogo tolera vindas de um mesmo IP.
+
+**1. Conecte-se e crie um usuário comum**
+
+Provedores costumam entregar acesso como `root`. **Não rode o bot como root** — se algo der errado, o estrago é no sistema inteiro. Crie um usuário normal:
+
+```bash
+adduser twm && usermod -aG sudo twm && su - twm
+```
+
+**2. Instale as dependências**
+
+```bash
+sudo apt update && sudo apt install -y git curl jq util-linux procps
+```
+
+**3. Baixe na pasta pessoal**
+
+```bash
+cd ~ && git clone https://github.com/Theoswd/TitasWar-Sung-Jinwoo.git && cd TitasWar-Sung-Jinwoo && chmod +x play.sh setup.sh stop.sh worker.sh twm.sh install-service.sh
+```
+
+**4. Verifique a integridade**
+
+```bash
+sha256sum -c .integrity --quiet && echo "Scripts íntegros"
+```
+
+**5. Cadastre as contas**
+
+```bash
+./setup.sh
+```
+
+**6. Instale como serviço**
+
+O script detecta seu usuário e o caminho, gera a unidade do systemd e a instala. Ele se recusa a rodar como root e avisa se o diretório estiver num disco montado onde as permissões não valem.
+
+```bash
+./install-service.sh
+```
+
+**7. Inicie**
+
+```bash
+sudo systemctl start twm
+```
+
+A partir daqui o bot sobe sozinho a cada reinício do servidor.
+
+**Comandos do dia a dia:**
+
+| O quê | Comando |
+|---|---|
+| Ver estado | `systemctl status twm` |
+| Log ao vivo | `journalctl -u twm -f` |
+| Log de uma conta | `tail -f ~/.twm/BR_NomeConta/twm.log` |
+| Parar | `sudo systemctl stop twm` |
+| Reiniciar | `sudo systemctl restart twm` |
+| Não iniciar no boot | `sudo systemctl disable twm` |
+
+> Quando não há terminal, o painel de contas fica oculto — ele seria reimpresso a cada 20 segundos no journal. A supervisão continua ativa: workers que caem são relançados e isso é registrado no log da conta.
+
+**Cuidados com o servidor.** Um VPS exposto à internet é alvo de varredura constante. O mínimo razoável:
+
+```bash
+sudo apt install -y ufw && sudo ufw allow OpenSSH && sudo ufw --force enable
+```
+
+E autenticação por chave SSH em vez de senha — rode isto **na sua máquina**, não no servidor:
+
+```bash
+ssh-copy-id twm@SEU_IP
+```
+
+Depois de confirmar que a chave funciona, desative o login por senha em `/etc/ssh/sshd_config` (`PasswordAuthentication no`) e recarregue com `sudo systemctl reload ssh`.
+
+---
 ### iSH (iPhone / iPad)
 
 O **[iSH](https://ish.app/)** é um emulador x86 que roda **Alpine Linux** no iOS. O código é compatível, mas **o iOS é o problema**, não o bot.
@@ -496,6 +579,7 @@ TitasWar-Sung-Jinwoo/
 ├── twm.sh           Loop de jogo de uma conta (login + ciclo principal)
 ├── setup.sh         Menu de cadastro/remoção/teste de contas
 ├── stop.sh          Encerra todos os workers
+├── install-service.sh  Instala como servico do systemd (VPS/Linux)
 │
 ├── run.sh           Agenda: o que executar em cada horário
 ├── crono.sh         Pausa entre ciclos e rotina start()
