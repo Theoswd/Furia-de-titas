@@ -64,7 +64,7 @@ for _lib in \
     flagfight.sh clanid.sh crono.sh arena.sh coliseum.sh \
     campaign.sh run.sh altars.sh clandmg.sh clanfight.sh \
     clancoliseum.sh king.sh undying.sh trade.sh career.sh \
-    cave.sh allies.sh svproxy.sh check.sh league.sh \
+    cave.sh allies.sh svproxy.sh check.sh league.sh clanquest.sh \
     specialevent.sh function.sh update_check.sh
 do
     [ -f "$TWMDIR/$_lib" ] && . "$TWMDIR/$_lib"

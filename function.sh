@@ -157,16 +157,21 @@ request_update() {
 # Valores padrao. Uma chave por linha.
 config_defaults() {
     cat <<'EOF'
-FUNC_check_rewards=n
-FUNC_use_elixir=n
+FUNC_check_rewards=y
+FUNC_use_elixir=y
 FUNC_coliseum=y
 FUNC_AUTO_UPDATE=n
 FUNC_play_league=999
 FUNC_clan_figth=y
-FUNC_collect_mission_rewards=n
+FUNC_collect_mission_rewards=y
 FUNC_pause_weekends=n
 FUNC_auto_events=y
-FUNC_clan_missions=n
+FUNC_clan_missions=y
+FUNC_clan_quests=y
+FUNC_clan_help=y
+FUNC_quest_force_gold=y
+FUNC_quest_gold_min=1200
+FUNC_arena_min=30
 FUNC_clan_statue=y
 FUNC_cave_boost=y
 SCRIPT_PAUSED=n

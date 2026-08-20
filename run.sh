@@ -1,66 +1,81 @@
 twm_play() {
-    # CORRECAO (multi-contas): antes gravava em "$HOME/twm/runmode_file".
-    # Esse diretorio nao existe no layout multi-contas (que usa $HOME/.twm/<conta>),
-    # entao a escrita falhava silenciosamente a cada ciclo. Pior: o cave.sh
-    # gravava em "$TWMDIR/runmode_file" — arquivo UNICO compartilhado por todas
-    # as contas, de modo que uma conta saindo do modo caverna trocava o modo
-    # de todas as outras. Agora o runmode e por conta, dentro de $TMP.
     echo "$RUN" > "$TMP/runmode_file" 2>/dev/null
 
     if [ ! -s "$TMP/CLD" ]; then
         clan_id
     fi
 
+    # ORDEM DE PRIORIDADE DOS EVENTOS
+    #
+    # O "case" para no primeiro padrao que casa, entao a ordem dos ramos
+    # E a prioridade. De cima para baixo:
+    #
+    #   1. Torneio dos Clas      10:55  18:55
+    #   2. Altares dos Deuses    13:55  20:55
+    #   3. Vale dos Imortais     09:55  15:55  21:55
+    #   4. Rei dos Imortais      12:25  16:25  22:25
+    #   5. Coliseu do Cla        10:28  14:58
+    #
+    # O Coliseu comum roda das 00:30 as 04:30 em todas as contas.
     case `date +%H:%M` in
-        (00:[0-5]5|01:[0-5]5|02:[0-5]5|03:[0-5]5)
-            coliseum_fight
-            ;;
-        (00:00|00:30|01:00|01:30|02:00|02:30|03:00|03:30|04:00|04:30|05:00|05:30|06:00|06:30|07:00|07:30|08:00|08:30|09:00|11:30|12:00|13:00|13:30|14:30|15:30|17:00|17:30|18:00|18:30|19:30|20:00|20:30|23:00)
-            start
-            ;;
-        (23:30)
-            # CORRECAO (seguranca — SEC-01): a chamada automatica a update()
-            # foi REMOVIDA daqui. Ela baixava e sobrescrevia play.sh, twm.sh,
-            # info.sh e outros a partir de um repositorio de TERCEIRO
-            # de terceiro, sem assinatura, sem checksum e sem
-            # curl --fail — ou seja, execucao de codigo arbitrario diaria, e
-            # substituicao dos arquivos do modelo multi-contas pelos do modelo
-            # de conta unica. Para atualizar, use "git pull" revisando o diff.
-            start
-            ;;
-        (09:5[5-9]|15:5[5-9]|21:5[5-9])
-            undying_start
-            start
-            ;;
-        (10:1[0-4]|16:1[0-4])
-            flagfight_start
-            ;;
-        (10:2[8-9]|14:5[8-9])
-            if [ -n "$CLD" ]; then
-                clancoliseum_start
-            fi
-            start
-            ;;
+
+        # --- 1. Torneio dos Clas
         (10:5[5-9]|18:5[5-9])
             if [ -n "$CLD" ]; then
                 clanfight_start
             fi
             start
             ;;
-        (12:2[5-9]|16:2[5-9]|22:2[5-9])
-            king_start
-            start
-            ;;
+
+        # --- 2. Altares dos Deuses
         (13:5[5-9]|20:5[5-9])
             if [ -n "$CLD" ]; then
                 altars_start
             fi
             start
             ;;
+
+        # --- 3. Vale dos Imortais
+        (09:5[5-9]|15:5[5-9]|21:5[5-9])
+            undying_start
+            start
+            ;;
+
+        # --- 4. Rei dos Imortais
+        (12:2[5-9]|16:2[5-9]|22:2[5-9])
+            king_start
+            start
+            ;;
+
+        # --- 5. Coliseu do Cla
+        (10:2[8-9]|14:5[8-9])
+            if [ -n "$CLD" ]; then
+                clancoliseum_start
+            fi
+            start
+            ;;
+
+        # --- Coliseu comum: 00:30 as 04:30
+        (00:3[0-9]|00:[45][0-9]|0[123]:[0-5][0-9]|04:[0-2][0-9]|04:30)
+            coliseum_fight
+            ;;
+
+        # --- Batalha de Bandeiras
+        (10:1[0-4]|16:1[0-4])
+            flagfight_start
+            ;;
+
+        # --- Eventos especiais
         (09:2[5-9]|21:2[5-9])
             specialEvent
             start
             ;;
+
+        # --- Rotina comum
+        (00:00|01:00|02:00|03:00|04:3[1-9]|05:00|05:30|06:00|06:30|07:00|07:30|08:00|08:30|09:00|11:00|11:30|12:00|13:00|13:30|14:00|14:30|15:00|15:30|17:00|17:30|18:00|18:30|19:00|19:30|20:00|20:30|22:00|23:00|23:30)
+            start
+            ;;
+
         (*)
             if echo "$RUN" | grep -q -E '[-]cl'; then
                 printf "Running in coliseum mode: %s\n" "$RUN"

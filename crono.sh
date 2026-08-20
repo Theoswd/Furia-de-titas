@@ -90,14 +90,40 @@ func_sleep() {
     func_cat
 }
 
+# Janelas fixas da Masmorra do Cla.
+# A propria pagina informa: "10 acessos gratis a cada 8 horas a partir
+# das 10:00" — ou seja 02:00, 10:00 e 18:00. Nao ha o que calcular.
+masmorra_na_janela() {
+    _h=`date +%H`
+    case "$_h" in
+        02|10|18) return 0 ;;
+        *)        return 1 ;;
+    esac
+}
+
+# Arena a cada 30 minutos, controlada por marcador em disco para
+# sobreviver a reinicios do worker.
+arena_liberada() {
+    _m=${FUNC_arena_min:-30}
+    case "$_m" in ''|*[!0-9]*) _m=30 ;; esac
+    _ultimo=`cat "$TMP/last_arena" 2>/dev/null`
+    case "$_ultimo" in ''|*[!0-9]*) _ultimo=0 ;; esac
+    _agora=`date +%s`
+    [ $((_agora - _ultimo)) -ge $((_m * 60)) ]
+}
+arena_marcar() { date +%s > "$TMP/last_arena" 2>/dev/null; }
+
+# Volta para a pagina inicial. As contas devem descansar ali entre os
+# ciclos, e nao numa pagina de combate ou de evento — o jogo mantem o
+# personagem "em batalha" e a navegacao seguinte cai em "Fuja da batalha".
+descansar() {
+    fetch_page "/?out_gate_confirm=true" "$TMP/REST" 2>/dev/null
+    fetch_page "/" "$TMP/REST" 2>/dev/null
+}
+
 start() {
     load_config
 
-    # CORRECAO (multi-contas): login_logoff() existia em loginlogoff.sh mas
-    # NUNCA era chamada por ninguem. Sem isso, quando o cookie expirava a
-    # conta seguia batendo na pagina de login para sempre, enquanto o monitor
-    # do play.sh continuava mostrando "online" (ele so testa kill -0 do
-    # worker). Era o sintoma "a conta aparece online mas parou de jogar".
     if type login_logoff > /dev/null 2>&1; then
         if ! login_logoff; then
             printf "Sessao invalida — pulando este ciclo\n"
@@ -108,13 +134,48 @@ start() {
     fi
 
     pause_missions_weekend
-    arena_duel
-    career_func
-    cave_routine
-    func_trade
-    campaign_func
-    clanDungeon
+    clan_id 2>/dev/null
+
+    # Lider do cla: mantem a estatua ativa (bonus de ouro e de prata).
     clan_statue
+
+    # Missoes do cla vem antes de tudo: recolhe as concluidas, apoia as
+    # dos companheiros e forca com ouro as que estao paradas.
+    if [ -n "$CLD" ]; then
+        cq_concluir    2>/dev/null
+        cq_ajudar      2>/dev/null
+        cq_forcar_ouro 2>/dev/null
+    fi
+
+    # Atividades. Cada uma verifica antes se ha missao do cla que ela
+    # completa; havendo, toma a missao para o progresso contar.
+    if arena_liberada; then
+        cq_antes arena 2>/dev/null
+        arena_duel
+        arena_marcar
+    fi
+
+    cq_antes carreira 2>/dev/null
+    career_func
+
+    cq_antes caverna 2>/dev/null
+    cave_routine
+
+    cq_antes liga 2>/dev/null
+    league_play 2>/dev/null
+
+    cq_antes elixir 2>/dev/null
+    use_elixir
+
+    campaign_func
+
+    if masmorra_na_janela; then
+        clanDungeon
+    fi
+
+    func_trade
+
+    # Cabana do Sabio: missoes, colecoes e reliquias
     check_missions
     check_rewards
 
@@ -127,6 +188,7 @@ start() {
     fi
 
     messages_info
+    descansar
     func_crono
     func_sleep
 }

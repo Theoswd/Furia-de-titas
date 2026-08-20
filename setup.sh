@@ -14,11 +14,27 @@ ACCOUNTS_FILE="$TWMDIR/accounts.conf"
 # Carrega funcoes de verificacao de sessao
 . "$TWMDIR/session_check.sh"
 
-GREEN='\033[32m'
-GOLD='\033[0;33m'
-RED='\033[0;31m'
-CYAN='\033[01;36m'
-RESET='\033[00m'
+# Paleta sorteada a cada abertura do menu.
+# A semente vem do PID e dos segundos do relogio, entao o conjunto de
+# cores muda a cada execucao sem depender de $RANDOM (que nao existe
+# em sh/dash/toybox).
+_seed=$(( ($$ + $(date +%s)) % 6 ))
+case "$_seed" in
+    0) A1='[1;36m'; A2='[1;34m' ;;
+    1) A1='[1;35m'; A2='[1;31m' ;;
+    2) A1='[1;32m'; A2='[1;33m' ;;
+    3) A1='[1;33m'; A2='[0;33m' ;;
+    4) A1='[1;34m'; A2='[1;35m' ;;
+    *) A1='[1;31m'; A2='[1;36m' ;;
+esac
+
+GREEN='[1;32m'
+GOLD='[1;33m'
+RED='[1;31m'
+CYAN="$A1"
+DIM='[2m'
+WHITE='[1;37m'
+RESET='[0m'
 
 # ============================================================
 #  SOMENTE SERVIDOR BR (furiadetitas.net)
@@ -32,19 +48,23 @@ server_scheme() { echo "https"; }
 
 show_menu() {
     clear
-    printf "${CYAN}╔══════════════════════════════════════╗${RESET}\n"
-    printf "${CYAN}║     TWM Multi-contas — Setup         ║${RESET}\n"
-    printf "${CYAN}╚══════════════════════════════════════╝${RESET}\n\n"
+    _L="--------------------------------------------------------------------"
     n=0
     [ -f "$ACCOUNTS_FILE" ] && n=$(grep -c -E '^[0-9]+[|]' "$ACCOUNTS_FILE" 2>/dev/null)
     case "$n" in ''|*[!0-9]*) n=0 ;; esac
-    printf "Contas cadastradas: ${GOLD}%s${RESET}\n\n" "$n"
-    printf "${GOLD}1)${RESET} Listar contas\n"
-    printf "${GOLD}2)${RESET} Adicionar conta\n"
-    printf "${GOLD}3)${RESET} Remover conta\n"
-    printf "${GOLD}4)${RESET} Testar login\n"
-    printf "${GOLD}0)${RESET} Sair\n\n"
-    printf "Opcao: "
+
+    printf "%b%s%b\n" "$A2" "$_L" "$RESET"
+    printf "  %bTWM%b %b· Gerenciador de Contas%b%*s%bBR%b\n" \
+           "$A1" "$RESET" "$DIM" "$RESET" 26 '' "$WHITE" "$RESET"
+    printf "%b%s%b\n" "$A2" "$_L" "$RESET"
+    printf "  %bContas cadastradas:%b %b%s%b\n\n" "$DIM" "$RESET" "$WHITE" "$n" "$RESET"
+    printf "   %b1%b  Listar contas\n"   "$A1" "$RESET"
+    printf "   %b2%b  Adicionar conta\n" "$A1" "$RESET"
+    printf "   %b3%b  Remover conta\n"   "$A1" "$RESET"
+    printf "   %b4%b  Testar login\n\n"  "$A1" "$RESET"
+    printf "   %b0%b  Sair\n"            "$DIM" "$RESET"
+    printf "%b%s%b\n" "$A2" "$_L" "$RESET"
+    printf "  %bOpcao:%b " "$WHITE" "$RESET"
 }
 
 list_accounts() {

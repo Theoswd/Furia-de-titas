@@ -263,27 +263,37 @@ if [ "${TWM_EMOJI:-0}" = "1" ]; then
     I_HP="❤️ "; I_EN="⚡ "; I_LV="⭐ "; I_GO="🪙 "; I_SI="🥈 "
     I_TIT="🎮 "; I_ACT="📋 "; I_EVT="⏰ "; I_ARROW="▸"
     S_ON="🟢"; S_WAIT="🟡"; S_ERR="🔴"; S_OFF="⚫"; S_UNK="⚪"
-    A_ARENA="⚔️  Arena"; A_CAR="🎖️  Carreira"; A_CAVE="⛏️  Caverna"
-    A_CAMP="🗺️  Campanha"; A_COL="🏛️  Coliseu"; A_CLAN="🛡️  Clã"
-    A_KING="👑  Rei"; A_TRADE="💱  Troca"; A_QUEST="📜  Missões"
-    A_REL="💎  Relíquias"; A_ALT="🔥  Altares"; A_LEAG="🏆  Liga"
-    A_EV="🎉  Evento"; A_IDLE="💤  Aguardando"; A_NONE="—"
+    A_CLANFIGHT="🏆  Torneio do Clã";   A_ALTARES="🔥  Altares dos Deuses"
+    A_VALE="🌘  Vale dos Imortais";     A_REI="👑  Rei dos Imortais"
+    A_CLANCOL="🏛️  Coliseu do Clã";     A_MASMORRA="🗝️  Masmorra do Clã"
+    A_CLANQUEST="📜  Missões do Clã";   A_BANDEIRAS="🚩  Batalha de Bandeiras"
+    A_COLISEU="🏟️  Coliseu";            A_ARENA="⚔️  Arena"
+    A_CARREIRA="🎖️  Carreira";          A_CAVERNA="⛏️  Caverna"
+    A_CAMPANHA="🗺️  Campanha";          A_LIGA="🥇  Liga dos Favoritos"
+    A_TROCA="💱  Troca Prata/Ouro";     A_SABIO="🧙  Cabana do Sábio"
+    A_EVENTO="🎉  Evento Especial";     A_DESCANSO="💤  Descansando"
+    A_NONE="—"
 else
     I_HP="HP"; I_EN="EN"; I_LV="LV"; I_GO="OU"; I_SI="PR"
     I_TIT=""; I_ACT=""; I_EVT=""; I_ARROW="->"
     S_ON="[on]"; S_WAIT="[..]"; S_ERR="[ER]"; S_OFF="[--]"; S_UNK="[??]"
-    A_ARENA="Arena"; A_CAR="Carreira"; A_CAVE="Caverna"
-    A_CAMP="Campanha"; A_COL="Coliseu"; A_CLAN="Cla"
-    A_KING="Rei"; A_TRADE="Troca"; A_QUEST="Missoes"
-    A_REL="Reliquias"; A_ALT="Altares"; A_LEAG="Liga"
-    A_EV="Evento"; A_IDLE="Aguardando"; A_NONE="-"
+    A_CLANFIGHT="Torneio do Clã";   A_ALTARES="Altares dos Deuses"
+    A_VALE="Vale dos Imortais";     A_REI="Rei dos Imortais"
+    A_CLANCOL="Coliseu do Clã";     A_MASMORRA="Masmorra do Clã"
+    A_CLANQUEST="Missões do Clã";   A_BANDEIRAS="Batalha de Bandeiras"
+    A_COLISEU="Coliseu";            A_ARENA="Arena"
+    A_CARREIRA="Carreira";          A_CAVERNA="Caverna"
+    A_CAMPANHA="Campanha";          A_LIGA="Liga dos Favoritos"
+    A_TROCA="Troca Prata/Ouro";     A_SABIO="Cabana do Sábio"
+    A_EVENTO="Evento Especial";     A_DESCANSO="Descansando"
+    A_NONE="-"
 fi
 
 LINHA="--------------------------------------------------------------------"
 
 # Agenda de eventos, extraida do case de horarios do run.sh.
 # Horarios em America/Bahia (BRT), que e o fuso usado pelos workers.
-EVENTOS="0005|Coliseu
+EVENTOS="0030|Coliseu
 0925|Evento especial
 0955|Imortais
 1010|Batalha de Bandeiras
@@ -354,27 +364,37 @@ estado_simbolo() {
     esac
 }
 
-# Descobre o que a conta esta fazendo agora, a partir do log
+# Nome completo da atividade, a partir do log da conta.
+#
+# Cada modulo escreve uma marca propria no log. A ordem dos testes importa:
+# "clancoliseum" precisa ser testado ANTES de "coliseum", e "clanfight"
+# antes de qualquer coisa generica, senao o Coliseu do Cla apareceria
+# apenas como "Coliseu".
 atividade_de() {
     _lg="$1"
     [ -f "$_lg" ] || { echo "$A_NONE"; return; }
-    _l=`tail -n 25 "$_lg" 2>/dev/null | grep -iE "Arena|Career|Carreira|Cave|Caverna|Campaign|Campanha|Coliseu|Coliseum|Clan|King|Rei|Trade|Troca|Missions|Quest|Relic|Altars|League|Liga|Event|aguardando" | tail -n 1`
+    _l=`tail -n 30 "$_lg" 2>/dev/null | grep -iE "clan tournament|clanfight|Ancient Altars|altars|Valley of the Immortals|undying|King of the Immortals|Clan coliseum|clancoliseum|Clan Dungeon|clandmg|Missao do cla|Clan quest|Flagfight|flagfight|Coliseum|Battle or event|^Arena|^Career|^Cave|^Campaign|available fights|Available fights|^Trade|Exchange|Checking Missions|Chest .* opened|Mission .* Completed|Relic|Current event|aguardando" | tail -n 1`
+
     case "$_l" in
-        *Arena*|*arena*)             echo "$A_ARENA" ;;
-        *Career*|*Carreira*)         echo "$A_CAR" ;;
-        *Cave*|*Caverna*|*caverna*)  echo "$A_CAVE" ;;
-        *Campaign*|*Campanha*)       echo "$A_CAMP" ;;
-        *Colise*|*colise*)           echo "$A_COL" ;;
-        *Clan*|*clan*)               echo "$A_CLAN" ;;
-        *King*|*Rei*)                echo "$A_KING" ;;
-        *Trade*|*Troca*)             echo "$A_TRADE" ;;
-        *Quest*|*Mission*|*Missao*)  echo "$A_QUEST" ;;
-        *Relic*|*Reliquia*)          echo "$A_REL" ;;
-        *Altars*|*Altares*)          echo "$A_ALT" ;;
-        *League*|*Liga*)             echo "$A_LEAG" ;;
-        *Event*|*Evento*)            echo "$A_EV" ;;
-        *aguardando*)                echo "$A_IDLE" ;;
-        *)                           echo "$A_NONE" ;;
+        *"clan tournament"*|*clanfight*)          echo "$A_CLANFIGHT" ;;
+        *"Ancient Altars"*|*altars*)              echo "$A_ALTARES" ;;
+        *"Valley of the Immortals"*|*undying*)    echo "$A_VALE" ;;
+        *"King of the Immortals"*)                echo "$A_REI" ;;
+        *"Clan coliseum"*|*clancoliseum*)         echo "$A_CLANCOL" ;;
+        *"Clan Dungeon"*|*clandmg*)               echo "$A_MASMORRA" ;;
+        *"Missao do cla"*|*"Clan quest"*)         echo "$A_CLANQUEST" ;;
+        *Flagfight*|*flagfight*)                  echo "$A_BANDEIRAS" ;;
+        *Coliseum*|*"Battle or event"*)           echo "$A_COLISEU" ;;
+        *Arena*)                                  echo "$A_ARENA" ;;
+        *Career*)                                 echo "$A_CARREIRA" ;;
+        *Cave*)                                   echo "$A_CAVERNA" ;;
+        *Campaign*)                               echo "$A_CAMPANHA" ;;
+        *"available fights"*|*"Available fights"*) echo "$A_LIGA" ;;
+        *Trade*|*Exchange*)                       echo "$A_TROCA" ;;
+        *"Checking Missions"*|*Chest*|*Mission*|*Relic*) echo "$A_SABIO" ;;
+        *"Current event"*)                        echo "$A_EVENTO" ;;
+        *aguardando*)                             echo "$A_DESCANSO" ;;
+        *)                                        echo "$A_NONE" ;;
     esac
     unset _lg _l
 }

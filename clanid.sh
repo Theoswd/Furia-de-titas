@@ -73,23 +73,50 @@ clanDungeon() {
     fi
 }
 
+# Conta e lider/oficial do cla?
+# A pagina do cla so mostra o link de administracao para quem tem cargo.
+clan_lider() {
+    [ -n "$CLD" ] || return 1
+    fetch_page "/clan/${CLD}/" "$TMP/CLANPG"
+    grep -q -E "/clan/${CLD}/[0-9]+/adm/" "$TMP/CLANPG"
+}
+
+# Estatua do Cla: mantem os bonus ativos.
+#
+# A implementacao anterior usava /clan/<CLD>/statue/ e
+# /statue/activate/ — URLs que nao existem no jogo. A pagina real e
+# /clan/<CLD>/built/ e os bonus sao ativados por parametro:
+#
+#   ?privateUpgrade=true&r=N   Bonus Pessoal   (custa ouro)
+#   ?goldUpgrade=true&r=N      Cla Bonus Ouro  (custa ouro do cla)
+#   ?silverUpgrade=true&r=N    Cla Bonus Prata (custa prata do cla)
+#
+# Quando um bonus ja esta ativo o link some e a pagina mostra apenas
+# "Tempo de sobra: HH:MM:SS" — por isso basta agir sobre o que aparecer.
 clan_statue() {
-    if [ "$FUNC_clan_statue" != "y" ]; then
-        return
+    [ "${FUNC_clan_statue:-y}" = "y" ] || return 1
+    [ -n "$CLD" ] || return 1
+
+    # Bonus do cla so podem ser ativados por quem tem cargo.
+    if ! clan_lider; then
+        return 1
     fi
 
-    if [ -z "$CLD" ]; then
-        return
-    fi
+    fetch_page "/clan/${CLD}/built/" "$TMP/STATUE"
+    [ -s "$TMP/STATUE" ] || return 1
 
-    fetch_page "/clan/${CLD}/statue/"
-
-    STATUE=`grep -o -E '/clan/[0-9]+/statue/activate/[?]r=[0-9]+' "$TMP/SRC" | head -n1`
-
-    if [ -n "$STATUE" ]; then
-        fetch_page "$STATUE"
-        printf "Clan statue activated\n"
-    fi
+    for _up in goldUpgrade silverUpgrade; do
+        _cl=`grep -o -E "/clan/${CLD}/built/[?]${_up}=true&r=[0-9]+" "$TMP/STATUE" | sed -n 1p`
+        if [ -n "$_cl" ]; then
+            fetch_page "$_cl"
+            case "$_up" in
+                goldUpgrade)   printf "Estatua do cla: bonus de OURO ativado\n" ;;
+                silverUpgrade) printf "Estatua do cla: bonus de PRATA ativado\n" ;;
+            esac
+        fi
+    done
+    unset _up _cl
+    return 0
 }
 
 clanQuests() {
