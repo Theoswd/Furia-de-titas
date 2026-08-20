@@ -1,0 +1,68 @@
+#!/bin/sh
+# session_check.sh
+
+# Decide se a pagina recebida corresponde a uma sessao ativa.
+#
+# CORRECAO: a versao anterior devolvia "nao logado" se a substring "sign_in"
+# aparecesse em QUALQUER lugar da pagina (inclusive num link de rodape) e
+# devolvia "logado" se aparecesse a palavra "exit" — generica demais. O
+# resultado eram relogins desnecessarios e falsos positivos. Agora o sinal
+# negativo e a presenca do FORMULARIO de login (campo de senha ou action de
+# sign_in), que so existe na pagina deslogada.
+is_logged_in() {
+    page="$1"
+    [ -z "$page" ] && return 1
+
+    if echo "$page" | grep -qiE "name=['\"]?pass['\"]?|action=[^>]*sign_in|[?&]sign_in=1"; then
+        return 1
+    fi
+
+    echo "$page" | grep -qi "\[level"          && return 0
+    echo "$page" | grep -qiE "/logout|[?&]exit" && return 0
+    echo "$page" | grep -qi "/user"            && return 0
+
+    return 1
+}
+
+extract_username() {
+    page="$1"
+
+    acc=`echo "$page" | sed -n "s/.*class='white'>\([^<]*\)<.*/\1/p" | head -n1`
+    [ -n "$acc" ] && echo "$acc" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' && return
+
+    acc=`echo "$page" | grep -o -E "[A-Za-z0-9_.][A-Za-z0-9_. -]*\[level" \
+        | sed 's/\[level//' | sed 's/[[:space:]]*$//' | head -n1`
+    [ -n "$acc" ] && echo "$acc" && return
+
+    acc=`echo "$page" | sed -n "s/.*href='\/user\/[0-9]*'>\([^<]*\)<\/a>.*/\1/p" | head -n1`
+    [ -n "$acc" ] && echo "$acc" && return
+
+    echo ""
+}
+
+test_login() {
+    _url="$1"
+    _user="$2"
+    _pass="$3"
+
+    # CORRECAO: o padrao era "/tmp/twm_test_$$.txt". O Termux NAO tem /tmp
+    # (usa $PREFIX/tmp, exposto em $TMPDIR). O curl nao conseguia gravar o
+    # cookie, a sessao se perdia entre as duas chamadas e o teste de login
+    # falhava SEMPRE — todo mundo via "Login nao confirmado".
+    _cookie="${4:-${TMPDIR:-/tmp}/twm_test_$$.txt}"
+
+    curl -sS -L --proto '=https' --proto-redir '=https' \
+        --connect-timeout 15 --max-time 45 \
+        -c "$_cookie" -b "$_cookie" \
+        --data-urlencode "login=${_user}" \
+        --data-urlencode "pass=${_pass}" \
+        "${_url}/?sign_in=1" > /dev/null
+
+    _page=`curl -sS -L --proto '=https' --proto-redir '=https' \
+        --connect-timeout 15 --max-time 45 \
+        -c "$_cookie" -b "$_cookie" "${_url}/user"`
+
+    rm -f "$_cookie"
+
+    is_logged_in "$_page"
+}
