@@ -73,13 +73,6 @@ request_update() {
                 done
                 key="FUNC_play_league"
                 ;;
-            5)
-                printf "Change the language? (y or n): "
-                menu_loop
-                menu_language
-                key="LANGUAGE"
-                continue
-                ;;
             6)
                 printf "Change your allies for battle? (y or n): "
                 while true; do
@@ -175,7 +168,6 @@ FUNC_arena_min=30
 FUNC_clan_statue=y
 FUNC_cave_boost=y
 SCRIPT_PAUSED=n
-LANGUAGE=en
 ALLIES=
 EOF
 }

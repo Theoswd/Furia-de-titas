@@ -60,7 +60,7 @@ fi
 
 cd "$TWMDIR" || exit 1
 for _lib in \
-    language.sh requeriments.sh loginlogoff.sh \
+    requeriments.sh loginlogoff.sh \
     flagfight.sh clanid.sh crono.sh arena.sh coliseum.sh \
     campaign.sh run.sh altars.sh clandmg.sh clanfight.sh \
     clancoliseum.sh king.sh undying.sh trade.sh career.sh \
@@ -71,14 +71,12 @@ do
 done
 unset _lib
 
-type translate_and_cache > /dev/null 2>&1 || translate_and_cache() { echo "$2"; }
 
 # CORRECAO: a ordem era language_setup depois load_config. Como o
 # language_setup criava o config.cfg contendo so LANGUAGE=, o load_config
 # encontrava o arquivo "ja existente" e nunca gravava os defaults. Agora o
 # load_config vem primeiro e garante todas as chaves.
 load_config
-language_setup
 
 if [ ! -f "$TMP/userAgent.txt" ] && [ -f "$TWMDIR/userAgent.txt" ]; then
     cp "$TWMDIR/userAgent.txt" "$TMP/userAgent.txt"

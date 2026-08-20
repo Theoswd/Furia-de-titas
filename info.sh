@@ -32,50 +32,6 @@ script_slogan() {
     printf "TWM - Titans War Macro v%s\n" "$versionNum"
 }
 
-# Le o idioma do config da conta. NAO cria o arquivo.
-#
-# CORRECAO: antes esta funcao era chamada no momento do "source" deste
-# arquivo (linha 39 da versao original). Como o twm.sh define $TMP antes
-# de dar source, ela criava $TMP/config.cfg contendo APENAS "LANGUAGE=en".
-# Em seguida load_config() encontrava o arquivo ja existente e nunca
-# gravava os defaults -> todas as FUNC_* ficavam vazias em todas as contas.
-# Agora quem garante as chaves e o load_config(), e a chamada automatica
-# foi removida.
-language_setup() {
-    CONFIG_FILE="${TMP:-.}/config.cfg"
-    LANGUAGE=`grep -E "^LANGUAGE=" "$CONFIG_FILE" 2>/dev/null | cut -d '=' -f2`
-    [ -z "$LANGUAGE" ] && LANGUAGE="en"
-    export LANGUAGE
-}
-
-printf_t() {
-    local_text="$1"
-    local_color_start="$2"
-    local_color_end="$3"
-    local_emoji_position="$4"
-    local_emoji="$5"
-    local_translated_text=`translate_and_cache "$LANGUAGE" "$local_text"`
-    if [ "$local_emoji_position" = "before" ]; then
-        printf "${local_color_start}%s %s${local_color_end}\n" "$local_emoji" "$local_translated_text"
-    else
-        printf "${local_color_start}%s %s${local_color_end}" "$local_translated_text" "$local_emoji"
-    fi
-}
-
-echo_t() {
-    local_text="$1"
-    local_color_start="$2"
-    local_color_end="$3"
-    local_emoji_position="$4"
-    local_emoji="$5"
-    local_translated_text=`translate_and_cache "$LANGUAGE" "$local_text"`
-    if [ "$local_emoji_position" = "before" ]; then
-        printf "${local_color_start}%s %s${local_color_end}\n" "$local_emoji" "$local_translated_text"
-    else
-        printf "${local_color_start}%s %s${local_color_end}\n" "$local_translated_text" "$local_emoji"
-    fi
-}
-
 # Aguarda o ultimo job em background terminar, ate N segundos.
 #
 # CORRECAO: a versao original rodava dentro de ( ... ) e extraia o PID com
