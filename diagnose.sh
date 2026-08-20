@@ -60,10 +60,29 @@ line=$(grep -E '^[0-9]+\|' "$ACCOUNTS_FILE" | sed -n "${1}p")
 srv=$(printf '%s' "$line" | cut -d'|' -f1)
 user=$(printf '%s' "$line" | cut -d'|' -f2)
 enc=$(printf '%s' "$line" | cut -d'|' -f3)
+# Segundo argumento opcional: testar a MESMA credencial em outro
+# servidor, sem alterar o cadastro. Serve para descobrir em qual
+# servidor a conta realmente existe — util quando siglas parecidas
+# foram confundidas no cadastro (RO=Romenia x RU=Russia, por exemplo).
+srv_orig="$srv"
+if [ -n "$2" ]; then
+    case "$2" in
+        1|2|3|4|5|6|7|8|9|10|11|12|13) srv="$2" ;;
+        *) printf "${R}Servidor invalido: %s (use 1 a 13)${N}
+" "$2"; exit 1 ;;
+    esac
+fi
+
 tag=$(server_tag "$srv"); host=$(server_url "$srv"); sch=$(server_scheme "$srv")
 URL="${sch}://${host}"
 
 printf "${C}=== Diagnostico: [%s] %s ===${N}\n" "$tag" "$user"
+if [ "$srv" != "$srv_orig" ]; then
+    printf "  ${Y}TESTE CRUZADO: a conta esta cadastrada em [%s], testando em [%s]${N}
+
+" \
+        "$(server_tag "$srv_orig")" "$tag"
+fi
 printf "  servidor: %s\n\n" "$URL"
 
 CK=$(mktemp 2>/dev/null || echo "${TMPDIR:-/tmp}/diag_$$.txt")
