@@ -471,6 +471,32 @@ cd ~/TitasWar-Sung-Jinwoo && sha256sum -c .integrity --quiet && echo "Nenhum scr
 ## Solução de problemas
 
 <details>
+<summary><b>Uma conta não loga mesmo com a senha certa</b></summary>
+
+Use o diagnóstico. Ele usa a credencial já salva, mostra exatamente o que o servidor responde e **nunca exibe a senha**:
+
+```bash
+./diagnose.sh
+```
+
+Isso lista as contas numeradas. Depois rode com o número da conta:
+
+```bash
+./diagnose.sh 4
+```
+
+O resultado separa as causas:
+
+| Conclusão | Significa | O que fazer |
+|---|---|---|
+| **O SERVIDOR RECUSOU a credencial** | o servidor respondeu com erro de autenticação | senha errada, conta banida, ou o nome cadastrado não é o nome de login. Teste a mesma senha no navegador |
+| **LOGIN FUNCIONOU** | a sessão foi criada, mas o bot achou que não | falha na detecção — abra uma issue com a saída |
+| **Formulário sem mensagem de erro** | sessão descartada | indício de bloqueio de IP; teste no navegador pela mesma rede |
+
+O diagnóstico também mostra o IP de saída da máquina, útil para comparar com o IP em que você costuma jogar.
+</details>
+
+<details>
 <summary><b>"could not create work tree dir: Permission denied" ao clonar</b></summary>
 
 Você está tentando instalar numa pasta do Windows (o terminal do WSL costuma abrir em `/mnt/c/Windows/System32`, que é somente leitura).
@@ -579,6 +605,7 @@ TitasWar-Sung-Jinwoo/
 ├── twm.sh           Loop de jogo de uma conta (login + ciclo principal)
 ├── setup.sh         Menu de cadastro/remoção/teste de contas
 ├── stop.sh          Encerra todos os workers
+├── diagnose.sh      Diagnostica falha de login de uma conta
 ├── install-service.sh  Instala como servico do systemd (VPS/Linux)
 │
 ├── run.sh           Agenda: o que executar em cada horário
