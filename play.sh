@@ -29,6 +29,12 @@ YELLOW='\033[1;33m'
 RESET='\033[00m'
 
 mkdir -p "$STATUS_DIR"
+
+# PID do proprio orquestrador. Sem isto o stop.sh nao conseguia
+# encerrar o monitor: ele roda como "./play.sh" (caminho relativo) e
+# um pgrep por caminho absoluto nao casa. Cada ./play.sh deixava mais
+# um monitor vivo, todos supervisionando as mesmas contas.
+echo "$$" > "$STATUS_DIR/orchestrator.pid"
 chmod 700 "$HOME/.twm" 2>/dev/null
 [ -f "$ACCOUNTS_FILE" ] && chmod 600 "$ACCOUNTS_FILE" 2>/dev/null
 

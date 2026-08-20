@@ -65,12 +65,27 @@ done
 # que continua rodando como monitor e relancando workers. Cada ./play.sh
 # deixava mais um monitor vivo, e varios supervisores concorriam pelas
 # mesmas contas. Agora o orquestrador tambem e encerrado.
-for p in $(pgrep -f "$TWMDIR/play.sh" 2>/dev/null); do
+orch_pid=$(cat "$STATUS_DIR/orchestrator.pid" 2>/dev/null)
+case "$orch_pid" in
+    ""|*[!0-9]*) ;;
+    *) kill -TERM "$orch_pid" 2>/dev/null ;;
+esac
+rm -f "$STATUS_DIR/orchestrator.pid"
+
+# Rede de seguranca: qualquer play.sh cujo diretorio de trabalho seja
+# o do bot. Comparar o cwd evita acertar um play.sh de outro projeto.
+for p in $(pgrep -f "play\.sh" 2>/dev/null); do
     [ "$p" = "$$" ] && continue
+    _cwd=$(readlink -f "/proc/$p/cwd" 2>/dev/null)
+    [ "$_cwd" = "$TWMDIR" ] || continue
     kill -TERM "$p" 2>/dev/null
 done
 sleep 1
-pkill -KILL -f "$TWMDIR/play.sh" 2>/dev/null
+for p in $(pgrep -f "play\.sh" 2>/dev/null); do
+    [ "$p" = "$$" ] && continue
+    _cwd=$(readlink -f "/proc/$p/cwd" 2>/dev/null)
+    [ "$_cwd" = "$TWMDIR" ] && kill -KILL "$p" 2>/dev/null
+done
 
 # Rede de seguranca para orfaos de execucoes antigas (antes do setsid).
 pkill -f "$TWMDIR/twm.sh" 2>/dev/null
