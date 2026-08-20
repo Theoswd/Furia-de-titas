@@ -8,7 +8,7 @@ career_func() {
         fetch_page "/career/"
 
         if grep -q -o -E '/career/(attack|take)/[?]r[=][0-9]+' "$TMP/SRC"; then
-            CAREER=`grep -o -E '/career/(attack|take)/[?]r[=][0-9]+' "$TMP/SRC"`
+            CAREER=`grep -o -E '/career/(attack|take)/[?]r[=][0-9]+' "$TMP/SRC" | sed -n 1p`
             BREAK=$(($(date +%s) + 60))
 
             while [ -n "$CAREER" ] && [ "$(date +%s)" -lt "$BREAK" ]; do

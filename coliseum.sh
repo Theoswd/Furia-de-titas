@@ -105,7 +105,10 @@ coliseum_fight() {
         BREAK_LOOP=""
         first_time=`date +%s`
 
-        until [ -n "$BREAK_LOOP" ]; do
+        # Limite de tempo: BREAK_LOOP so e definido quando a luta
+        # termina. Se o estado nunca resolver, o laco era infinito.
+        COL_BREAK=$(($(date +%s) + 600))
+        until [ -n "$BREAK_LOOP" ] || [ "$(date +%s)" -gt "$COL_BREAK" ]; do
             now=`date +%s`
             time_since_last_heal=$((now - last_heal))
             time_since_last_dodge=$((now - last_dodge))

@@ -101,7 +101,10 @@ clanQuests() {
 
     QUEST=`grep -o -E '/clan/[0-9]+/quest/(take|end)/[0-9]+/[?]r=[0-9]+' "$TMP/SRC" | head -n1`
 
-    while [ -n "$QUEST" ]; do
+    # Limite de tempo: se a mesma missao continuar aparecendo (por
+    # exemplo uma que nao pode ser concluida), o laco nao terminava.
+    CQ_BREAK=$(($(date +%s) + 90))
+    while [ -n "$QUEST" ] && [ "$(date +%s)" -lt "$CQ_BREAK" ]; do
         fetch_page "$QUEST"
         printf "Clan quest processed\n"
         fetch_page "/clan/${CLD}/quest/"

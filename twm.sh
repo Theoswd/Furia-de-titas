@@ -25,21 +25,8 @@ TMP="$TWM_ACC_DIR"
 TMP_COOKIE="$TMP/cookie.txt"
 export URL UR TMP TMP_COOKIE
 
-case "$UR" in
-    1)  export TZ="America/Bahia" ;;
-    2)  export TZ="Europe/Berlin" ;;
-    3)  export TZ="America/Cancun" ;;
-    4)  export TZ="Europe/Paris" ;;
-    5)  export TZ="Asia/Kolkata" ;;
-    6)  export TZ="Asia/Jakarta" ;;
-    7)  export TZ="Europe/Rome" ;;
-    8)  export TZ="Europe/Warsaw" ;;
-    9)  export TZ="Europe/Bucharest" ;;
-    10) export TZ="Europe/Moscow" ;;
-    11) export TZ="Europe/Belgrade" ;;
-    12) export TZ="Asia/Shanghai" ;;
-    13) export TZ="Europe/London" ;;
-esac
+# Servidor unico (BR): fuso fixo.
+export TZ="America/Bahia"
 
 mkdir -p "$TMP"
 chmod 700 "$TMP" 2>/dev/null

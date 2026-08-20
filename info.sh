@@ -180,48 +180,76 @@ hpmp() {
     fi
 }
 
-# Le nome, HP e MP a partir de uma pagina /user JA baixada.
+# Extrai os dados da conta de uma pagina /user ja baixada e grava em
+# $TMP/stats, que o painel do play.sh le. Nenhuma requisicao extra: o
+# login_logoff() ja baixa essa pagina a cada ciclo.
 #
-# CORRECAO: o hpmp() antigo so era chamado pelo undying.sh e lia de um
-# arquivo ($TMP/SRC) que raramente continha a pagina certa, com regexes que
-# nao batem mais com o HTML atual. Por isso a linha de status saia como
-# "HP:  (%) | MP:  (%)". Estrutura real da pagina:
-#   health.png' alt='hp'/> <span class='white'>65312</span> | <img
-#   src='/images/icon/mana.png' alt='mp'/> 470</span>
+# Campos nao encontrados viram "-" em vez de ficarem vazios, para o painel
+# nao mentir sobre um valor que nao conseguiu ler.
+#
+# Padroes confirmados contra o HTML real do jogo:
+#   <title>Grimlock</title>
+#   health.png' alt='hp'/> <span class='white'>65312</span>
+#   mana.png' alt='mp'/> 470</span>
+#   icon/level.png' alt=''/> 40 nivel
+#   mana.png' alt=''/> Energia: 2125
+# Ouro e prata seguem os padroes ja usados pelo cave.sh (gold.png/silver.png).
+# Remove separadores de milhar (vírgula E ponto: o servidor BR usa 1.234).
+_num() { printf '%s' "$1" | tr -d '.,' | grep -o -E '[0-9]+' | head -n1; }
+
 parse_status() {
     _pg="$1"
     [ -n "$_pg" ] || return 1
 
-    NOWHP=`printf '%s' "$_pg" \
-        | grep -o -E "health\.png' alt='hp'/> <span[^>]*>[0-9]{1,9}" \
-        | grep -o -E '[0-9]{1,9}$' | head -n1`
-    NOWMP=`printf '%s' "$_pg" \
-        | grep -o -E "mana\.png' alt='mp'/>[^0-9<]{0,4}[0-9]{1,9}" \
-        | grep -o -E '[0-9]{1,9}$' | head -n1`
+    ACC_HP=`printf '%s' "$_pg" | grep -o -E "health\.png' alt='hp'/> <span[^>]*>[0-9]{1,9}" | grep -o -E '[0-9]{1,9}$' | head -n1`
+    ACC_MP=`printf '%s' "$_pg" | grep -o -E "mana\.png' alt='mp'/>[^0-9<]{0,4}[0-9]{1,9}" | grep -o -E '[0-9]{1,9}$' | head -n1`
+    ACC_LVL=`printf '%s' "$_pg" | grep -o -E "icon/level\.png' alt='[^']*'/> ?[0-9]{1,4}" | grep -o -E '[0-9]{1,4}$' | head -n1`
+    ACC_ENE=`printf '%s' "$_pg" | grep -o -E "[Ee]nergia:? ?[0-9.,]{1,15}" | head -n1`
+    ACC_ENE=`_num "$ACC_ENE"`
+    ACC_GOLD=`printf '%s' "$_pg" | grep -o -E "gold\.png[^0-9]{0,40}[0-9][0-9.,]{0,15}" | head -n1`
+    ACC_GOLD=`_num "$ACC_GOLD"`
+    ACC_SILVER=`printf '%s' "$_pg" | grep -o -E "silver\.png[^0-9]{0,40}[0-9][0-9.,]{0,15}" | head -n1`
+    ACC_SILVER=`_num "$ACC_SILVER"`
 
-    if [ -n "$NOWHP" ] && [ -n "$FIXHP" ] && [ "$FIXHP" -gt 0 ] 2>/dev/null; then
-        HPPER=`awk -v a="$NOWHP" -v b="$FIXHP" 'BEGIN{printf "%.0f", a/b*100}'`
+    # Compatibilidade com o codigo antigo
+    NOWHP="$ACC_HP"; NOWMP="$ACC_MP"
+
+    if [ -n "$ACC_HP" ] && [ -n "$FIXHP" ] && [ "$FIXHP" -gt 0 ] 2>/dev/null; then
+        HPPER=`awk -v a="$ACC_HP" -v b="$FIXHP" 'BEGIN{printf "%.0f", a/b*100}'`
     else
         HPPER=""
     fi
+
+    printf '%s|%s|%s|%s|%s|%s|%s|%s\n' \
+        "${ACC:-$TWM_USER}" "${ACC_HP:--}" "${ACC_MP:--}" "${ACC_ENE:--}" \
+        "${ACC_LVL:--}" "${ACC_GOLD:--}" "${ACC_SILVER:--}" "$(date +%s)" \
+        > "$TMP/stats" 2>/dev/null
+
     unset _pg
 }
 
-# Busca o HP maximo em /train. Muda pouco, entao basta chamar no login.
+# Busca o HP maximo em /train. Muda pouco: basta uma vez por login.
 fetch_max_hp() {
     _t=`run_curl "${URL}/train" 2>/dev/null`
     FIXHP=`printf '%s' "$_t" | grep -o -E '\([0-9]{1,9}\)' | head -n1 | tr -d '()'`
+    # A energia costuma aparecer aqui; se a /user nao trouxer, aproveita.
+    if [ -z "$ACC_ENE" ] || [ "$ACC_ENE" = "-" ]; then
+        ACC_ENE=`printf '%s' "$_t" | grep -o -E "[Ee]nergia:? ?[0-9.,]{1,15}" | head -n1`
+        ACC_ENE=`_num "$ACC_ENE"`
+    fi
     unset _t
 }
 
-# Monta a linha de status. Imprime o que existe; nao inventa campo vazio.
+# Linha de status no log da conta. Imprime so o que existe.
 messages_info() {
     _a="${ACC:-$TWM_USER}"
     printf "TWM v%s | %s\n" "${versionNum:-?}" "$_a" > "$TMP/msg_file"
     if [ -n "$HPPER" ]; then
-        printf "HP: %s (%s%%) | MP: %s\n" "${NOWHP:-?}" "$HPPER" "${NOWMP:-?}" >> "$TMP/msg_file"
+        printf "HP: %s (%s%%) | MP: %s | Energia: %s | Nivel: %s\n" \
+            "${ACC_HP:--}" "$HPPER" "${ACC_MP:--}" "${ACC_ENE:--}" "${ACC_LVL:--}" >> "$TMP/msg_file"
     else
-        printf "HP: %s | MP: %s\n" "${NOWHP:-?}" "${NOWMP:-?}" >> "$TMP/msg_file"
+        printf "HP: %s | MP: %s | Energia: %s | Nivel: %s\n" \
+            "${ACC_HP:--}" "${ACC_MP:--}" "${ACC_ENE:--}" "${ACC_LVL:--}" >> "$TMP/msg_file"
     fi
     unset _a
 }

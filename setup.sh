@@ -20,34 +20,15 @@ RED='\033[0;31m'
 CYAN='\033[01;36m'
 RESET='\033[00m'
 
-server_url() {
-    case "$1" in
-        1)  echo "furiadetitas.net" ;;   2)  echo "titanen.mobi" ;;
-        3)  echo "guerradetitanes.net" ;; 4)  echo "tiwar.fr" ;;
-        5)  echo "in.tiwar.net" ;;        6)  echo "tiwar-id.net" ;;
-        7)  echo "guerradititani.net" ;;   8)  echo "tiwar.pl" ;;
-        9)  echo "tiwar.ro" ;;            10) echo "tiwar.ru" ;;
-        11) echo "rs.tiwar.net" ;;        12) echo "cn.tiwar.net" ;;
-        13) echo "tiwar.net" ;;
-    esac
-}
-
-server_scheme() {
-    case "$1" in
-        5) echo "http" ;;
-        *) echo "https" ;;
-    esac
-}
-
-server_tag() {
-    case "$1" in
-        1)  echo "BR" ;;  2)  echo "DE" ;;  3)  echo "ES" ;;
-        4)  echo "FR" ;;  5)  echo "IN" ;;  6)  echo "ID" ;;
-        7)  echo "IT" ;;  8)  echo "PL" ;;  9)  echo "RO" ;;
-        10) echo "RU" ;;  11) echo "SR" ;;  12) echo "ZH" ;;
-        13) echo "EN" ;;
-    esac
-}
+# ============================================================
+#  SOMENTE SERVIDOR BR (furiadetitas.net)
+#  O suporte aos outros 12 servidores foi removido a pedido.
+#  O campo de servidor continua no accounts.conf (sempre "1")
+#  para nao quebrar cadastros existentes.
+# ============================================================
+server_url()    { case "$1" in 1) echo "furiadetitas.net" ;; esac; }
+server_tag()    { case "$1" in 1) echo "BR" ;; esac; }
+server_scheme() { echo "https"; }
 
 show_menu() {
     clear
@@ -86,28 +67,18 @@ list_accounts() {
     read -r _d
 }
 
+# Servidor unico: nao ha o que escolher.
 show_servers() {
-    printf "\n${CYAN}Servidores:${RESET}\n"
-    printf " 1) BR  furiadetitas.net     2) DE  titanen.mobi\n"
-    printf " 3) ES  guerradetitanes.net  4) FR  tiwar.fr\n"
-    printf " 5) IN  in.tiwar.net (HTTP)  6) ID  tiwar-id.net\n"
-    printf " 7) IT  guerradititani.net   8) PL  tiwar.pl\n"
-    printf " 9) RO  tiwar.ro            10) RU  tiwar.ru\n"
-    printf "11) SR  rs.tiwar.net        12) ZH  cn.tiwar.net\n"
-    printf "13) EN  tiwar.net\n"
+    printf "
+${CYAN}Servidor: BR - furiadetitas.net${RESET}
+"
 }
 
 add_account() {
     clear
     printf "${CYAN}=== Adicionar conta ===${RESET}\n"
     show_servers
-    printf "\nNumero do servidor: "
-    read -r srv
-
-    case "$srv" in
-        [1-9]|10|11|12|13) ;;
-        *) printf "${RED}Servidor invalido.${RESET}\n"; sleep 2; return ;;
-    esac
+    srv=1
 
     url=$(server_url "$srv")
     tag=$(server_tag "$srv")

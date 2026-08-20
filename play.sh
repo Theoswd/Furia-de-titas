@@ -49,37 +49,15 @@ else
     SETSID=""
 fi
 
-server_url() {
-    case "$1" in
-        1)  echo "furiadetitas.net" ;;   2)  echo "titanen.mobi" ;;
-        3)  echo "guerradetitanes.net" ;; 4)  echo "tiwar.fr" ;;
-        5)  echo "in.tiwar.net" ;;        6)  echo "tiwar-id.net" ;;
-        7)  echo "guerradititani.net" ;;  8)  echo "tiwar.pl" ;;
-        9)  echo "tiwar.ro" ;;            10) echo "tiwar.ru" ;;
-        11) echo "rs.tiwar.net" ;;        12) echo "cn.tiwar.net" ;;
-        13) echo "tiwar.net" ;;
-    esac
-}
-
-# O servidor IN (in.tiwar.net) recusa conexao na porta 443 e so atende em
-# HTTP. Como o codigo montava "https://" fixo para todos, esse servidor
-# nunca funcionou. ATENCAO: em HTTP a senha trafega em texto claro.
-server_scheme() {
-    case "$1" in
-        5) echo "http" ;;
-        *) echo "https" ;;
-    esac
-}
-
-server_tag() {
-    case "$1" in
-        1) echo "BR" ;;  2) echo "DE" ;;  3) echo "ES" ;;
-        4) echo "FR" ;;  5) echo "IN" ;;  6) echo "ID" ;;
-        7) echo "IT" ;;  8) echo "PL" ;;  9) echo "RO" ;;
-        10) echo "RU" ;; 11) echo "SR" ;; 12) echo "ZH" ;;
-        13) echo "EN" ;;
-    esac
-}
+# ============================================================
+#  SOMENTE SERVIDOR BR (furiadetitas.net)
+#  O suporte aos outros 12 servidores foi removido a pedido.
+#  O campo de servidor continua no accounts.conf (sempre "1")
+#  para nao quebrar cadastros existentes.
+# ============================================================
+server_url()    { case "$1" in 1) echo "furiadetitas.net" ;; esac; }
+server_tag()    { case "$1" in 1) echo "BR" ;; esac; }
+server_scheme() { echo "https"; }
 
 # Remove CR (accounts.conf editado no Windows) e caracteres de controle.
 clean_field() {
@@ -221,7 +199,9 @@ while IFS='|' read -r srv user encoded <&3; do
 
     pid=""
     _w=0
-    while [ -z "$pid" ] && [ "$_w" -lt 10 ]; do
+    # 5s bastam: o worker grava o PID como primeira acao. Com 20 contas,
+    # o limite antigo de 10s somava ate 200s de espera no pior caso.
+    while [ -z "$pid" ] && [ "$_w" -lt 5 ]; do
         sleep 1
         pid=$(cat "$pid_file" 2>/dev/null)
         _w=$((_w + 1))
@@ -233,7 +213,15 @@ while IFS='|' read -r srv user encoded <&3; do
     # do mesmo IP: o rate-limit derrubava quase todas e o backoff exponencial
     # (ate 300s) mantinha as contas sincronizadas reincidindo em bloco.
     if [ "$n" -lt "$total" ]; then
-        _jit=$(( (n * 7 + $$ % 13) % 16 + 5 ))
+        # Escalonamento adaptativo. O valor fixo de 5-20s por conta
+        # levaria ate 6,7 minutos so para subir 20 contas. Agora a
+        # janela total fica em torno de 3 minutos, qualquer que seja o
+        # numero de contas, com um piso de 3s para nao autenticar todas
+        # no mesmo instante (o servidor limita login por IP).
+        _base=$(( 180 / total ))
+        [ "$_base" -lt 3 ] && _base=3
+        [ "$_base" -gt 15 ] && _base=15
+        _jit=$(( _base + (n + $$) % 4 ))
         printf "   aguardando %ss antes da proxima conta\n" "$_jit"
         sleep "$_jit"
     fi
@@ -250,21 +238,59 @@ printf "\n${GREEN}%s worker(s) iniciado(s).${RESET}\n\n" "$n"
 printf "Log de conta:  ${CYAN}tail -f ~/.twm/BR_NomeConta/twm.log${RESET}\n"
 printf "Parar tudo:    ${CYAN}./stop.sh${RESET}\n\n"
 # Monitor — reabre accounts.conf a cada ciclo via fd3
-# Painel so faz sentido com terminal. Sob systemd (ou qualquer saida
-# redirecionada) ele seria reimpresso a cada 20s no journal; nesse caso
-# o laco continua supervisionando e relancando workers, em silencio.
+# ============================================================
+#  PAINEL
+#  So faz sentido com terminal. Sob systemd (ou qualquer saida
+#  redirecionada) seria reimpresso a cada 20s no journal; nesse
+#  caso o laco segue supervisionando e relancando, em silencio.
+# ============================================================
 if [ -t 1 ]; then HAS_TTY=1; else HAS_TTY=0; fi
 [ "$HAS_TTY" = 0 ] && echo "[monitor] supervisionando $n conta(s); painel oculto (sem terminal)"
 
-W="======================================"
+LINHA="━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+# Emoji conforme o estado do worker
+estado_emoji() {
+    case "$1" in
+        running)                          echo "🟢" ;;
+        starting|loading|login_retry|restarting) echo "🟡" ;;
+        dead)                             echo "🔴" ;;
+        stopped)                          echo "⚫" ;;
+        *)                                echo "⚪" ;;
+    esac
+}
+
+# Descobre o que a conta esta fazendo agora, a partir do log
+atividade_de() {
+    _lg="$1"
+    [ -f "$_lg" ] || { echo "—"; return; }
+    _l=`tail -n 25 "$_lg" 2>/dev/null | grep -iE "Arena|Career|Carreira|Cave|Caverna|Campaign|Campanha|Coliseu|Coliseum|Clan|King|Rei|Trade|Missions|Quest|Relic|Altars|League|Liga|Event|aguardando" | tail -n 1`
+    case "$_l" in
+        *Arena*|*arena*)             echo "⚔️  Arena" ;;
+        *Career*|*Carreira*)         echo "🎖️  Carreira" ;;
+        *Cave*|*Caverna*|*caverna*)  echo "⛏️  Caverna" ;;
+        *Campaign*|*Campanha*)       echo "🗺️  Campanha" ;;
+        *Colise*|*colise*)           echo "🏛️  Coliseu" ;;
+        *Clan*|*clan*)               echo "🛡️  Clã" ;;
+        *King*|*Rei*)                echo "👑  Rei" ;;
+        *Trade*|*Troca*)             echo "💱  Troca" ;;
+        *Quest*|*Mission*|*Missao*)  echo "📜  Missões" ;;
+        *Relic*|*Reliquia*)          echo "💎  Relíquias" ;;
+        *Altars*|*Altares*)          echo "🔥  Altares" ;;
+        *League*|*Liga*)             echo "🏆  Liga" ;;
+        *Event*|*Evento*)            echo "🎉  Evento" ;;
+        *aguardando*)                echo "💤  Aguardando" ;;
+        *)                           echo "—" ;;
+    esac
+    unset _lg _l
+}
 
 while true; do
-    [ -t 1 ] && clear
-    now=$(date +%H:%M:%S)
+    [ "$HAS_TTY" = 1 ] && clear
+    agora=$(date +%H:%M:%S)
 
-    [ "$HAS_TTY" = 1 ] && printf "╔%s╗\n" "$W"
-    [ "$HAS_TTY" = 1 ] && printf "║  TWM Multi-contas        %s  ║\n" "$now"
-    [ "$HAS_TTY" = 1 ] && printf "╠%s╣\n" "$W"
+    tot_ouro=0; tot_prata=0; n_on=0; n_off=0; idx=0
+    LISTA=""; ATIV=""
 
     while IFS='|' read -r srv user _enc <&3; do
         srv=$(clean_field "$srv")
@@ -273,7 +299,9 @@ while true; do
         [ -z "$user" ] && continue
         tag=$(server_tag "$srv")
         [ -z "$tag" ] && continue
+
         acc_id="${tag}_${user}"
+        acc_dir="$HOME/.twm/${acc_id}"
         status_file="$STATUS_DIR/${acc_id}.status"
         pid_file="$STATUS_DIR/${acc_id}.pid"
         status=$(cat "$status_file" 2>/dev/null || echo "?")
@@ -281,31 +309,44 @@ while true; do
 
         if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then
             echo "dead" > "$status_file"
-            # Worker morto (OOM killer do Android, por exemplo). Antes o
-            # monitor apenas EXIBIA "ERRO" e a conta ficava parada para
-            # sempre. Agora ele resobe o worker desta conta.
-            printf "[monitor] relancando worker\n" >> "$HOME/.twm/${acc_id}/twm.log" 2>/dev/null
-            launch_worker "$srv" "$user" "" > /dev/null 2>&1
             status="dead"
+            printf "[monitor] relancando worker\n" >> "$acc_dir/twm.log" 2>/dev/null
+            launch_worker "$srv" "$user" "" > /dev/null 2>&1
         fi
 
-        case "$status" in
-            running)     col="\033[32m" label="online"      ;;
-            loading)     col="\033[33m" label="carregando"  ;;
-            login_retry) col="\033[33m" label="login..."    ;;
-            restarting)  col="\033[33m" label="reiniciando" ;;
-            starting)    col="\033[33m" label="iniciando"   ;;
-            dead)        col="\033[31m" label="ERRO"        ;;
-            stopped)     col="\033[31m" label="parado"      ;;
-            *)           col="\033[33m" label="$status"     ;;
-        esac
+        [ "$status" = "running" ] && n_on=$((n_on + 1)) || n_off=$((n_off + 1))
+        idx=$((idx + 1))
 
-        entry=$(printf "[%s] %-16s %-10s" "$tag" "$user" "$label")
-        [ "$HAS_TTY" = 1 ] && printf "║  %b* %s\033[00m  ║\n" "$col" "$entry"
+        # Dados gravados pelo worker (sem requisicao extra aqui)
+        nome="$user"; hp="-"; mp="-"; ene="-"; lvl="-"; ouro="-"; prata="-"
+        if [ -s "$acc_dir/stats" ]; then
+            IFS='|' read -r nome hp mp ene lvl ouro prata _ts < "$acc_dir/stats"
+            [ -z "$nome" ] && nome="$user"
+        fi
+        case "$ouro"  in ''|*[!0-9]*) ;; *) tot_ouro=$((tot_ouro + ouro)) ;; esac
+        case "$prata" in ''|*[!0-9]*) ;; *) tot_prata=$((tot_prata + prata)) ;; esac
 
+        em=$(estado_emoji "$status")
+        LISTA="${LISTA}$(printf ' %2s %s %-18.18s ❤️ %-7s ⚡ %-6s ⭐ %-4s 🪙 %-8s 🥈 %s' \
+              "$idx" "$em" "$nome" "$hp" "$ene" "$lvl" "$ouro" "$prata")
+"
+        ATIV="${ATIV}$(printf '    %-18.18s ▸ %s' "$nome" "$(atividade_de "$acc_dir/twm.log")")
+"
     done 3< "$ACCOUNTS_FILE"
 
-    [ "$HAS_TTY" = 1 ] && printf "╚%s╝\n" "$W"
+    if [ "$HAS_TTY" = 1 ]; then
+        printf '%s\n' "$LINHA"
+        printf '  🎮 TWM Multi-contas · BR%*s%s\n' 28 '' "$agora"
+        printf '%s\n' "$LINHA"
+        printf '%s' "$LISTA"
+        printf '%s\n' "$LINHA"
+        printf '  📋 ATIVIDADE EM CONJUNTO\n'
+        printf '%s' "$ATIV"
+        printf '%s\n' "$LINHA"
+        printf '  🟢 %s online   🔴 %s parada(s)      💰 Ouro %s   🥈 Prata %s\n' \
+               "$n_on" "$n_off" "$tot_ouro" "$tot_prata"
+        printf '%s\n' "$LINHA"
+    fi
 
     _i=0
     while [ "$_i" -lt 20 ]; do

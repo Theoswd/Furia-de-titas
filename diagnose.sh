@@ -19,25 +19,15 @@ ACCOUNTS_FILE="$TWMDIR/accounts.conf"
 
 G='\033[32m'; R='\033[0;31m'; Y='\033[1;33m'; C='\033[01;36m'; N='\033[00m'
 
-server_url() {
-    case "$1" in
-        1) echo "furiadetitas.net";; 2) echo "titanen.mobi";;
-        3) echo "guerradetitanes.net";; 4) echo "tiwar.fr";;
-        5) echo "in.tiwar.net";; 6) echo "tiwar-id.net";;
-        7) echo "guerradititani.net";; 8) echo "tiwar.pl";;
-        9) echo "tiwar.ro";; 10) echo "tiwar.ru";;
-        11) echo "rs.tiwar.net";; 12) echo "cn.tiwar.net";;
-        13) echo "tiwar.net";;
-    esac
-}
-server_tag() {
-    case "$1" in
-        1) echo BR;; 2) echo DE;; 3) echo ES;; 4) echo FR;; 5) echo IN;;
-        6) echo ID;; 7) echo IT;; 8) echo PL;; 9) echo RO;; 10) echo RU;;
-        11) echo SR;; 12) echo ZH;; 13) echo EN;;
-    esac
-}
-server_scheme() { case "$1" in 5) echo http;; *) echo https;; esac; }
+# ============================================================
+#  SOMENTE SERVIDOR BR (furiadetitas.net)
+#  O suporte aos outros 12 servidores foi removido a pedido.
+#  O campo de servidor continua no accounts.conf (sempre "1")
+#  para nao quebrar cadastros existentes.
+# ============================================================
+server_url()    { case "$1" in 1) echo "furiadetitas.net" ;; esac; }
+server_tag()    { case "$1" in 1) echo "BR" ;; esac; }
+server_scheme() { echo "https"; }
 
 [ -s "$ACCOUNTS_FILE" ] || { printf "${R}Nenhuma conta cadastrada.${N}\n"; exit 1; }
 
@@ -60,29 +50,14 @@ line=$(grep -E '^[0-9]+\|' "$ACCOUNTS_FILE" | sed -n "${1}p")
 srv=$(printf '%s' "$line" | cut -d'|' -f1)
 user=$(printf '%s' "$line" | cut -d'|' -f2)
 enc=$(printf '%s' "$line" | cut -d'|' -f3)
-# Segundo argumento opcional: testar a MESMA credencial em outro
-# servidor, sem alterar o cadastro. Serve para descobrir em qual
-# servidor a conta realmente existe — util quando siglas parecidas
-# foram confundidas no cadastro (RO=Romenia x RU=Russia, por exemplo).
+# Servidor unico (BR): o teste cruzado entre servidores foi removido
+# junto com o suporte multi-servidor.
 srv_orig="$srv"
-if [ -n "$2" ]; then
-    case "$2" in
-        1|2|3|4|5|6|7|8|9|10|11|12|13) srv="$2" ;;
-        *) printf "${R}Servidor invalido: %s (use 1 a 13)${N}
-" "$2"; exit 1 ;;
-    esac
-fi
 
 tag=$(server_tag "$srv"); host=$(server_url "$srv"); sch=$(server_scheme "$srv")
 URL="${sch}://${host}"
 
 printf "${C}=== Diagnostico: [%s] %s ===${N}\n" "$tag" "$user"
-if [ "$srv" != "$srv_orig" ]; then
-    printf "  ${Y}TESTE CRUZADO: a conta esta cadastrada em [%s], testando em [%s]${N}
-
-" \
-        "$(server_tag "$srv_orig")" "$tag"
-fi
 printf "  servidor: %s\n\n" "$URL"
 
 CK=$(mktemp 2>/dev/null || echo "${TMPDIR:-/tmp}/diag_$$.txt")

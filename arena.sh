@@ -53,6 +53,13 @@ arena_duel() {
 
     until grep -q -o 'lab/wizard' "$TMP/SRC" || [ "$(date +%s)" -gt "$BREAK" ]; do
         ACCESS=`grep -o -E '(/arena/attack/1/[?]r[=][0-9]+)' "$TMP/SRC" | sed -n '1p'`
+        # Sem link de ataque a arena acabou: sai em vez de repetir
+        # fetch_page com URL vazia (que baixa a home) por 60 segundos.
+        if [ -z "$ACCESS" ]; then
+            printf "  Arena sem ataques disponiveis
+"
+            break
+        fi
         fetch_page "$ACCESS"
         count=$((count + 1))
         printf "  Attack %s\n" "$count"

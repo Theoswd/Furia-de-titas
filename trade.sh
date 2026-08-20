@@ -22,14 +22,14 @@ clan_money() {
     if [ -n "$CLD" ]; then
         printf "Clan money ...\n"
 
-        fetch_page "${URL}/arena/quit"
+        fetch_page "/arena/quit"
         awk_code=`sed "s/href='/\n/g" "$TMP/SRC" | grep "attack/1" | head -n 1 | awk -F\/ '{ print $5 }' | tr -cd '[:digit:]'`
         echo "$awk_code" > "$TMP/CODE"
 
         printf "/clan/%s/money/?r=%s&silver=1000&gold=0&confirm=true&type=limit\n" "$CLD" "`cat "$TMP/CODE"`"
         fetch_page "/clan/${CLD}/money/?r=$(cat "$TMP/CODE")&silver=1000&gold=0&confirm=true&type=limit"
 
-        fetch_page "${URL}/arena/quit"
+        fetch_page "/arena/quit"
         awk_code=`sed "s/href='/\n/g" "$TMP/SRC" | grep "attack/1" | head -n 1 | awk -F\/ '{ print $5 }' | tr -cd '[:digit:]'`
         echo "$awk_code" > "$TMP/CODE"
 

@@ -31,7 +31,10 @@ specialEvent() {
             fetch_page "${click}"
             sleep 1s
             click=`grep -o -E "/fault/attack/\?r=[0-9]+" "$TMP/SRC" | sed -n '1p'`
-            while true; do
+            # Limite de tempo: se o link de ataque continuar presente,
+            # o laco nao terminava sozinho.
+            SE_BREAK=$(($(date +%s) + 90))
+            while [ "$(date +%s)" -lt "$SE_BREAK" ]; do
                 if [ -n "${click}" ]; then
                     fetch_page "${click}"
                     click=`grep -o -E "/fault/attack/\?r=[0-9]+" "$TMP/SRC" | sed -n '1p'`

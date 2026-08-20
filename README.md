@@ -75,11 +75,7 @@ Resumo do que mudou na prática. O detalhamento técnico está em **[CORRECOES.m
 - **Config deixou de ser executado como código.**
 - **HTTPS reforçado** — bloqueio de downgrade para HTTP em redirecionamentos, e timeouts para o bot não travar em socket pendurado.
 
-### Servidores
-
-- **IT** corrigido: `guerraditiani.net` (que não resolve mais) → **`guerradititani.net`**.
-- **IN** (`in.tiwar.net`) passa a funcionar: esse servidor **não oferece HTTPS** (porta 443 recusa conexão) e o código forçava `https://` para todos. Agora usa HTTP, com aviso explícito de que a senha trafega em texto claro.
-- **RU** (`tiwar.ru`), **BR**, **EN** e os demais foram verificados um a um e estão corretos.
+- **Somente servidor BR.** O suporte aos outros 12 servidores foi removido: o projeto agora atende apenas **`furiadetitas.net`**. O campo de servidor continua no `accounts.conf` (sempre `1`) para não quebrar cadastros existentes.
 
 ---
 ## Requisitos
@@ -167,17 +163,7 @@ Abre um menu interativo. Escolha `2` para adicionar. Ele pergunta o servidor, o 
 ./setup.sh
 ```
 
-Servidores disponíveis:
-
-| Nº | Tag | Domínio | Nº | Tag | Domínio |
-|---|---|---|---|---|---|
-| 1 | BR | furiadetitas.net | 8 | PL | tiwar.pl |
-| 2 | DE | titanen.mobi | 9 | RO | tiwar.ro |
-| 3 | ES | guerradetitanes.net | 10 | RU | tiwar.ru |
-| 4 | FR | tiwar.fr | 11 | SR | rs.tiwar.net |
-| 5 | IN | in.tiwar.net *(só HTTP)* | 12 | ZH | cn.tiwar.net |
-| 6 | ID | tiwar-id.net | 13 | EN | tiwar.net |
-| 7 | IT | guerradititani.net | | | |
+Só existe um servidor: **BR — furiadetitas.net**. O `setup.sh` não pergunta qual, apenas o usuário e a senha.
 
 Repita o passo para cada conta. Não há limite fixo — o limite prático é a memória e a bateria do aparelho.
 
@@ -456,7 +442,7 @@ cd ~/TitasWar-Sung-Jinwoo && git fetch && git log --oneline HEAD..origin/main
 
 > **Base64 não é criptografia.** É uma codificação reversível: qualquer pessoa com acesso ao arquivo recupera a senha. A proteção real vem das permissões (`600` no arquivo, `700` em `~/.twm`), que restringem o acesso ao seu usuário.
 
-**Para onde sua senha vai.** Apenas para o domínio oficial do servidor que você escolheu. O código restringe o destino a uma lista fixa de 13 domínios, sem caso genérico — não existe entrada de dados que faça a senha ir para outro lugar. Não há envio para nenhum terceiro.
+**Para onde sua senha vai.** Apenas para `furiadetitas.net`, o domínio oficial do servidor BR. O código restringe o destino a um único domínio (`furiadetitas.net`), sem caso genérico — não existe entrada de dados que faça a senha ir para outro lugar. Não há envio para nenhum terceiro.
 
 **O `.gitignore` protege você.** Ele impede que `accounts.conf`, cookies e logs sejam enviados caso você faça um fork e publique. Nunca remova essas linhas.
 

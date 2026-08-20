@@ -208,11 +208,26 @@ cave_routine() {
         count=8
     fi
 
+    # LIMITE DE TEMPO: o laco abaixo era "while true", sem limite e sem
+    # saida quando nao ha acao disponivel. Com a caverna em espera, CAVE
+    # ficava vazio, o case nao casava com nada, e o laco repetia
+    # fetch_page "/cave/" indefinidamente — cerca de 3600 requisicoes por
+    # hora, por conta. Era a maior fonte de carga do bot.
+    CAVE_BREAK=$(($(date +%s) + 240))
+
     fetch_page "/cave/"
 
-    while true; do
+    while [ "$(date +%s)" -lt "$CAVE_BREAK" ]; do
         CAVE=`grep -o -E '/cave/(gather|down|runaway|speedUp)/[?]r[=][0-9]+' "$TMP/SRC" | sed -n '1p'`
         RESULT=`echo "$CAVE" | cut -d'/' -f3`
+
+        # Sem link de acao, a caverna esta em espera: sai em vez de
+        # repetir a mesma requisicao ate o tempo acabar.
+        if [ -z "$CAVE" ]; then
+            printf "Caverna sem acao disponivel agora
+"
+            break
+        fi
 
         RESOURCES=`grep -o -E 'res/[0-9]+\.png' "$TMP/SRC" | sed 's/res\///;s/.png//'`
         MINERALS_FOUND=`echo "$RESOURCES" | grep -E '^[1-5]$' | wc -l`
