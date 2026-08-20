@@ -112,7 +112,12 @@ sz=$(wc -c < "$RESP" 2>/dev/null)
 printf "   tamanho: %s bytes\n" "$sz"
 
 AUTHERR=0
-grep -qiE "неверн|Ошибка авториз|incorretamente|Falha na autoriz|incorrect|invalid" "$RESP" 2>/dev/null && AUTHERR=1
+# Deteccao ESTRUTURAL, nao por palavra. A tentativa anterior procurava
+# termos de erro em cada idioma e falhava por detalhes de grafia — em
+# romenes e "incorect" com um R so, entao "incorrect" nao casava e o
+# diagnostico saia inconclusivo. O bloco de erro do jogo usa sempre a
+# mesma marcacao, em qualquer um dos 13 idiomas.
+grep -qE "error\.png|class='[^']*error" "$RESP" 2>/dev/null && AUTHERR=1
 FORM=0
 grep -qE "name='pass'" "$RESP" 2>/dev/null && FORM=1
 
@@ -126,7 +131,7 @@ printf "\n${C}=== CONCLUSAO ===${N}\n"
 if [ "$AUTHERR" = 1 ]; then
     printf "${R}O SERVIDOR RECUSOU a credencial.${N}\n"
     printf "  Mensagem encontrada na resposta:\n"
-    grep -oiE "(неверн|Ошибка авториз|incorretamente|Falha na autoriz)[^<]{0,60}" "$RESP" | head -2 | sed 's/^/    > /'
+    grep -oE "error\.png[^<]*<[^>]*>[^<]{0,90}" "$RESP" | head -2 | sed "s/.*alt=''\/>//" | sed "s/^/    > /"
     printf "\n  Causas, em ordem de probabilidade:\n"
     printf "    1. Senha alterada ou digitada errada no cadastro\n"
     printf "    2. Conta banida ou suspensa\n"
