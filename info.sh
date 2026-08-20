@@ -193,25 +193,45 @@ hpmp() {
 #   mana.png' alt='mp'/> 470</span>
 #   icon/level.png' alt=''/> 40 nivel
 #   mana.png' alt=''/> Energia: 2125
-# Ouro e prata seguem os padroes ja usados pelo cave.sh (gold.png/silver.png).
-# Remove separadores de milhar (vírgula E ponto: o servidor BR usa 1.234).
-_num() { printf '%s' "$1" | tr -d '.,' | grep -o -E '[0-9]+' | head -n1; }
+# Converte "408,1M" / "12K" / "396" em numero inteiro, para somar no painel.
+# O jogo abrevia valores grandes; sem isso, "408,1M" virava 4081.
+_para_num() {
+    _v=`printf '%s' "$1" | tr -d ' '`
+    case "$_v" in
+        *K|*k) _m=1000 ;;
+        *M|*m) _m=1000000 ;;
+        *B|*b) _m=1000000000 ;;
+        *)     _m=1 ;;
+    esac
+    _d=`printf '%s' "$_v" | tr ',' '.' | tr -cd '0-9.'`
+    [ -z "$_d" ] && { echo 0; return; }
+    awk -v d="$_d" -v m="$_m" 'BEGIN{ printf "%.0f", d*m }'
+}
 
+# Extrai os dados da conta de uma pagina /user ja baixada e grava em
+# $TMP/stats, lido pelo painel do play.sh. Sem requisicao extra: o
+# login_logoff() ja baixa essa pagina a cada ciclo.
+#
+# Padroes confirmados contra o HTML real:
+#   <title>Grimlock</title>
+#   health.png' alt='hp'/> <span class='white'>65312</span>
+#   mana.png' alt='mp'/> 346
+#   icon/level.png' alt='lvl'/> 90
+#   icon/gold.png' alt='g'/> 396
+#   icon/silver.png' alt='s'/> 408,1M
+# Energia so aparece em /train: mana.png' alt=''/> Energia: 2125
 parse_status() {
     _pg="$1"
     [ -n "$_pg" ] || return 1
 
     ACC_HP=`printf '%s' "$_pg" | grep -o -E "health\.png' alt='hp'/> <span[^>]*>[0-9]{1,9}" | grep -o -E '[0-9]{1,9}$' | head -n1`
     ACC_MP=`printf '%s' "$_pg" | grep -o -E "mana\.png' alt='mp'/>[^0-9<]{0,4}[0-9]{1,9}" | grep -o -E '[0-9]{1,9}$' | head -n1`
-    ACC_LVL=`printf '%s' "$_pg" | grep -o -E "icon/level\.png' alt='[^']*'/> ?[0-9]{1,4}" | grep -o -E '[0-9]{1,4}$' | head -n1`
-    ACC_ENE=`printf '%s' "$_pg" | grep -o -E "[Ee]nergia:? ?[0-9.,]{1,15}" | head -n1`
-    ACC_ENE=`_num "$ACC_ENE"`
-    ACC_GOLD=`printf '%s' "$_pg" | grep -o -E "gold\.png[^0-9]{0,40}[0-9][0-9.,]{0,15}" | head -n1`
-    ACC_GOLD=`_num "$ACC_GOLD"`
-    ACC_SILVER=`printf '%s' "$_pg" | grep -o -E "silver\.png[^0-9]{0,40}[0-9][0-9.,]{0,15}" | head -n1`
-    ACC_SILVER=`_num "$ACC_SILVER"`
+    ACC_LVL=`printf '%s' "$_pg" | grep -o -E "level\.png' alt='[^']*'/> ?[0-9]{1,4}" | grep -o -E '[0-9]{1,4}$' | head -n1`
 
-    # Compatibilidade com o codigo antigo
+    # Ouro e prata: guarda o texto como o jogo mostra (pode vir "408,1M").
+    ACC_GOLD=`printf '%s' "$_pg" | grep -o -E "gold\.png' alt='[^']*'/> ?[0-9][0-9.,]{0,12}[KMBkmb]?" | sed -E "s@.*/> ?@@" | head -n1`
+    ACC_SILVER=`printf '%s' "$_pg" | grep -o -E "silver\.png' alt='[^']*'/> ?[0-9][0-9.,]{0,12}[KMBkmb]?" | sed -E "s@.*/> ?@@" | head -n1`
+
     NOWHP="$ACC_HP"; NOWMP="$ACC_MP"
 
     if [ -n "$ACC_HP" ] && [ -n "$FIXHP" ] && [ "$FIXHP" -gt 0 ] 2>/dev/null; then
@@ -228,17 +248,19 @@ parse_status() {
     unset _pg
 }
 
-# Busca o HP maximo em /train. Muda pouco: basta uma vez por login.
-fetch_max_hp() {
+# Dados que so existem na pagina /train: HP maximo e energia.
+# Uma requisicao por ciclo de start(), nao por minuto.
+fetch_train_stats() {
     _t=`run_curl "${URL}/train" 2>/dev/null`
+    [ -n "$_t" ] || return 1
     FIXHP=`printf '%s' "$_t" | grep -o -E '\([0-9]{1,9}\)' | head -n1 | tr -d '()'`
-    # A energia costuma aparecer aqui; se a /user nao trouxer, aproveita.
-    if [ -z "$ACC_ENE" ] || [ "$ACC_ENE" = "-" ]; then
-        ACC_ENE=`printf '%s' "$_t" | grep -o -E "[Ee]nergia:? ?[0-9.,]{1,15}" | head -n1`
-        ACC_ENE=`_num "$ACC_ENE"`
-    fi
+    ACC_ENE=`printf '%s' "$_t" | grep -o -E "Energia:? ?[0-9][0-9.,]{0,12}[KMBkmb]?" | sed -E 's@.*:? ?@@' | head -n1`
+    [ -z "$ACC_ENE" ] && ACC_ENE=`printf '%s' "$_t" | grep -o -E "Energia:? ?[0-9.,]{1,15}" | grep -o -E '[0-9.,]{1,15}$' | head -n1`
     unset _t
 }
+
+# Compatibilidade: nome antigo usado pelo twm.sh
+fetch_max_hp() { fetch_train_stats; }
 
 # Linha de status no log da conta. Imprime so o que existe.
 messages_info() {

@@ -10,6 +10,9 @@ login_logoff() {
         # A pagina /user ja esta em maos: aproveita para atualizar HP/MP
         # antes de descarta-la. Antes o PAGE era descartado aqui e o
         # messages_info imprimia campos vazios.
+        # Energia e HP maximo so existem em /train: uma requisicao por
+        # ciclo de start(), nao por minuto.
+        fetch_train_stats 2>/dev/null
         parse_status "$PAGE"
         unset _acc PAGE
         messages_info
@@ -50,6 +53,9 @@ login_logoff() {
         printf "[%s] %s — reconectado\n" "$TWM_TAG" "$TWM_USER"
         _acc=`extract_username "$PAGE"`
         [ -n "$_acc" ] && ACC=`echo "$_acc" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'`
+        # Energia e HP maximo so existem em /train: uma requisicao por
+        # ciclo de start(), nao por minuto.
+        fetch_train_stats 2>/dev/null
         parse_status "$PAGE"
         unset _acc
         messages_info

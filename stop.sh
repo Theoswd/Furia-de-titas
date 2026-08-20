@@ -20,6 +20,9 @@ for pid_file in "$STATUS_DIR"/*.pid; do
     [ -f "$pid_file" ] || continue
 
     acc_id=`basename "$pid_file" .pid`
+    # orchestrator.pid e o PID do proprio play.sh, nao de uma conta:
+    # sem isto ele virava uma linha "orchestrator  stopped" no painel.
+    [ "$acc_id" = "orchestrator" ] && continue
     pid=`cat "$pid_file" 2>/dev/null`
 
     case "$pid" in

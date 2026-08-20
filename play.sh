@@ -281,6 +281,20 @@ fi
 
 LINHA="--------------------------------------------------------------------"
 
+# Converte "408,1M" / "12K" / "396" em inteiro, para os totais.
+para_num() {
+    _v=`printf %s "$1" | tr -d " "`
+    case "$_v" in
+        *K|*k) _m=1000 ;;
+        *M|*m) _m=1000000 ;;
+        *B|*b) _m=1000000000 ;;
+        *)     _m=1 ;;
+    esac
+    _d=`printf %s "$_v" | tr "," "." | tr -cd "0-9."`
+    [ -z "$_d" ] && { echo 0; return; }
+    awk -v d="$_d" -v m="$_m" 'BEGIN{ printf "%.0f", d*m }'
+}
+
 estado_cor() {
     case "$1" in
         running)                                echo "$C_GREEN" ;;
@@ -362,8 +376,8 @@ while true; do
             IFS='|' read -r nome hp mp ene lvl ouro prata _ts < "$acc_dir/stats"
             [ -z "$nome" ] && nome="$user"
         fi
-        case "$ouro"  in ''|*[!0-9]*) ;; *) tot_ouro=$((tot_ouro + ouro)) ;; esac
-        case "$prata" in ''|*[!0-9]*) ;; *) tot_prata=$((tot_prata + prata)) ;; esac
+        [ "$ouro"  != "-" ] && tot_ouro=$((tot_ouro + $(para_num "$ouro")))
+        [ "$prata" != "-" ] && tot_prata=$((tot_prata + $(para_num "$prata")))
 
         cor=$(estado_cor "$status")
         sim=$(estado_simbolo "$status")
