@@ -294,20 +294,6 @@ hpmp() {
 #   mana.png' alt='mp'/> 470</span>
 #   icon/level.png' alt=''/> 40 nivel
 #   mana.png' alt=''/> Energia: 2125
-# Converte "408,1M" / "12K" / "396" em numero inteiro, para somar no painel.
-# O jogo abrevia valores grandes; sem isso, "408,1M" virava 4081.
-_para_num() {
-    _v=`printf '%s' "$1" | tr -d ' '`
-    case "$_v" in
-        *K|*k) _m=1000 ;;
-        *M|*m) _m=1000000 ;;
-        *B|*b) _m=1000000000 ;;
-        *)     _m=1 ;;
-    esac
-    _d=`printf '%s' "$_v" | tr ',' '.' | tr -cd '0-9.'`
-    [ -z "$_d" ] && { echo 0; return; }
-    awk -v d="$_d" -v m="$_m" 'BEGIN{ printf "%.0f", d*m }'
-}
 
 # Extrai os dados da conta de uma pagina /user ja baixada e grava em
 # $TMP/stats, lido pelo painel do play.sh. Sem requisicao extra: o
@@ -330,8 +316,8 @@ parse_status() {
     ACC_LVL=`printf '%s' "$_pg" | grep -o -E "level\.png' alt='[^']*'/> ?[0-9]{1,4}" | grep -o -E '[0-9]{1,4}$' | head -n1`
 
     # Ouro e prata: guarda o texto como o jogo mostra (pode vir "408,1M").
-    ACC_GOLD=`printf '%s' "$_pg" | grep -o -E "gold\.png' alt='[^']*'/> ?[0-9][0-9.,]{0,12}[KMBkmb]?" | sed -E "s@.*/> ?@@" | head -n1`
-    ACC_SILVER=`printf '%s' "$_pg" | grep -o -E "silver\.png' alt='[^']*'/> ?[0-9][0-9.,]{0,12}[KMBkmb]?" | sed -E "s@.*/> ?@@" | head -n1`
+    ACC_GOLD=`printf '%s' "$_pg" | grep -o -E "gold\.png' alt='[^']*'/> ?[0-9][0-9.,']{0,14}[KMBkmb]?" | sed -E "s@.*/> ?@@" | head -n1`
+    ACC_SILVER=`printf '%s' "$_pg" | grep -o -E "silver\.png' alt='[^']*'/> ?[0-9][0-9.,']{0,14}[KMBkmb]?" | sed -E "s@.*/> ?@@" | head -n1`
 
     NOWHP="$ACC_HP"; NOWMP="$ACC_MP"
 
@@ -355,8 +341,8 @@ fetch_train_stats() {
     _t=`run_curl "${URL}/train" 2>/dev/null`
     [ -n "$_t" ] || return 1
     FIXHP=`printf '%s' "$_t" | grep -o -E '\([0-9]{1,9}\)' | head -n1 | tr -d '()'`
-    ACC_ENE=`printf '%s' "$_t" | grep -o -E "Energia:? ?[0-9][0-9.,]{0,12}[KMBkmb]?" | sed -E 's@.*:? ?@@' | head -n1`
-    [ -z "$ACC_ENE" ] && ACC_ENE=`printf '%s' "$_t" | grep -o -E "Energia:? ?[0-9.,]{1,15}" | grep -o -E '[0-9.,]{1,15}$' | head -n1`
+    ACC_ENE=`printf '%s' "$_t" | grep -o -E "Energia:? ?[0-9][0-9.,']{0,14}[KMBkmb]?" | sed -E 's@.*:? ?@@' | head -n1`
+    [ -z "$ACC_ENE" ] && ACC_ENE=`printf '%s' "$_t" | grep -o -E "Energia:? ?[0-9.,']{1,15}" | grep -o -E '[0-9.,']{1,15}$' | head -n1`
     unset _t
 }
 
@@ -482,7 +468,7 @@ valor_num() {
         *B|*b) _mu=1000000000 ;;
         *)     _mu=1 ;;
     esac
-    _dg=`printf '%s' "$_v" | tr ',' '.' | tr -cd '0-9.'`
+    _dg=`printf '%s' "$_v" | tr -d "'" | tr ',' '.' | tr -cd '0-9.'`
     [ -z "$_dg" ] && { echo 0; return; }
     awk -v d="$_dg" -v m="$_mu" 'BEGIN{ printf "%.0f", d*m }'
     unset _v _mu _dg
