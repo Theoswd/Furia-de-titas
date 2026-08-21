@@ -29,13 +29,46 @@ cq_ids() {
     esac
 }
 
-# Baixa a pagina de missoes do cla em $TMP/CQUEST.
+# Baixa a pagina de missoes do cla em $TMP/CQUEST, reaproveitando por
+# alguns segundos.
+#
+# CORRECAO (15 downloads da MESMA pagina por ciclo): toda funcao daqui
+# comeca chamando cq_pagina, e um ciclo de start() as encadeia:
+#
+#   cq_concluir 1 + cq_ajudar 1 + cq_forcar_ouro 1
+#   + cq_antes x6, e cada cq_antes faz cq_concluir + cq_tomar   = 12
+#   ------------------------------------------------------------
+#                                                              = 15
+#
+# Quinze vezes a mesma pagina, por conta, por ciclo — com 6 contas sao 90
+# requisicoes por ciclo que nao acrescentam nada. A pagina so muda quando o
+# proprio bot age sobre ela (tomar, concluir, ajudar), e esses pontos
+# invalidam o cache explicitamente, entao a leitura nunca fica velha.
 cq_pagina() {
     [ -n "$CLD" ] || clan_id
     [ -n "$CLD" ] || return 1
+
+    if [ -s "$TMP/CQUEST" ]; then
+        _cq_mt=`stat -c %Y "$TMP/CQUEST" 2>/dev/null`
+        case "$_cq_mt" in
+            ''|*[!0-9]*) ;;   # sem stat utilizavel: baixa de novo
+            *)
+                _cq_idade=$(( `date +%s` - _cq_mt ))
+                if [ "$_cq_idade" -ge 0 ] && [ "$_cq_idade" -lt "${CQ_TTL:-45}" ]; then
+                    unset _cq_mt _cq_idade
+                    return 0
+                fi
+                ;;
+        esac
+        unset _cq_mt _cq_idade
+    fi
+
     fetch_page "/clan/${CLD}/quest/" "$TMP/CQUEST"
     [ -s "$TMP/CQUEST" ]
 }
+
+# Descarta o cache. Chamado depois de toda acao que muda a pagina.
+cq_invalidar() { rm -f "$TMP/CQUEST" 2>/dev/null; return 0; }
 
 # cq_tomar <tipo>
 # Toma a missao do cla correspondente aquela atividade, se houver.
@@ -54,6 +87,11 @@ cq_tomar() {
             _tomou=0
         fi
     done
+    # DEPOIS do laco, nunca dentro: o cache e a propria lista que o laco
+    # esta percorrendo. Invalidando a cada volta, a missao 1 era tomada,
+    # a pagina sumia e a 2 nao era mais encontrada — "liga" e "arena" tem
+    # duas missoes cada, e a segunda de cada par ficava para tras.
+    [ "$_tomou" = 0 ] && cq_invalidar
     unset _tipo _id _cl
     return $_tomou
 }
@@ -72,6 +110,7 @@ cq_concluir() {
             _n=$((_n + 1))
         fi
     done
+    [ "$_n" -gt 0 ] && cq_invalidar
     unset _id _cl
     [ "$_n" -gt 0 ]
 }
@@ -84,27 +123,54 @@ cq_ajudar() {
     cq_pagina || return 1
 
     _usou_ouro=0
+    _ajudou=0
     for _id in 1 2 3 4 5 6 7 8; do
         _cl=`grep -o -E "/clan/${CLD}/quest/help/${_id}/?[?]r=[0-9]+" "$TMP/CQUEST" | sed -n 1p`
         [ -n "$_cl" ] || continue
 
-        # Links de ajuda que cobram ouro trazem confirmacao de custo.
-        if printf '%s' "$_cl" | grep -q 'gold\|pay'; then
-            [ "$_usou_ouro" -eq 1 ] && continue
-            _usou_ouro=1
-        fi
+        # CORRECAO: aqui o teste era
+        #     printf '%s' "$_cl" | grep -q 'gold\|pay'
+        # sobre a URL de ajuda — que e sempre
+        #     /clan/<CLD>/quest/help/<id>/?r=<numero>
+        # e portanto NUNCA contem "gold" nem "pay". O limite de uma ajuda
+        # paga por ciclo, que o comentario prometia, nunca entrou em vigor:
+        # o grep dava falso em todas as voltas.
+        #
+        # O custo, quando existe, esta no TEXTO da pagina ao lado do link,
+        # nao na URL. Sem uma ancora confiavel para esse texto, o limite
+        # passa a valer para QUALQUER ajuda: no maximo uma por ciclo. Ajudar
+        # menos e recuperavel — o proximo ciclo ajuda de novo; gastar ouro
+        # sem querer, nao.
+        [ "$_usou_ouro" -eq 1 ] && continue
+        _usou_ouro=1
         fetch_page "$_cl"
         printf "Ajuda em missao do cla (#%s)\n" "$_id"
+        _ajudou=1
     done
-    unset _id _cl _usou_ouro
+    [ "${_ajudou:-0}" = 1 ] && cq_invalidar
+    unset _id _cl _usou_ouro _ajudou
     return 0
 }
 
 # cq_forcar_ouro
 # Missao parada com ouro suficiente: conclui pagando.
 # O limite vem de FUNC_quest_gold_min (padrao 1200).
+#
+# DESLIGADA POR PADRAO — a mecanica nao existe neste jogo.
+#
+# Os nomes de URL abaixo (finish, complete, endGold, forGold) eram chutes:
+# nenhum deles aparece na pagina de missoes do cla. A pagina real foi
+# inspecionada em duas contas, uma delas com 4.620 de ouro, e nao ha link,
+# nem onclick, nem form, nem button de concluir-missao-com-ouro. O que a
+# pagina oferece e tomar, cancelar, ajudar e concluir quando o progresso
+# fecha — nada pago.
+#
+# Ligada, a funcao so gastava uma leitura de pagina por ciclo para procurar
+# um link que nunca existiu. Fica no codigo, e nao removida, para o caso de
+# o jogo passar a oferecer: quem quiser tentar usa FUNC_quest_force_gold=y
+# e confere o log.
 cq_forcar_ouro() {
-    [ "${FUNC_quest_force_gold:-y}" = "y" ] || return 1
+    [ "${FUNC_quest_force_gold:-n}" = "y" ] || return 1
     _min=${FUNC_quest_gold_min:-1200}
     case "$_min" in ''|*[!0-9]*) _min=1200 ;; esac
 

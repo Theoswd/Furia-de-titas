@@ -55,6 +55,22 @@ twm_play() {
             start
             ;;
 
+        # --- Rotina completa dentro da janela do Coliseu
+        #
+        # CORRECAO: 01:00, 02:00 e 03:00 estavam listados na rotina comum
+        # la embaixo, mas o "case" para no PRIMEIRO padrao que casa e o
+        # ramo do Coliseu (logo abaixo) cobre 00:30 as 04:30 — engolia os
+        # tres. Na pratica a rotina completa rodava as 00:00 e so voltava
+        # as 04:31: quatro horas e meia por dia sem Cabana do Sabio,
+        # caverna, carreira, liga, campanha, troca, elixir nem bencao.
+        #
+        # A intencao do autor estava escrita (os horarios listados); o que
+        # faltava era a precedencia. Tres minutos do dia saem do Coliseu,
+        # que tem janela de quatro horas e nao sente a falta.
+        (01:00|02:00|03:00)
+            start
+            ;;
+
         # --- Coliseu comum: 00:30 as 04:30
         (00:3[0-9]|00:[45][0-9]|0[123]:[0-5][0-9]|04:[0-2][0-9]|04:30)
             coliseum_fight
@@ -68,6 +84,13 @@ twm_play() {
         # --- Batalha de Bandeiras
         (10:1[0-4]|16:1[0-4])
             flagfight_start
+            # CORRECAO: era o unico ramo que nao chamava nem start nem
+            # tarefas_livres. Os cinco minutos da janela passavam sem
+            # checklist do cla, sem arena e sem atualizar os numeros do
+            # painel, duas vezes por dia. As tarefas tem portao proprio de
+            # tempo, entao chamar aqui nao adianta nada alem de nao perder
+            # a vez.
+            tarefas_livres
             ;;
 
         # --- Eventos especiais
@@ -77,7 +100,7 @@ twm_play() {
             ;;
 
         # --- Rotina comum
-        (00:00|01:00|02:00|03:00|04:3[1-9]|05:00|05:30|06:00|06:30|07:00|07:30|08:00|08:30|09:00|11:00|11:30|12:00|13:00|13:30|14:00|14:30|15:00|15:30|17:00|17:30|18:00|18:30|19:00|19:30|20:00|20:30|22:00|23:00|23:30)
+        (00:00|04:3[1-9]|05:00|05:30|06:00|06:30|07:00|07:30|08:00|08:30|09:00|11:00|11:30|12:00|13:00|13:30|14:00|14:30|15:00|15:30|17:00|17:30|18:00|18:30|19:00|19:30|20:00|20:30|22:00|23:00|23:30)
             start
             ;;
 

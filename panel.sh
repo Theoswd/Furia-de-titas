@@ -324,6 +324,7 @@ painel_loop() {
 while true; do
     [ -t 1 ] && [ "${PANEL_ONCE:-0}" != "1" ] && clear
     agora=$(date +%H:%M:%S)
+    _now=$(date +%s)
 
     # Remede a cada volta: o celular pode ser girado com o painel aberto.
     LARG=$(painel_largura)
@@ -376,9 +377,45 @@ while true; do
         idx=$((idx + 1))
 
         nome="$user"; hp="-"; mp="-"; ene="-"; lvl="-"; ouro="-"; prata="-"
+        _idade=""
         if [ -s "$acc_dir/stats" ]; then
             IFS='|' read -r nome hp mp ene lvl ouro prata _ts < "$acc_dir/stats"
             [ -z "$nome" ] && nome="$user"
+
+            # QUAO VELHOS SAO ESSES NUMEROS?
+            #
+            # O arquivo stats guarda o instante da leitura na ultima coluna,
+            # mas o painel lia esse campo e nao fazia nada com ele. Numero
+            # de uma hora atras aparecia com a mesma cara de numero de
+            # agora, e nada apaga o arquivo quando o bot para — foi assim
+            # que um saldo antigo de "4" continuou no painel depois de a
+            # leitura de ouro ja estar corrigida, fazendo parecer que a
+            # correcao nao tinha pegado.
+            #
+            # O worker reescreve o stats a cada ~3 min (atualiza_stats).
+            # Passando de 10, ou a conta parou ou travou: os numeros saem
+            # em cinza, com a idade ao lado.
+            case "$_ts" in
+                ''|*[!0-9]*) ;;
+                *) _seg=$(( _now - _ts ))
+                   [ "$_seg" -gt 600 ] && _idade="$_seg" ;;
+            esac
+        fi
+
+        # Idade em texto curto, por aritmetica (sem date -d, que o toybox
+        # do Android nao aceita, e sem fork).
+        _selo=""
+        if [ -n "$_idade" ]; then
+            if [ "$_idade" -ge 3600 ]; then
+                _selo="~$((_idade / 3600))h "
+            else
+                _selo="~$((_idade / 60))m "
+            fi
+            # O til tambem vai no nome: no layout largo os numeros ficam na
+            # mesma linha e nao sobra espaco para o selo sem estourar a
+            # borda, entao a marca viaja no campo do nome, que tem largura
+            # fixa e nunca desalinha.
+            nome="~$nome"
         fi
 
         # Atribuicao direta no lugar de "cor=$(estado_cor ...)": a
@@ -439,9 +476,12 @@ while true; do
                 _l1="$I_HP"; _l2="$I_EN"; _l3="$I_LV"; _l4="$I_GO"; _l5="$I_SI"
             fi
             _num=$((LARG - 4))
-            LISTA="${LISTA}$(printf "    %b%.*s%b" "$C_GRAY" "$_num" \
-                "$(printf "%s %s %s %s %s %s %s %s %s %s" \
-                    "$_l1" "$hp" "$_l2" "$ene" "$_l3" "$lvl" \
+            # Numeros velhos saem esmaecidos e com a idade ao lado, para
+            # nunca serem lidos como leitura de agora.
+            if [ -n "$_idade" ]; then _cor_n="$C_DIM"; else _cor_n="$C_GRAY"; fi
+            LISTA="${LISTA}$(printf "    %b%.*s%b" "$_cor_n" "$_num" \
+                "$(printf "%s%s %s %s %s %s %s %s %s %s %s" \
+                    "$_selo" "$_l1" "$hp" "$_l2" "$ene" "$_l3" "$lvl" \
                     "$_l4" "$ouro" "$_l5" "$prata")" "$C_RESET")
 "
             [ -n "$_cbt" ] && LISTA="${LISTA}$(printf "    %b%s%b" "$_cor_c" "$_cbt" "$C_RESET")
