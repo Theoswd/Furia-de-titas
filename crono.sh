@@ -37,6 +37,12 @@ func_cat() {
     _i="${i:-60}"
     case "$_i" in ''|*[!0-9]*) _i=60 ;; esac
 
+    # A conta esta parada entre ciclos: registra a pagina inicial, que
+    # e onde ela de fato descansa. Sem isto o painel continuava
+    # mostrando a ultima aba visitada (tipicamente Missoes do Cla) o
+    # tempo todo, mesmo com o bot ocioso.
+    printf %s "/" > "${TMP}/pagina" 2>/dev/null
+
     if [ ! -t 0 ]; then
         printf "Sem batalhas agora, aguardando %ss\n" "$_i"
         sleep "$_i"
@@ -103,6 +109,37 @@ cq_liberado() {
 }
 cq_marcar() { date +%s > "$TMP/last_cq" 2>/dev/null; }
 
+# Atualizacao dos numeros do painel (HP, energia, nivel, ouro, prata).
+#
+# O stats so era gravado dentro do start(), que roda nos minutos da
+# agenda — com vaos de mais de uma hora. O painel exibia valores
+# velhos: ouro 128 quando ja era 28, HP 583 quando ja era 656.
+# Uma requisicao a /user a cada 3 minutos por conta resolve sem peso.
+stats_liberado() {
+    _m=${FUNC_stats_min:-3}
+    case "$_m" in ''|*[!0-9]*) _m=3 ;; esac
+    _u=`cat "$TMP/last_stats" 2>/dev/null`
+    case "$_u" in ''|*[!0-9]*) _u=0 ;; esac
+    [ $(( $(date +%s) - _u )) -ge $((_m * 60)) ]
+}
+
+atualiza_stats() {
+    # Preserva a aba atual. O run_curl registra toda pagina acessada,
+    # entao esta consulta a /user sobrescreveria a atividade real e o
+    # painel passaria a exibir "Meu Heroi" o tempo todo.
+    _aba_ant=`cat "${TMP}/pagina" 2>/dev/null`
+    _pg=`run_curl "${URL}/user" 2>/dev/null`
+    [ -n "$_pg" ] || return 1
+    is_logged_in "$_pg" || return 1
+    _a=`extract_username "$_pg"`
+    [ -n "$_a" ] && ACC="$_a"
+    parse_status "$_pg"
+    messages_info
+    date +%s > "$TMP/last_stats" 2>/dev/null
+    printf %s "$_aba_ant" > "${TMP}/pagina" 2>/dev/null
+    unset _pg _a _aba_ant
+}
+
 # A masmorra libera 10 golpes por janela de 8h. Um marcador por
 # janela evita repetir a rotina a cada volta do laco.
 masmorra_liberada() {
@@ -133,6 +170,11 @@ masmorra_marcar() { date +%s > "$TMP/last_masmorra" 2>/dev/null; }
 # o start() roda o checklist completo e as demais atividades.
 tarefas_livres() {
     [ -n "$CLD" ] || clan_id 2>/dev/null
+
+    # --- Numeros do painel, a cada 3 min
+    if stats_liberado; then
+        atualiza_stats 2>/dev/null
+    fi
 
     # --- Checklist das missoes do cla
     if [ -n "$CLD" ] && cq_liberado; then
