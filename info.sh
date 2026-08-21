@@ -78,6 +78,28 @@ time_exit() {
 #  -sS em vez de -s      : mantem silencio de progresso MAS mostra erros,
 #                          que antes eram engolidos ("parou e nao sei por que").
 run_curl() {
+    # Registra a pagina acessada.
+    #
+    # Antes so o fetch_page fazia isso, mas os modulos de combate
+    # chamam run_curl direto: coliseum tem 16 chamadas diretas e
+    # nenhum fetch_page. O painel ficava preso na ultima pagina do
+    # fetch_page (tipicamente /clan, da checagem de missoes) enquanto
+    # a conta ja estava lutando no Coliseu. Registrando aqui, todo
+    # acesso passa a ser refletido, venha de onde vier.
+    for _rcarg in "$@"; do
+        case "$_rcarg" in
+            http://*|https://*)
+                _rcp="${_rcarg#*://}"
+                case "$_rcp" in
+                    */*) _rcp="/${_rcp#*/}" ;;
+                    *)   _rcp="/" ;;
+                esac
+                printf %s "$_rcp" > "${TMP}/pagina" 2>/dev/null
+                ;;
+        esac
+    done
+    unset _rcarg _rcp
+
     case "$URL" in
         http://*) _rc_p="--proto =http,https --proto-redir =http,https" ;;
         *)        _rc_p="--proto =https --proto-redir =https" ;;

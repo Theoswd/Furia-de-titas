@@ -386,6 +386,7 @@ aba_de() {
     _p=`cat "$1/pagina" 2>/dev/null`
     case "$_p" in
         ""|"/"|"/?out_gate_confirm=true") echo "Página Principal" ;;
+        "/?sign_in=1")    echo "Entrando" ;;
         /arena*)          echo "Arena" ;;
         /career*)         echo "Carreira" ;;
         /cave*)           echo "Caverna" ;;
