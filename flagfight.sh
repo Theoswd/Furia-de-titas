@@ -100,7 +100,7 @@ flagfight_fight() {
   printf "Flagfight ok\n"
   sleep 10s
   apply_event flagfight
-  clear
+  [ -t 1 ] && clear
 }
 
 flagfight_start() {

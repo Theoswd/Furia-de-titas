@@ -109,7 +109,7 @@ clan_allies() {
 
 conf_allies() {
     cd "$TMP" || return 1
-    clear
+    [ -t 1 ] && clear
 
     printf "The script will consider users on your friends list and Clan as allies.\n"
     printf "1) Add/Update alliances (All Battles)\n"
@@ -176,7 +176,7 @@ conf_allies() {
             : >> "$TMP/callies.txt"
             ;;
         *)
-            clear
+            [ -t 1 ] && clear
             if [ -n "$AL" ]; then
                 # CORRECAO: aqui era "kill -9 $$" — SIGKILL no proprio
                 # shell por causa de uma opcao de menu invalida. Num worker

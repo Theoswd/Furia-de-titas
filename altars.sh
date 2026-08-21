@@ -95,7 +95,7 @@ altars_fight() {
   apply_event
   printf "Altars ok\n"
   sleep 10s
-  clear
+  [ -t 1 ] && clear
 }
 
 altars_start() {

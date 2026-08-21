@@ -97,7 +97,7 @@ clancoliseum_fight() {
   unset src_ram full_ram ACCESS cf_access
   printf "Clancoliseum ok\n"
   sleep 10s
-  clear
+  [ -t 1 ] && clear
 }
 
 clancoliseum_start() {

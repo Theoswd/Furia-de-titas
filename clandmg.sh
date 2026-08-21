@@ -110,7 +110,7 @@ clandmgfight_fight() {
   unset cf_access _random
   func_unset
   printf "Clan duel ok\n"
-  clear
+  [ -t 1 ] && clear
 }
 
 clandmgfight_start() {

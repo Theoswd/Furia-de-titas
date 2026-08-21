@@ -111,7 +111,7 @@ clanfight_fight() {
   func_unset
   printf "ClanFight ok\n"
   sleep 10s
-  clear
+  [ -t 1 ] && clear
 }
 
 clanfight_start() {

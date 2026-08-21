@@ -139,6 +139,13 @@ clan_statue() {
         _cl=`grep -o -E "/clan/${CLD}/built/[?]${_up}=true&r=[0-9]+" "$TMP/STATUE" | sed -n 1p`
         if [ -n "$_cl" ]; then
             fetch_page "$_cl" "$TMP/STATUE2"
+            # Reler a PAGINA DA ESTATUA, nao a resposta do clique.
+            #
+            # A resposta do clique nao traz o link de ativacao mesmo
+            # quando a ativacao falha, entao checar ali dava sempre
+            # "ativado". Em producao: 31 sucessos no log enquanto o
+            # link seguia na pagina e a tesouraria nao mudava.
+            fetch_page "/clan/${CLD}/built/" "$TMP/STATUE2"
             # VERIFICA o resultado em vez de assumir sucesso.
             #
             # A versao anterior clicava e registrava "ativado" sempre. Em
