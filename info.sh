@@ -221,6 +221,8 @@ fetch_page() {
     _fp_pid=$!
     unset TWM_MAXTIME
 
+    # ESPACAMENTO ENTRE REQUISICOES
+    #
     # O "sleep 1" fica EM PARALELO com a requisicao, nao depois dela.
     #
     # E o mesmo espacamento minimo de 1s por requisicao que a versao
@@ -229,10 +231,18 @@ fetch_page() {
     # somado a CADA pagina: com ~90 paginas por ciclo, mais de um minuto
     # perdido por conta, por ciclo. Medido: 10 paginas em 30s (em paralelo)
     # contra 35s (em serie).
-    sleep 1
+    # TWM_PACING=0 dispensa esse processo: o proprio tempo de ida e volta
+    # da requisicao (meio segundo a dois no servidor do jogo) ja espaca as
+    # chamadas. Vale no Android 12, onde CADA processo conta para o limite
+    # de 32 — sao 6 "sleep" parados, um por conta, so para esperar.
+    # O play.sh liga isso sozinho quando detecta que o limite aperta.
+    _fp_pace="${TWM_PACING:-1}"
+    case "$_fp_pace" in ''|*[!0-9]*) _fp_pace=1 ;; esac
+    [ "$_fp_pace" -gt 0 ] && sleep "$_fp_pace"
+
     wait "$_fp_pid" 2>/dev/null
     _fp_rc=$?
-    unset _fp_pid
+    unset _fp_pid _fp_pace
 
     if [ "$_fp_rc" != "0" ]; then
         printf "curl %s: %s\n" "$_fp_rc" "$relative_url" >> "${TMP:-.}/ERROR_DEBUG"

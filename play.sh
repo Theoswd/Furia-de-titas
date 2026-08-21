@@ -131,8 +131,10 @@ kill_worker_tree() {
     [ -n "$kw_pid" ] || return 1
     case "$kw_pid" in *[!0-9]*) return 1 ;; esac
 
+    # worker.sh OU twm.sh: apos o exec do worker.sh o cmdline e o do twm.sh.
     if [ -r "/proc/$kw_pid/cmdline" ]; then
-        tr '\0' ' ' < "/proc/$kw_pid/cmdline" 2>/dev/null | grep -q 'worker\.sh' || return 1
+        tr '\0' ' ' < "/proc/$kw_pid/cmdline" 2>/dev/null \
+            | grep -qE 'worker\.sh|twm\.sh' || return 1
     else
         kill -0 "$kw_pid" 2>/dev/null || return 1
     fi
@@ -155,8 +157,11 @@ worker_vivo() {
     [ -n "$wv_pid" ] || return 1
     case "$wv_pid" in *[!0-9]*) return 1 ;; esac
     kill -0 "$wv_pid" 2>/dev/null || return 1
+    # Aceita worker.sh E twm.sh: o worker.sh faz exec do twm.sh, entao
+    # depois da troca o PID e o mesmo mas o cmdline e o do twm.sh.
     if [ -r "/proc/$wv_pid/cmdline" ]; then
-        tr '\0' ' ' < "/proc/$wv_pid/cmdline" 2>/dev/null | grep -q 'worker\.sh' || return 1
+        tr '\0' ' ' < "/proc/$wv_pid/cmdline" 2>/dev/null \
+            | grep -qE 'worker\.sh|twm\.sh' || return 1
     fi
     return 0
 }
@@ -265,6 +270,52 @@ printf "${GOLD}Contas:${RESET} %s\n\n" "$ACCOUNTS_FILE"
 # consumo por conta foi cortado (veja info.sh: fetch_page e time_exit nao
 # gastam mais um fork de "sleep" por segundo de espera), mas com muitas
 # contas ainda vale desligar o monitor.
+# Limpa workers orfaos de execucoes anteriores.
+#
+# Os workers sobem com nohup+setsid: quando o Android mata a sessao com
+# SIGKILL, eles SOBREVIVEM. A cada nova tentativa sobra mais uma leva, e
+# esses processos contam para o limite de 32 do Android 12 — o bot vai
+# ficando cada vez mais perto do teto sem ninguem perceber. Aqui morrem os
+# que nao correspondem a nenhuma conta em execucao registrada.
+limpa_orfaos() {
+    _lo_n=0
+    for _lo_p in /proc/[0-9]*; do
+        _lo_pid=${_lo_p#/proc/}
+        case "$_lo_pid" in *[!0-9]*) continue ;; esac
+        [ "$_lo_pid" = "$$" ] && continue
+        [ -r "$_lo_p/cmdline" ] || continue
+        case "$(tr '\0' ' ' < "$_lo_p/cmdline" 2>/dev/null)" in
+            *"$TWMDIR/worker.sh"*|*"$TWMDIR/twm.sh"*) ;;
+            *) continue ;;
+        esac
+        # Esta entre os PIDs que os arquivos de estado conhecem?
+        _lo_conhecido=0
+        for _lo_f in "$STATUS_DIR"/*.pid; do
+            [ -f "$_lo_f" ] || continue
+            [ "$(cat "$_lo_f" 2>/dev/null)" = "$_lo_pid" ] && _lo_conhecido=1 && break
+        done
+        [ "$_lo_conhecido" = 1 ] && continue
+        kill -TERM "$_lo_pid" 2>/dev/null
+        _lo_n=$((_lo_n + 1))
+    done
+    [ "$_lo_n" -gt 0 ] && \
+        printf "${GOLD}%s processo(s) orfao(s) de execucoes anteriores encerrado(s).${RESET}\n\n" "$_lo_n"
+    unset _lo_n _lo_p _lo_pid _lo_conhecido _lo_f
+}
+limpa_orfaos
+
+# Modo economico de processos.
+#
+# O Android 12+ mata a sessao inteira acima de 32 processos filhos. Medido
+# num Moto E22 (Android 12): o Termux marcava 26 processos com apenas duas
+# contas no ar — com seis nao havia como caber. Acima de 3 contas o
+# espacamento entre requisicoes passa a ser o proprio tempo de rede, o que
+# dispensa um "sleep" parado por conta.
+if [ -d /data/data/com.termux ] && [ "$total" -gt 3 ] && [ -z "$TWM_PACING" ]; then
+    TWM_PACING=0
+    export TWM_PACING
+fi
+
 if [ -d /data/data/com.termux ] && [ "$total" -gt 3 ]; then
     printf "${YELLOW}AVISO (Android 12+): o sistema pode matar o bot com SIGKILL (signal 9).${RESET}\n"
     printf "  Deixe o Termux em ${CYAN}Bateria > Sem restricoes${RESET} e, com o celular no PC:\n"

@@ -39,7 +39,8 @@ for pid_file in "$STATUS_DIR"/*.pid; do
     # cmdline antes de sinalizar.
     ours=0
     if [ -r "/proc/$pid/cmdline" ]; then
-        tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null | grep -q 'worker\.sh' && ours=1
+        tr '\0' ' ' < "/proc/$pid/cmdline" 2>/dev/null \
+            | grep -qE 'worker\.sh|twm\.sh' && ours=1
     elif kill -0 "$pid" 2>/dev/null; then
         ours=1
     fi

@@ -70,12 +70,23 @@ rotate_log() {
     unset _lg _sz
 }
 
-# Loop infinito — reinicia twm.sh se encerrar
-while true; do
-    rotate_log
-    echo "running" > "$TWM_STATUS_FILE"
-    "$TOYBOX" "$TWMDIR/twm.sh" "$RUN" < /dev/null
-    echo "restarting" > "$TWM_STATUS_FILE"
-    printf "[%s] %s — reiniciando em 15s\n" "$TWM_TAG" "$TWM_USER"
-    sleep 15
-done
+rotate_log
+echo "running" > "$TWM_STATUS_FILE"
+
+# SUBSTITUI este processo pelo twm.sh, em vez de ficar parado esperando por
+# ele num laco.
+#
+# CORRECAO (SIGKILL / "signal 9" no Android 12): o worker.sh existia so
+# para relancar o twm.sh quando ele saisse — um processo permanente POR
+# CONTA que passava a vida bloqueado. Com 6 contas sao 6 processos parados,
+# e o Android 12 mata a sessao inteira acima de 32 processos.
+#
+# Medido no aparelho do relato (Moto E22, Android 12, limite 32): o Termux
+# ja marcava 26 processos com apenas DUAS contas no ar. Com seis nao havia
+# como caber.
+#
+# Com o exec o twm.sh herda este PID, entao o arquivo .pid segue valido e o
+# stop.sh continua encontrando a conta. Quem relanca agora e o play.sh, que
+# ja verifica a cada volta do painel se o PID morreu — antes eram 15s de
+# espera aqui, agora sao no maximo 20s la, sem custar um processo parado.
+exec "$TOYBOX" "$TWMDIR/twm.sh" "$RUN" < /dev/null

@@ -115,9 +115,12 @@ printf "Registro: %s\n\n" "$LOG"
         case "$_p" in ''|*[!0-9]*) _p=0 ;; esac
         [ "$_p" -gt "$_pico_proc" ] && _pico_proc="$_p"
         case "$_m" in ''|*[!0-9]*) ;; *) [ "$_m" -lt "$_min_mem" ] && _min_mem="$_m" ;; esac
-        reg "proc_bot=$_p  proc_total=$_t  mem_disp=${_m}MB"
+        reg "proc_bot=$_p  proc_total=$_t  mem_disp=${_m}MB  (pico $_pico_proc)"
         echo "$_pico_proc $_min_mem" > "$HOME/.twm/.sigkill_pico"
-        sleep 2
+        # 1s, nao 2: os processos de parsing (grep, sed) duram
+        # milissegundos, e uma amostragem lenta simplesmente nao ve o pico
+        # — que e justamente o numero que o Android compara com o limite.
+        sleep 1
     done
 ) &
 OBS=$!
@@ -138,6 +141,21 @@ reg "=== FIM: play.sh saiu com codigo $_rc ==="
     reg "  pico de processos do bot : $_pk"
     reg "  memoria disponivel minima: ${_mm}MB"
 }
+# A lista nomeada revela worker orfao de execucao anterior: eles sobrevivem
+# ao SIGKILL (nohup+setsid) e vao se acumulando a cada tentativa, cada um
+# contando para o limite do Android.
+reg "=== PROCESSOS DO BOT QUE FICARAM VIVOS ==="
+_achou=0
+for _p in /proc/[0-9]*; do
+    [ -r "$_p/cmdline" ] || continue
+    _c=$(tr '\0' ' ' < "$_p/cmdline" 2>/dev/null)
+    case "$_c" in
+        *twm.sh*|*worker.sh*|*play.sh*) reg "  ${_p#/proc/}  $_c"; _achou=1 ;;
+    esac
+done
+[ "$_achou" = 0 ] && reg "  (nenhum — nada ficou para tras)"
+reg ""
+
 ambiente
 sistema
 

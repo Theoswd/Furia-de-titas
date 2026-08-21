@@ -346,6 +346,20 @@ Nos dois casos o ajuste **volta ao normal quando o aparelho reinicia** — é pr
 
 **2. Restrição de bateria.** Em **Configurações → Bateria → Termux**, marque **"Sem restrições"**, e mantenha o `termux-wake-lock` ativo.
 
+### Quantos processos o bot ocupa
+
+O Android 12+ mata a sessão inteira acima de **32 processos filhos**. Num Moto E22 com Android 12, o Termux já marcava 26 processos com **duas** contas no ar — com seis não havia como caber. Por isso cada processo permanente foi eliminado:
+
+| | antes | agora |
+|---|---|---|
+| `worker.sh` parado esperando o `twm.sh` | 6 | **0** — faz `exec`, vira o próprio `twm.sh` |
+| `sleep` de espaçamento, um por conta | 6 | **0** — o tempo de rede já espaça |
+| **Pico medido com 6 contas** | **21** | **15** |
+
+Além disso o `./play.sh` encerra, ao iniciar, os workers órfãos de execuções anteriores — eles sobrevivem ao `SIGKILL` e vão se acumulando a cada tentativa, cada um contando para o limite.
+
+> Mesmo assim a margem é apertada num aparelho de 4 GB: some ~12 processos do próprio Termux e você está em ~27 de 32. **Se o `signal 9` persistir com 6 contas, rode 4** — ou aplique o ajuste do item 1, que é o único jeito de remover o teto.
+
 ### Quanto o bot já foi enxugado
 
 A conta de processos simultâneos com 6 contas, que é o que o Android mede:
