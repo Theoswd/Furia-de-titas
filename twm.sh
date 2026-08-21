@@ -292,7 +292,22 @@ while true; do
     sleep "$_wait"
 
     # A partir da 4a recusa o teto sobe para 15 min.
-    if [ "$login_try" -ge 4 ]; then _cap=900; else _cap=300; fi
+    # ESCALADA SUAVE NO INICIO.
+    #
+    # Medido: uma conta com credencial CORRETA e recusada em cerca de
+    # 1 de cada 3 tentativas. Tres diagnosticos seguidos na mesma conta
+    # deram recusado / funcionou / funcionou. Ou seja, uma recusa
+    # isolada nao prova senha errada — o servidor simplesmente nega as
+    # vezes quando ha varias contas do mesmo IP no ar.
+    #
+    # Escalar para 5 ou 15 minutos ja na segunda recusa deixava uma
+    # conta boa parada por muito tempo a toa. As tres primeiras
+    # recusas agora tem espera curta; a escalada so vale para o caso
+    # em que a recusa e mesmo persistente.
+    if   [ "$login_try" -le 3 ]; then _cap=60
+    elif [ "$login_try" -le 6 ]; then _cap=300
+    else                               _cap=900
+    fi
     [ "$login_delay" -lt "$_cap" ] && login_delay=$((login_delay * 2))
     [ "$login_delay" -gt "$_cap" ] && login_delay=$_cap
     rm -f "$TMP_COOKIE"
