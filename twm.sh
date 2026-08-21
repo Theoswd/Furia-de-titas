@@ -104,7 +104,21 @@ do_login() {
     # Testar a sessao custa uma requisicao GET; autenticar custa duas e
     # conta para o limite. Na pratica isso elimina quase todos os logins.
     if [ -s "$TMP_COOKIE" ]; then
-        PAGE=$(run_curl "${URL}/user")
+        # Distingue FALHA DE REDE de CREDENCIAL RECUSADA.
+        #
+        # O curl devolve codigo != 0 quando nao conseguiu falar com o
+        # servidor (28 = timeout, 7 = conexao recusada, 6 = DNS). Isso
+        # nao diz nada sobre a senha — e so o servidor tropecando ou a
+        # rede oscilando. Tratar os dois casos igual fazia um soluco de
+        # 10 segundos jogar a conta para 5 ou 15 minutos de espera.
+        PAGE=$(run_curl "${URL}/user" 2>/dev/null)
+        _rc=$?
+        if [ "$_rc" -ne 0 ] || [ -z "$PAGE" ]; then
+            LOGIN_ERRO=rede
+            unset PAGE
+            return 1
+        fi
+        LOGIN_ERRO=credencial
         if is_logged_in "$PAGE"; then
             ACC=$(extract_username "$PAGE")
             [ -z "$ACC" ] && ACC="$TWM_USER"
@@ -185,11 +199,33 @@ while true; do
     if do_login; then
         break
     fi
+
+    # FALHA DE REDE nao escala o backoff.
+    #
+    # O curl devolve codigo != 0 quando nao conseguiu falar com o servidor
+    # (28 timeout, 7 recusado, 6 DNS). Isso nao diz nada sobre a senha.
+    # Tratar igual a uma credencial recusada fazia um soluco de poucos
+    # segundos no servidor jogar a conta para 5 ou 15 minutos parada — e,
+    # com varias contas subindo juntas, todas caiam nisso ao mesmo tempo.
+    if [ "${LOGIN_ERRO:-credencial}" = "rede" ]; then
+        _wait=$(( 20 + ($$ % 20) ))
+        printf "[%s] %s — servidor nao respondeu, nova tentativa em %ss\n" \
+            "$TWM_TAG" "$TWM_USER" "$_wait"
+        [ -n "$TWM_STATUS_FILE" ] && echo "login_retry" > "$TWM_STATUS_FILE"
+        sleep "$_wait"
+        login_delay=30
+        login_try=0
+        rm -f "$TMP_COOKIE"
+        continue
+    fi
+
+    # CREDENCIAL RECUSADA: aqui sim o backoff cresce, porque insistir de
+    # segundo em segundo com senha errada so alimenta o rate-limit do IP.
     login_try=$((login_try + 1))
 
-    # Jitter: sem ele todas as contas que falham reincidem EM BLOCO no mesmo
-    # instante (mesmo IP), mantendo o rate-limit do servidor permanentemente
-    # ativo. Backoff sem aleatoriedade nao dispersa carga, so a agenda.
+    # Jitter: sem ele todas as contas que falham reincidem EM BLOCO no
+    # mesmo instante, do mesmo IP. Backoff sem aleatoriedade nao dispersa
+    # carga, apenas a agenda.
     _half=$(( login_delay / 2 ))
     _wait=$(( _half + ( ($$ + login_try) % (_half + 1) ) ))
 
@@ -198,10 +234,7 @@ while true; do
     [ -n "$TWM_STATUS_FILE" ] && echo "login_retry" > "$TWM_STATUS_FILE"
     sleep "$_wait"
 
-    # Teto maior apos varias falhas seguidas. O servidor penaliza
-    # tentativas repetidas do mesmo IP e responde com a mesma mensagem
-    # de "senha incorreta", entao insistir de 5 em 5 minutos mantem a
-    # punicao ativa. A partir da 4a falha o intervalo sobe para 15 min.
+    # A partir da 4a recusa o teto sobe para 15 min.
     if [ "$login_try" -ge 4 ]; then _cap=900; else _cap=300; fi
     [ "$login_delay" -lt "$_cap" ] && login_delay=$((login_delay * 2))
     [ "$login_delay" -gt "$_cap" ] && login_delay=$_cap
