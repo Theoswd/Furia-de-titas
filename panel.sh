@@ -269,6 +269,10 @@ aba_de() {
         /collfight*)      echo "Batalha Coletiva" ;;
         /marathon*)       echo "Maratona" ;;
         /user*)           echo "Meu Herói" ;;
+        /settings*)       echo "Configurações" ;;
+        /mail*)           echo "Mensagens" ;;
+        /questrnd*)       echo "Missão Aleatória" ;;
+        /logout*)         echo "Saindo" ;;
         *)                echo "$_p" ;;
     esac
     unset _p
