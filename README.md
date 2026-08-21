@@ -422,6 +422,27 @@ TWM_COLS=48 ./status.sh
 </details>
 
 <details>
+<summary><b>A Bênção e o ouro</b></summary>
+
+A página `/effshop/` mostra **"Tempo de sobra: HHHH:MM:SS"** e o botão diz **Prolongar**, não comprar — cada compra soma 3 dias ao que já resta, e o link fica sempre lá.
+
+O bot lê esse campo e só prolonga quando restam menos de 24 horas. Para conferir o que ele está vendo:
+
+```bash
+cd ~/Furia-de-titas && ./bencao.sh
+cd ~/Furia-de-titas && ./bencao.sh 1
+```
+
+| Configuração | Padrão | O que faz |
+|---|---|---|
+| `FUNC_use_blessing` | `y` | liga ou desliga |
+| `FUNC_blessing_min_horas` | `24` | só prolonga abaixo disso |
+| `FUNC_blessing_gold_min` | `100` | ouro mínimo para prolongar |
+
+> Se o campo "Tempo de sobra" sumir da página, o bot **não** prolonga e registra o motivo — sem saber o estado, ficar quieto sai mais barato que gastar.
+</details>
+
+<details>
 <summary><b>Onde ficam os arquivos</b></summary>
 
 As telas não mostram caminhos de propósito — eles expõem o nome de usuário do sistema e não ajudam no uso diário. Ficam aqui:

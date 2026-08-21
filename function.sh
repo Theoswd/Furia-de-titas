@@ -153,6 +153,10 @@ config_defaults() {
 FUNC_check_rewards=y
 FUNC_use_elixir=y
 FUNC_use_blessing=y
+# So prolonga a bencao quando restarem menos que estas horas. A pagina
+# informa o restante em "Tempo de sobra", e a compra ACUMULA — sem este
+# limite o bot empilha 3 dias a cada ciclo em cima do que ja resta.
+FUNC_blessing_min_horas=24
 FUNC_blessing_gold_min=100
 # Validade da bencao, em dias (0 = comprar sempre que possivel)
 FUNC_blessing_dias=3
