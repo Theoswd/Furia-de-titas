@@ -72,10 +72,18 @@ clanDungeon() {
     fetch_page "/clandungeon/" "$TMP/DUNGEON"
     [ -s "$TMP/DUNGEON" ] || return 1
 
-    # Golpes restantes, so para registrar no log
-    _golpes=`grep -oE "Golpes mais:[^0-9]{0,8}[0-9]{1,3}" "$TMP/DUNGEON" | grep -oE '[0-9]{1,3}$' | head -n1`
+    # Golpes gratuitos restantes. O numero vem separado por tags no
+    # HTML cru, entao e preciso remove-las antes de casar.
+    _golpes=`sed 's/<[^>]*>//g' "$TMP/DUNGEON" | grep -oE "Golpes mais:[^0-9]{0,8}[0-9]{1,3}" | grep -oE '[0-9]{1,3}$' | head -n1`
     [ -n "$_golpes" ] && printf "Masmorra: %s golpes disponiveis\n" "$_golpes"
 
+    # SOMENTE GOLPES GRATUITOS.
+    #
+    # A pagina traz um unico link acionavel, /clandungeon/attack/, que
+    # consome os 10 acessos gratis da janela de 8h. Nao existe ali
+    # nenhum link de compra — verificado: nada com gold, pay, buy ou
+    # chance. Quando os gratuitos acabam o link some e o laco encerra,
+    # entao nao ha como gastar ouro por golpe extra.
     _br=$(($(date +%s) + 180))
     _n=0
     while [ "$(date +%s)" -lt "$_br" ]; do
