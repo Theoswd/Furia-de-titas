@@ -110,7 +110,8 @@ cq_forcar_ouro() {
 
     # Ouro atual, lido da propria pagina
     cq_pagina || return 1
-    _ouro=`grep -o -E "gold\.png. alt=.[^']*./> ?[0-9][0-9.,']{0,14}[KMBkmb]?" "$TMP/CQUEST" | sed -E "s@.*/> ?@@" | head -n1`
+    # Saldo da conta e sempre alt='g'; alt='Ouro' e a recompensa da missao.
+    _ouro=`grep -o -E "gold\.png' alt='g'/> ?[0-9][0-9.,']{0,14}[KMBkmb]?" "$TMP/CQUEST" | sed -E "s@.*/> ?@@" | head -n1`
     _ouro=`valor_num "$_ouro"`
     case "$_ouro" in ''|*[!0-9]*) return 1 ;; esac
     [ "$_ouro" -gt "$_min" ] || return 1

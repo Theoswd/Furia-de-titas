@@ -56,7 +56,8 @@ func_trade() {
     case "$_dias" in ''|*[!0-9]*) _dias=365 ;; esac
 
     fetch_page "/trade/exchange"
-    _pr=`grep -o -E "silver\.png' alt='[^']*'/> ?[0-9][0-9.,']{0,14}[KMBkmb]?" "$TMP/SRC" | sed -E "s@.*/> ?@@" | head -n1`
+    # Saldo da conta e sempre alt='s'; alt='' e taxa de cambio da propria loja.
+    _pr=`grep -o -E "silver\.png' alt='s'/> ?[0-9][0-9.,']{0,14}[KMBkmb]?" "$TMP/SRC" | sed -E "s@.*/> ?@@" | head -n1`
     _prata=`valor_num "$_pr"`
     case "$_prata" in ''|*[!0-9]*) _prata=0 ;; esac
 
@@ -101,7 +102,8 @@ use_blessing() {
     fi
 
     # So compra se houver ouro suficiente (custa 100).
-    _ouro=`grep -o -E "gold\.png. alt=.[^']*./> ?[0-9][0-9.,']{0,14}[KMBkmb]?" "$TMP/EFFSHOP" | sed -E "s@.*/> ?@@" | head -n1`
+    # Saldo da conta e sempre alt='g'; alt='' sao os precos dos itens.
+    _ouro=`grep -o -E "gold\.png' alt='g'/> ?[0-9][0-9.,']{0,14}[KMBkmb]?" "$TMP/EFFSHOP" | sed -E "s@.*/> ?@@" | head -n1`
     _ouro=`valor_num "$_ouro"`
     case "$_ouro" in ''|*[!0-9]*) _ouro=0 ;; esac
     if [ "$_ouro" -lt "${FUNC_blessing_gold_min:-100}" ]; then

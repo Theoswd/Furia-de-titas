@@ -316,8 +316,8 @@ parse_status() {
     ACC_LVL=`printf '%s' "$_pg" | grep -o -E "level\.png' alt='[^']*'/> ?[0-9]{1,4}" | grep -o -E '[0-9]{1,4}$' | head -n1`
 
     # Ouro e prata: guarda o texto como o jogo mostra (pode vir "408,1M").
-    ACC_GOLD=`printf '%s' "$_pg" | grep -o -E "gold\.png' alt='[^']*'/> ?[0-9][0-9.,']{0,14}[KMBkmb]?" | sed -E "s@.*/> ?@@" | head -n1`
-    ACC_SILVER=`printf '%s' "$_pg" | grep -o -E "silver\.png' alt='[^']*'/> ?[0-9][0-9.,']{0,14}[KMBkmb]?" | sed -E "s@.*/> ?@@" | head -n1`
+    ACC_GOLD=`printf '%s' "$_pg" | grep -o -E "gold\.png' alt='g'/> ?[0-9][0-9.,']{0,14}[KMBkmb]?" | sed -E "s@.*/> ?@@" | head -n1`
+    ACC_SILVER=`printf '%s' "$_pg" | grep -o -E "silver\.png' alt='s'/> ?[0-9][0-9.,']{0,14}[KMBkmb]?" | sed -E "s@.*/> ?@@" | head -n1`
 
     NOWHP="$ACC_HP"; NOWMP="$ACC_MP"
 
