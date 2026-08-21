@@ -164,8 +164,10 @@ start() {
     cq_antes liga 2>/dev/null
     league_play 2>/dev/null
 
+    # Batalhas sempre com elixir e bencao
     cq_antes elixir 2>/dev/null
     use_elixir
+    use_blessing 2>/dev/null
 
     campaign_func
 

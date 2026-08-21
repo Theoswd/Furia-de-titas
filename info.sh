@@ -98,6 +98,10 @@ run_curl() {
 
 # Acessa qualquer pagina pelo caminho relativo
 fetch_page() {
+    # Registra onde a conta esta. O painel le isso para mostrar a aba
+    # atual em vez de um rotulo generico. Como todo acesso passa por
+    # aqui, basta uma linha para cobrir o jogo inteiro.
+    printf %s "$1" > "${TMP}/pagina" 2>/dev/null
     relative_url="$1"
     output_file="${2:-$TMP/SRC}"
 

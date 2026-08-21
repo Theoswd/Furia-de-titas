@@ -109,7 +109,7 @@ sha256sum -c .integrity --quiet && echo "Scripts integros"
 > ```
 >
 > Rode o `./play.sh` dentro da sessão e saia com **Ctrl+B** depois **D**. Para voltar: `tmux attach -t twm`.
-> cd ~/Furia-de-titas (caso o o play.sh de erro de diretório use esse comando e depois tente novamente)
+> **Se o `./play.sh` reclamar de diretório**, seu terminal está numa pasta que não existe mais. Rode `cd ~/Furia-de-titas` e tente de novo.
 
 ---
 
@@ -207,6 +207,18 @@ cd ~/Furia-de-titas && sha256sum *.sh | sort -k2 > .integrity
 ---
 
 ## Solução de problemas
+
+<details>
+<summary><b>"Unable to read current working directory" ou o play.sh não inicia</b></summary>
+
+Seu terminal está numa pasta que foi renomeada ou removida. Volte para a pasta do bot:
+
+```bash
+cd ~/Furia-de-titas
+```
+
+Depois rode o comando de novo.
+</details>
 
 <details>
 <summary><b>A conta não loga / fica presa em "login..."</b></summary>

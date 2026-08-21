@@ -274,9 +274,9 @@ if [ "${TWM_EMOJI:-0}" = "1" ]; then
     A_EVENTO="🎉  Evento Especial";     A_DESCANSO="💤  Descansando"
     A_NONE="—"
 else
-    I_HP="HP"; I_EN="EN"; I_LV="LV"; I_GO="OU"; I_SI="PR"
+    I_HP="HP"; I_EN="Eng"; I_LV="LV"; I_GO="Ouro"; I_SI="PR"
     I_TIT=""; I_ACT=""; I_EVT=""; I_ARROW="->"
-    S_ON="[on]"; S_WAIT="[..]"; S_ERR="[ER]"; S_OFF="[--]"; S_UNK="[??]"; S_PAUSE="[||]"
+    S_ON="[on]"; S_WAIT="[..]"; S_ERR="[off]"; S_OFF="[--]"; S_UNK="[??]"; S_PAUSE="[||]"
     A_CLANFIGHT="Torneio do Clã";   A_ALTARES="Altares dos Deuses"
     A_VALE="Vale dos Imortais";     A_REI="Rei dos Imortais"
     A_CLANCOL="Coliseu do Clã";     A_MASMORRA="Masmorra do Clã"
@@ -366,39 +366,84 @@ estado_simbolo() {
     esac
 }
 
-# Nome completo da atividade, a partir do log da conta.
+# Nome da aba em que a conta esta agora.
 #
-# Cada modulo escreve uma marca propria no log. A ordem dos testes importa:
-# "clancoliseum" precisa ser testado ANTES de "coliseum", e "clanfight"
-# antes de qualquer coisa generica, senao o Coliseu do Cla apareceria
-# apenas como "Coliseu".
-atividade_de() {
-    _lg="$1"
-    [ -f "$_lg" ] || { echo "$A_NONE"; return; }
-    _l=`tail -n 30 "$_lg" 2>/dev/null | grep -iE "clan tournament|clanfight|Ancient Altars|altars|Valley of the Immortals|undying|King of the Immortals|Clan coliseum|clancoliseum|Clan Dungeon|clandmg|Missao do cla|Clan quest|Flagfight|flagfight|Coliseum|Battle or event|^Arena|^Career|^Cave|^Campaign|available fights|Available fights|^Trade|Exchange|Checking Missions|Chest .* opened|Mission .* Completed|Relic|Current event|aguardando" | tail -n 1`
-
-    case "$_l" in
-        *"clan tournament"*|*clanfight*)          echo "$A_CLANFIGHT" ;;
-        *"Ancient Altars"*|*altars*)              echo "$A_ALTARES" ;;
-        *"Valley of the Immortals"*|*undying*)    echo "$A_VALE" ;;
-        *"King of the Immortals"*)                echo "$A_REI" ;;
-        *"Clan coliseum"*|*clancoliseum*)         echo "$A_CLANCOL" ;;
-        *"Clan Dungeon"*|*clandmg*)               echo "$A_MASMORRA" ;;
-        *"Missao do cla"*|*"Clan quest"*)         echo "$A_CLANQUEST" ;;
-        *Flagfight*|*flagfight*)                  echo "$A_BANDEIRAS" ;;
-        *Coliseum*|*"Battle or event"*)           echo "$A_COLISEU" ;;
-        *Arena*)                                  echo "$A_ARENA" ;;
-        *Career*)                                 echo "$A_CARREIRA" ;;
-        *Cave*)                                   echo "$A_CAVERNA" ;;
-        *Campaign*)                               echo "$A_CAMPANHA" ;;
-        *"available fights"*|*"Available fights"*) echo "$A_LIGA" ;;
-        *Trade*|*Exchange*)                       echo "$A_TROCA" ;;
-        *"Checking Missions"*|*Chest*|*Mission*|*Relic*) echo "$A_SABIO" ;;
-        *"Current event"*)                        echo "$A_EVENTO" ;;
-        *aguardando*)                             echo "$A_DESCANSO" ;;
-        *)                                        echo "$A_NONE" ;;
+# O fetch_page grava o caminho acessado em $TMP/pagina, entao aqui e so
+# traduzir. Descanso deixa de ser um rotulo generico: quando a conta volta
+# para "/", o painel mostra "Pagina Principal", que e onde ela de fato esta.
+aba_de() {
+    _p=`cat "$1/pagina" 2>/dev/null`
+    case "$_p" in
+        ""|"/"|"/?out_gate_confirm=true") echo "Página Principal" ;;
+        /arena*)          echo "Arena" ;;
+        /career*)         echo "Carreira" ;;
+        /cave*)           echo "Caverna" ;;
+        /campaign*)       echo "Campanha" ;;
+        /coliseum*)       echo "Coliseu" ;;
+        /clancoliseum*)   echo "Coliseu do Clã" ;;
+        /clanfight*)      echo "Torneio dos Clãs" ;;
+        /clandungeon*|/clandmgfight*) echo "Masmorra do Clã" ;;
+        /clan/*quest*)    echo "Missões do Clã" ;;
+        /clan/*built*)    echo "Estátua do Clã" ;;
+        /clan*)           echo "Clã" ;;
+        /altars*)         echo "Altares dos Deuses" ;;
+        /undying*)        echo "Vale dos Imortais" ;;
+        /king*)           echo "Rei dos Imortais" ;;
+        /flagfight*)      echo "Batalha de Bandeiras" ;;
+        /league*)         echo "Liga dos Favoritos" ;;
+        /trade*)          echo "Troca" ;;
+        /effshop*|/lab*)  echo "Aprimoramento" ;;
+        /quest*)          echo "Missões" ;;
+        /collector*)      echo "Coleções" ;;
+        /relic*)          echo "Relíquias" ;;
+        /sage*)           echo "Cabana do Sábio" ;;
+        /inv*)            echo "Inventário" ;;
+        /train*)          echo "Treino" ;;
+        /fault*)          echo "Falha" ;;
+        /collfight*)      echo "Batalha Coletiva" ;;
+        /marathon*)       echo "Maratona" ;;
+        /user*)           echo "Meu Herói" ;;
+        *)                echo "$_p" ;;
     esac
-    unset _lg _l
+    unset _p
+}
+
+# Relatorio de combate: HP ao vivo e dano recebido.
+#
+# Os modulos de combate mantem os arquivos HP e old_HP no diretorio da
+# conta durante a luta. Comparando os dois sai o dano levado desde a
+# ultima acao, sem precisar alterar os sete modulos de batalha.
+#
+# Devolve uma das formas:
+#   "VOCE ESTA MORTO"            HP zerado
+#   "-142 de dano recebido"      perdeu vida desde a ultima leitura
+#   "+380 recuperado"            curou
+#   ""                           fora de combate
+combate_de() {
+    _d="$1"
+    _hp=`cat "$_d/HP" 2>/dev/null | tr -cd '0-9'`
+    _old=`cat "$_d/old_HP" 2>/dev/null | tr -cd '0-9'`
+    [ -n "$_hp" ] || { echo ""; return; }
+
+    if [ "$_hp" -eq 0 ] 2>/dev/null; then
+        echo "VOCÊ ESTÁ MORTO"
+        unset _d _hp _old
+        return
+    fi
+
+    if [ -n "$_old" ] && [ "$_old" -gt 0 ] 2>/dev/null; then
+        _dif=$((_hp - _old))
+        if [ "$_dif" -lt 0 ]; then
+            printf 'HP %s  (%s de dano recebido)' "$_hp" "$_dif"
+        elif [ "$_dif" -gt 0 ]; then
+            printf 'HP %s  (+%s recuperado)' "$_hp" "$_dif"
+        else
+            printf 'HP %s' "$_hp"
+        fi
+    else
+        printf 'HP %s' "$_hp"
+    fi
+    unset _d _hp _old _dif
 }
 
 while true; do
@@ -450,9 +495,23 @@ while true; do
             "$C_GOLD" "$I_GO" "$ouro" \
             "$C_GRAY" "$I_SI" "$prata" "$C_RESET")
 "
-        ATIV="${ATIV}$(printf "    %b%-18.18s %b%s %b%s%b" \
-            "$C_WHITE" "$nome" "$C_DIM" "$I_ARROW" "$C_CYAN" "$(atividade_de "$acc_dir/twm.log")" "$C_RESET")
+        # Aba atual + relatorio de combate (HP ao vivo, dano, morte)
+        _aba=$(aba_de "$acc_dir")
+        _cbt=$(combate_de "$acc_dir")
+        if [ -n "$_cbt" ]; then
+            case "$_cbt" in
+                *MORTO*) _cor_c="$C_RED" ;;
+                *dano*)  _cor_c="$C_YELLOW" ;;
+                *)       _cor_c="$C_GREEN" ;;
+            esac
+            ATIV="${ATIV}$(printf "    %b%-18.18s %b%s %b%-22.22s %b%s%b" \
+                "$C_WHITE" "$nome" "$C_DIM" "$I_ARROW" "$C_CYAN" "$_aba" "$_cor_c" "$_cbt" "$C_RESET")
 "
+        else
+            ATIV="${ATIV}$(printf "    %b%-18.18s %b%s %b%s%b" \
+                "$C_WHITE" "$nome" "$C_DIM" "$I_ARROW" "$C_CYAN" "$_aba" "$C_RESET")
+"
+        fi
     done 3< "$ACCOUNTS_FILE"
 
     if [ "$HAS_TTY" = 1 ]; then
