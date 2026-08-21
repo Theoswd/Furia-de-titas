@@ -21,8 +21,35 @@
 #   lote  10 -> precisa de   6.570.000
 #   lote   1 -> precisa de     657.000
 #   abaixo disso nao troca
+# Troca PRATA -> OURO, UMA VEZ POR DIA.
+#
+# A pagina oferece tres lotes:
+#   /trade/exchange/gold/1?r=N       1800 prata ->   1 ouro
+#   /trade/exchange/gold/10?r=N     18000 prata ->  10 ouro
+#   /trade/exchange/gold/100?r=N   180000 prata -> 100 ouro
+#
+# O lote e escolhido pela reserva de prata: so usa um lote se o saldo
+# aguentar essa mesma troca, uma por dia, durante um ano inteiro. Isso
+# mantem a economia estavel — quem tem pouca prata cai para o lote menor
+# em vez de drenar o caixa.
+#
+#   lote 100 -> reserva de 65.700.000 de prata (365 x 180.000)
+#   lote  10 -> reserva de  6.570.000
+#   lote   1 -> reserva de    657.000
+#   abaixo disso nao troca
+#
+# A troca ocorre UMA VEZ por dia. O marcador fica em $TMP/last_trade e
+# guarda a data, entao reiniciar o bot no mesmo dia nao repete a troca.
 func_trade() {
     [ "${FUNC_trade:-y}" = "y" ] || return 1
+
+    _hoje=`date +%Y%m%d`
+    _ult=`cat "$TMP/last_trade" 2>/dev/null`
+    if [ "$_ult" = "$_hoje" ]; then
+        unset _hoje _ult
+        return 0
+    fi
+
     printf "Trade\n"
 
     _dias=${FUNC_trade_dias:-365}
@@ -39,27 +66,23 @@ func_trade() {
     else
         printf "Trade: prata insuficiente para trocar com seguranca (%s)\n" "$_pr"
         printf "Trade ok\n"
-        unset _dias _pr _prata _lote
+        unset _hoje _ult _dias _pr _prata _lote
         return 0
     fi
 
-    printf "Trade: prata %s — lote de %s ouro (sustenta %s trocas)\n" \
-        "$_pr" "$_lote" "$_dias"
+    _cl=`grep -o -E "/trade/exchange/gold/${_lote}[?]r=[0-9]+" "$TMP/SRC" | sed -n 1p`
+    if [ -z "$_cl" ]; then
+        printf "Trade: lote de %s indisponivel agora\n" "$_lote"
+        printf "Trade ok\n"
+        unset _hoje _ult _dias _pr _prata _lote _cl
+        return 0
+    fi
 
-    _br=$(($(date +%s) + 60))
-    _feito=0
-    while [ "$(date +%s)" -lt "$_br" ]; do
-        _cl=`grep -o -E "/trade/exchange/gold/${_lote}[?]r=[0-9]+" "$TMP/SRC" | sed -n 1p`
-        [ -n "$_cl" ] || break
-        fetch_page "$_cl"
-        _feito=$((_feito + _lote))
-        # Recarrega para pegar o novo r= e o saldo atualizado
-        fetch_page "/trade/exchange"
-    done
-
-    [ "$_feito" -gt 0 ] && printf "Trade: %s de ouro obtido\n" "$_feito"
+    fetch_page "$_cl"
+    printf '%s' "$_hoje" > "$TMP/last_trade" 2>/dev/null
+    printf "Trade: prata %s — trocou por %s de ouro (1x hoje)\n" "$_pr" "$_lote"
     printf "Trade ok\n"
-    unset _dias _pr _prata _lote _br _cl _feito
+    unset _hoje _ult _dias _pr _prata _lote _cl
 }
 
 # Compra a Bencao em /effshop/ (+200 em todas as estatisticas, +25%% de
