@@ -342,7 +342,7 @@ fetch_train_stats() {
     [ -n "$_t" ] || return 1
     FIXHP=`printf '%s' "$_t" | grep -o -E '\([0-9]{1,9}\)' | head -n1 | tr -d '()'`
     ACC_ENE=`printf '%s' "$_t" | grep -o -E "Energia:? ?[0-9][0-9.,']{0,14}[KMBkmb]?" | sed -E 's@.*:? ?@@' | head -n1`
-    [ -z "$ACC_ENE" ] && ACC_ENE=`printf '%s' "$_t" | grep -o -E "Energia:? ?[0-9.,']{1,15}" | grep -o -E '[0-9.,']{1,15}$' | head -n1`
+    [ -z "$ACC_ENE" ] && ACC_ENE=`printf '%s' "$_t" | grep -o -E "Energia:? ?[0-9.,']{1,15}" | grep -o -E "[0-9.,']{1,15}$" | head -n1`
     unset _t
 }
 
