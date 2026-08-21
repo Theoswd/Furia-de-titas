@@ -171,6 +171,7 @@ FUNC_quest_gold_min=1200
 FUNC_arena_min=30
 FUNC_cq_min=15
 FUNC_masmorra=y
+FUNC_estatua_horas=6
 FUNC_clan_statue=y
 FUNC_cave_boost=y
 SCRIPT_PAUSED=n

@@ -123,6 +123,22 @@ clan_lider() {
 #
 # Quando um bonus ja esta ativo o link some e a pagina mostra apenas
 # "Tempo de sobra: HH:MM:SS" — por isso basta agir sobre o que aparecer.
+# Espera antes de tentar de novo apos uma recusa.
+#
+# Sem isto o bot reclicava o link a cada ciclo. Em producao foram 31
+# tentativas seguidas com o servidor respondendo "Voce nao tem prata
+# suficiente para ativar um edificio" — a tesouraria do cla tinha
+# 54.300 de prata e o bonus custa 222.000. Insistir de minuto em
+# minuto nao muda o saldo, so gasta requisicao.
+estatua_liberada() {
+    _h=${FUNC_estatua_horas:-6}
+    case "$_h" in ''|*[!0-9]*) _h=6 ;; esac
+    _u=`cat "$TMP/last_estatua" 2>/dev/null`
+    case "$_u" in ''|*[!0-9]*) _u=0 ;; esac
+    [ $(( $(date +%s) - _u )) -ge $((_h * 3600)) ]
+}
+estatua_marcar() { date +%s > "$TMP/last_estatua" 2>/dev/null; }
+
 clan_statue() {
     [ "${FUNC_clan_statue:-y}" = "y" ] || return 1
     [ -n "$CLD" ] || return 1
@@ -131,6 +147,9 @@ clan_statue() {
     if ! clan_lider; then
         return 1
     fi
+
+    # Se a ultima tentativa foi recusada, espera antes de repetir.
+    estatua_liberada || return 1
 
     fetch_page "/clan/${CLD}/built/" "$TMP/STATUE"
     [ -s "$TMP/STATUE" ] || return 1
@@ -155,9 +174,9 @@ clan_statue() {
             # tesouraria nao cobria; o bot insistia a cada ciclo.
             if grep -q "${_up}=true" "$TMP/STATUE2" 2>/dev/null; then
                 case "$_up" in
-                    goldUpgrade)   printf "Estatua: bonus de OURO nao ativou (tesouraria insuficiente?)
+                    goldUpgrade)   printf "Estatua: bonus de OURO nao ativou (ouro do cla insuficiente)
 " ;;
-                    silverUpgrade) printf "Estatua: bonus de PRATA nao ativou (tesouraria insuficiente?)
+                    silverUpgrade) printf "Estatua: bonus de PRATA nao ativou (prata do cla insuficiente)
 " ;;
                 esac
             else
@@ -170,6 +189,10 @@ clan_statue() {
             fi
         fi
     done
+    # Marca a tentativa: com ou sem sucesso, so volta a mexer na
+    # estatua depois do intervalo. Os bonus duram 48h, entao nao ha
+    # perda em esperar 6h para reavaliar.
+    estatua_marcar
     unset _up _cl
     return 0
 }
