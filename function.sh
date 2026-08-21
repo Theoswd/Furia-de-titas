@@ -155,6 +155,7 @@ FUNC_use_elixir=y
 FUNC_use_blessing=y
 FUNC_blessing_gold_min=100
 FUNC_trade=y
+FUNC_trade_dias=365
 FUNC_coliseum=y
 FUNC_AUTO_UPDATE=n
 FUNC_play_league=999

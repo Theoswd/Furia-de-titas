@@ -45,19 +45,19 @@ cd ~ && git clone https://github.com/Theoswd/Furia-de-titas.git && cd Furia-de-t
 **5.** Verifique a integridade:
 
 ```bash
-sha256sum -c .integrity --quiet && echo "Scripts integros"
+cd ~/Furia-de-titas && sha256sum -c .integrity --quiet && echo "Scripts integros"
 ```
 
 **6.** Cadastre as contas:
 
 ```bash
-./setup.sh
+cd ~/Furia-de-titas && ./setup.sh
 ```
 
 **7.** Inicie:
 
 ```bash
-./play.sh
+cd ~/Furia-de-titas && ./play.sh
 ```
 
 ---
@@ -87,19 +87,19 @@ git clone https://github.com/Theoswd/Furia-de-titas.git && cd Furia-de-titas
 **4.** Verifique a integridade:
 
 ```bash
-sha256sum -c .integrity --quiet && echo "Scripts integros"
+cd ~/Furia-de-titas && sha256sum -c .integrity --quiet && echo "Scripts integros"
 ```
 
 **5.** Cadastre as contas:
 
 ```bash
-./setup.sh
+cd ~/Furia-de-titas && ./setup.sh
 ```
 
 **6.** Inicie:
 
 ```bash
-./play.sh
+cd ~/Furia-de-titas && ./play.sh
 ```
 
 > Para o bot continuar rodando depois de fechar o terminal, use `tmux`:
@@ -130,19 +130,19 @@ cd ~ && git clone https://github.com/Theoswd/Furia-de-titas.git && cd Furia-de-t
 **3.** Verifique a integridade:
 
 ```bash
-sha256sum -c .integrity --quiet && echo "Scripts integros"
+cd ~/Furia-de-titas && sha256sum -c .integrity --quiet && echo "Scripts integros"
 ```
 
 **4.** Cadastre as contas:
 
 ```bash
-./setup.sh
+cd ~/Furia-de-titas && ./setup.sh
 ```
 
 **5.** Inicie:
 
 ```bash
-./play.sh
+cd ~/Furia-de-titas && ./play.sh
 ```
 
 > **O iOS suspende aplicativos em segundo plano.** O bot para quando você sai do iSH ou bloqueia a tela, e não há como evitar isso. A emulação também é lenta. Para uso contínuo, prefira Termux ou WSL.
@@ -151,17 +151,20 @@ sha256sum -c .integrity --quiet && echo "Scripts integros"
 
 ## Comandos
 
+> Todos os comandos incluem `cd ~/Furia-de-titas` porque precisam ser executados **dentro da pasta do bot**. Se você já estiver nela, o `cd` não atrapalha; se não estiver, ele evita o erro.
+
 | O quê | Comando |
 |---|---|
-| Iniciar | `./play.sh` |
-| Pausar / retomar | `./pause.sh` |
-| Ver estado | `./pause.sh status` |
-| Parar tudo | `./stop.sh` |
-| Cadastrar contas | `./setup.sh` |
-| Diagnosticar login | `./diagnose.sh` |
+| Iniciar | `cd ~/Furia-de-titas && ./play.sh` |
+| Pausar / retomar | `cd ~/Furia-de-titas && ./pause.sh` |
+| Ver estado | `cd ~/Furia-de-titas && ./pause.sh status` |
+| Parar tudo | `cd ~/Furia-de-titas && ./stop.sh` |
+| Cadastrar contas | `cd ~/Furia-de-titas && ./setup.sh` |
+| Diagnosticar login | `cd ~/Furia-de-titas && ./diagnose.sh` |
 | Ver log de uma conta | `tail -f ~/.twm/BR_NomeConta/twm.log` |
 
-> **Pausar não desloga.** Os processos continuam vivos e a sessão no jogo permanece válida — ao retomar não há novo login. A pausa entra em vigor **ao fim do ciclo em andamento**, então uma conta no meio de uma batalha pode levar alguns minutos para parar. Para encerrar de vez, use `./stop.sh`.
+> **Pausar não desloga.** Os processos continuam vivos e a sessão no jogo permanece válida — ao retomar não há novo login. A pausa entra em vigor **ao fim do ciclo em andamento**, então uma conta no meio de uma batalha pode levar alguns minutos para parar. Para encerrar de vez, use `cd ~/Furia-de-titas && ./stop.sh`.
+
 ---
 
 ## Atualização
@@ -226,13 +229,13 @@ Depois rode o comando de novo.
 Rode o diagnóstico. Ele mostra o que o servidor responde e **nunca exibe a senha**:
 
 ```bash
-./diagnose.sh
+cd ~/Furia-de-titas && ./diagnose.sh
 ```
 
 Depois com o número da conta:
 
 ```bash
-./diagnose.sh 1
+cd ~/Furia-de-titas && ./diagnose.sh 1
 ```
 
 | Resultado | Significa |
@@ -284,7 +287,7 @@ A fonte do terminal não os suporta. Use o modo padrão, sem a variável `TWM_EM
 <summary><b>Contas duplicadas ou processos travados</b></summary>
 
 ```bash
-./stop.sh && pkill -f twm.sh && ./play.sh
+cd ~/Furia-de-titas && ./stop.sh && pkill -f twm.sh && ./play.sh
 ```
 </details>
 
