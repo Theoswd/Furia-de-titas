@@ -156,12 +156,16 @@ cd ~/Furia-de-titas && ./play.sh
 | O quê | Comando |
 |---|---|
 | Iniciar | `cd ~/Furia-de-titas && ./play.sh` |
+| **Ver o painel** (não mexe nas contas) | `cd ~/Furia-de-titas && ./status.sh` |
+| Reiniciar tudo do zero | `cd ~/Furia-de-titas && ./play.sh --restart` |
 | Pausar / retomar | `cd ~/Furia-de-titas && ./pause.sh` |
 | Ver estado | `cd ~/Furia-de-titas && ./pause.sh status` |
 | Parar tudo | `cd ~/Furia-de-titas && ./stop.sh` |
 | Cadastrar contas | `cd ~/Furia-de-titas && ./setup.sh` |
 | Diagnosticar login | `cd ~/Furia-de-titas && ./diagnose.sh` |
 | Ver log de uma conta | `tail -f ~/.twm/BR_NomeConta/twm.log` |
+
+> **Para só olhar as contas, use o `./status.sh`, não o `./play.sh`.** O `status.sh` é somente leitura: desenha o painel e não sobe, não mata e não reinicia worker nenhum — sair com **Ctrl+C** não para nada. O `./play.sh` continua sendo o comando para *iniciar*; rodá-lo de novo agora preserva as contas que já estão rodando, e só sobe as que faltam.
 
 > **Pausar não desloga.** Os processos continuam vivos e a sessão no jogo permanece válida — ao retomar não há novo login. A pausa entra em vigor **ao fim do ciclo em andamento**, então uma conta no meio de uma batalha pode levar alguns minutos para parar. Para encerrar de vez, use `cd ~/Furia-de-titas && ./stop.sh`.
 
@@ -265,6 +269,38 @@ Descarte as alterações locais e atualize:
 ```bash
 cd ~/Furia-de-titas && git checkout -- . && git pull
 ```
+</details>
+
+<details>
+<summary><b>As contas estão jogando mas o painel mostra tudo em <code>[..]</code> / "0 online"</b></summary>
+
+Os workers sobem com `nohup` + `setsid`, então **sobrevivem** quando o Termux é fechado ou morto pelo Android. O painel, não: ele vivia dentro do `./play.sh` e morria junto. As contas continuavam jogando e ficavam invisíveis.
+
+O problema é o que vinha depois: para rever o painel, a única saída era rodar `./play.sh` de novo — e ele **derrubava as contas que estavam boas** e disparava 6 logins simultâneos do mesmo IP. O servidor recusa essa rajada com a mesma mensagem de "senha incorreta", e todas caíam no backoff de 30 s até 15 min. Daí o painel inteiro em `[..]`, tudo em `-`, "0 online". **O ato de olhar quebrava o que estava funcionando.**
+
+Agora:
+
+```bash
+cd ~/Furia-de-titas && ./status.sh
+```
+
+Somente leitura — mostra as contas sem tocar em processo nenhum, quantas vezes você quiser. E o `./play.sh` ficou idempotente: rodá-lo com contas já no ar responde `já rodando (PID N) - mantida` e sobe só o que falta. Para forçar o reinício geral, `./play.sh --restart`.
+
+> Se as contas caíram no backoff de login, elas se recuperam sozinhas — mas a espera chega a 15 min por conta. Acompanhe com `./status.sh`.
+</details>
+
+<details>
+<summary><b>Manter o painel aberto depois de fechar o Termux</b></summary>
+
+As contas não precisam do painel para funcionar. Mas se quiser voltar à mesma tela:
+
+```bash
+pkg install tmux -y && tmux new -s twm
+```
+
+Rode o `./play.sh` dentro da sessão e saia com **Ctrl+B** depois **D**. Para voltar: `tmux attach -t twm`.
+
+Sem `tmux`, basta abrir o Termux e rodar `./status.sh` — o painel volta e as contas nunca foram interrompidas.
 </details>
 
 <details>
