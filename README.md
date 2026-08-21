@@ -204,7 +204,7 @@ cd ~/Furia-de-titas && git checkout -- . && git pull
 Se você mesmo editar algum script, gere um novo baseline:
 
 ```bash
-cd ~/Furia-de-titas && sha256sum *.sh | sort -k2 > .integrity
+cd ~/Furia-de-titas && sha256sum -b *.sh | sort -k2 > .integrity
 ```
 
 ---
@@ -265,6 +265,46 @@ Descarte as alterações locais e atualize:
 ```bash
 cd ~/Furia-de-titas && git checkout -- . && git pull
 ```
+</details>
+
+<details>
+<summary><b>"[Process completed (signal 9)]" — o bot morre sozinho no meio do lançamento</b></summary>
+
+`signal 9` é `SIGKILL`: **o Android matou o processo**, o bot não travou nem deu erro. Duas causas, nesta ordem:
+
+**1. Limite de processos "fantasma" (Android 12 ou superior).** O sistema classifica como *phantom process* todo processo filho do Termux que ele não reconhece e, passando de **32 simultâneos**, mata sem avisar. Com o celular ligado no PC:
+
+```bash
+adb shell settings put global settings_enable_monitor_phantom_procs false
+```
+
+O ajuste volta ao normal quando o aparelho reinicia — é preciso repetir.
+
+**2. Restrição de bateria.** Em **Configurações → Bateria → Termux**, marque **"Sem restrições"**, e mantenha o `termux-wake-lock` ativo.
+
+> O consumo de processos por conta foi reduzido: cada página baixada gastava até 19 processos (um subshell, o `curl` e até 17 execuções de `sleep`), e agora gasta 3 fixos. Ainda assim, acima de 6 contas o ajuste do item 1 é recomendado.
+</details>
+
+<details>
+<summary><b>O `./setup.sh` mostra "Contas cadastradas: 0" mas o `./play.sh` encontra as contas</b></summary>
+
+Os dois estavam lendo **arquivos diferentes**. O `accounts.conf` fica dentro da pasta do bot e não é versionado, então quem clonou o repositório mais de uma vez acaba com duas cópias — uma com as contas e outra vazia.
+
+O menu do `./setup.sh` e o cabeçalho do `./play.sh` agora **mostram sempre o caminho do arquivo em uso**. Compare os dois; se forem diferentes, apague a pasta que não tem as contas:
+
+```bash
+ls -la ~/Furia-de-titas/accounts.conf
+```
+
+Se o arquivo local não existir, os dois scripts procuram nos lugares conhecidos antes de desistir — não é mais possível um enxergar as contas e o outro não.
+</details>
+
+<details>
+<summary><b>A coluna "ATIVIDADE EM CONJUNTO" fica sempre em "Página Principal"</b></summary>
+
+Corrigido. O painel lê a página atual de um arquivo que só era escrito por `fetch_page` — mas todo o código de batalha (`king.sh`, `coliseum.sh`, `clanfight.sh`, `altars.sh`, `undying.sh`, entre outros, mais de 100 pontos) chama o `curl` por outro caminho e nunca atualizava esse arquivo. O registro passou para a função central de requisição, por onde toda chamada passa de verdade.
+
+Entre um ciclo e outro a conta descansa na página inicial de propósito, então **"Página Principal" durante a espera é o estado correto** — o que mudou é que agora a batalha em andamento aparece.
 </details>
 
 <details>

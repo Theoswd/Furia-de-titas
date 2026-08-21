@@ -5,11 +5,56 @@
 # qualquer processo do mesmo UID no Termux).
 umask 077
 
-_dir=$(dirname "$0")
-TWMDIR=$(cd "$_dir" && pwd)
-unset _dir
+# Resolve o caminho real do script, seguindo links simbolicos.
+#
+# CORRECAO: era so "dirname $0". Chamado por um link simbolico (ou por um
+# atalho em $PREFIX/bin), o TWMDIR apontava para a pasta do LINK e nao para
+# a do repositorio — e o accounts.conf gravado era outro.
+_self="$0"
+_hops=0
+while [ -L "$_self" ] && [ "$_hops" -lt 20 ]; do
+    _link=$(readlink "$_self")
+    case "$_link" in
+        /*) _self="$_link" ;;
+        *)  _self="$(dirname "$_self")/$_link" ;;
+    esac
+    _hops=$((_hops + 1))
+done
+_dir=$(dirname "$_self")
+TWMDIR=$(cd "$_dir" && pwd -P)
+unset _dir _self _link _hops
 
-ACCOUNTS_FILE="$TWMDIR/accounts.conf"
+# Localiza o arquivo de contas — MESMA regra do play.sh.
+#
+# CORRECAO: o caminho vinha exclusivamente do diretorio do script, e as
+# duas ferramentas podiam terminar em arquivos diferentes. Com mais de uma
+# copia do repositorio no aparelho — o caso mais comum e clonar de novo
+# depois de um problema — este menu anunciava "Contas cadastradas: 0"
+# enquanto o ./play.sh subia as contas normalmente, sem nenhuma pista de
+# que estavam lendo arquivos distintos.
+#
+# Agora, se o arquivo local nao existir, os lugares conhecidos sao
+# procurados antes de desistir, e o caminho em uso e sempre exibido no
+# menu. Um cadastro novo continua indo para o diretorio do repositorio.
+resolve_accounts_file() {
+    if [ -s "$TWMDIR/accounts.conf" ]; then
+        printf '%s' "$TWMDIR/accounts.conf"
+        return 0
+    fi
+    for _cand in "$HOME/Furia-de-titas/accounts.conf" \
+                 "$HOME/.twm/accounts.conf" \
+                 "$HOME/twm/accounts.conf"; do
+        if [ -s "$_cand" ]; then
+            printf '%s' "$_cand"
+            unset _cand
+            return 0
+        fi
+    done
+    unset _cand
+    printf '%s' "$TWMDIR/accounts.conf"
+}
+
+ACCOUNTS_FILE=$(resolve_accounts_file)
 
 # Carrega funcoes de verificacao de sessao
 . "$TWMDIR/session_check.sh"
@@ -49,6 +94,9 @@ server_scheme() { echo "https"; }
 show_menu() {
     clear
     _L="--------------------------------------------------------------------"
+    # Reavalia a cada abertura: o arquivo pode ter acabado de ser criado
+    # por "Adicionar conta" ou esvaziado por "Remover conta".
+    ACCOUNTS_FILE=$(resolve_accounts_file)
     n=0
     [ -f "$ACCOUNTS_FILE" ] && n=$(grep -c -E '^[0-9]+[|]' "$ACCOUNTS_FILE" 2>/dev/null)
     case "$n" in ''|*[!0-9]*) n=0 ;; esac
@@ -57,7 +105,10 @@ show_menu() {
     printf "  %bTWM%b %b· Gerenciador de Contas%b%*s%bBR%b\n" \
            "$A1" "$RESET" "$DIM" "$RESET" 26 '' "$WHITE" "$RESET"
     printf "%b%s%b\n" "$A2" "$_L" "$RESET"
-    printf "  %bContas cadastradas:%b %b%s%b\n\n" "$DIM" "$RESET" "$WHITE" "$n" "$RESET"
+    printf "  %bContas cadastradas:%b %b%s%b\n" "$DIM" "$RESET" "$WHITE" "$n" "$RESET"
+    # O caminho e impresso sempre: um "0" sem o arquivo ao lado nao permite
+    # distinguir "nenhuma conta" de "estou lendo o arquivo errado".
+    printf "  %bArquivo:%b %b%s%b\n\n" "$DIM" "$RESET" "$DIM" "$ACCOUNTS_FILE" "$RESET"
     printf "   %b1%b  Listar contas\n"   "$A1" "$RESET"
     printf "   %b2%b  Adicionar conta\n" "$A1" "$RESET"
     printf "   %b3%b  Remover conta\n"   "$A1" "$RESET"

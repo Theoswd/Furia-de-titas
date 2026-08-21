@@ -42,28 +42,47 @@ script_slogan() {
 # espacamento entre requisicoes, que e um limitador de taxa natural.
 time_exit() {
     TEFPID=$!
-    _te_max="$1"
     [ -z "$TEFPID" ] && return 0
-    case "$_te_max" in ''|*[!0-9]*) _te_max=17 ;; esac
 
-    _te_n=0
-    while [ "$_te_n" -lt "$_te_max" ]; do
-        sleep 1
-        _te_n=$((_te_n + 1))
-        if ! kill -0 "$TEFPID" 2>/dev/null; then
-            wait "$TEFPID" 2>/dev/null
-            unset _te_n _te_max
-            return 0
-        fi
-    done
-
-    kill -15 "$TEFPID" 2>/dev/null
+    # Espacamento deliberado entre requisicoes: limitador de taxa natural,
+    # herdado da versao original (que o obtinha do primeiro "sleep 1" do
+    # laco de espera).
     sleep 1
-    kill -0 "$TEFPID" 2>/dev/null && kill -9 "$TEFPID" 2>/dev/null
+
+    # CORRECAO CRITICA (SIGKILL / "signal 9" no Android 12+):
+    #
+    # A versao anterior esperava com
+    #     while [ n -lt 17 ]; do sleep 1; kill -0 PID; done
+    # ou seja ate 17 forks de /bin/sleep POR REQUISICAO, mais o subshell e
+    # o curl. Cada conta faz dezenas de requisicoes por ciclo; com 6 contas
+    # em paralelo a arvore de processos do Termux passa facilmente dos 32
+    # processos "fantasma" que o Android 12+ tolera — e o sistema responde
+    # matando a sessao inteira com SIGKILL, sem aviso. E exatamente o
+    # "[Process completed (signal 9)]" que aparece no meio do lancamento.
+    #
+    # O prazo agora e imposto pelo proprio curl (--max-time, em run_curl),
+    # entao o processo em segundo plano TEM hora marcada para morrer e
+    # basta um "wait" — que nao cria processo nenhum.
+    #
+    # O argumento continua sendo aceito por compatibilidade com os 100+
+    # pontos de chamada, mas quem corta agora e o curl. Nos pontos que
+    # chamam run_curl direto o prazo passa de 17s para os 45s padrao do
+    # run_curl; o --connect-timeout de 15s ja cobre o caso comum (servidor
+    # fora do ar) e o valor maior foi mantido de proposito para nao
+    # apertar o login, que e a parte mais fragil do fluxo. Quem precisar
+    # de prazo curto define TWM_MAXTIME antes da chamada, como o
+    # fetch_page faz.
     wait "$TEFPID" 2>/dev/null
-    printf "timeout %ss: requisicao abortada\n" "$_te_max" >> "${TMP:-.}/ERROR_DEBUG"
-    unset _te_n _te_max
-    return 1
+    _te_rc=$?
+
+    # 28 = CURLE_OPERATION_TIMEDOUT.
+    if [ "$_te_rc" = "28" ]; then
+        printf "timeout: requisicao abortada\n" >> "${TMP:-.}/ERROR_DEBUG"
+        unset _te_rc
+        return 1
+    fi
+    unset _te_rc
+    return 0
 }
 
 # Funcao central de requisicao via curl.
@@ -75,41 +94,117 @@ time_exit() {
 #  --connect-timeout /
 #  --max-time            : sem isso, um socket pendurado travava o worker
 #                          para sempre (as chamadas de login sao sincronas).
+#                          O valor agora sai de $TWM_MAXTIME (45s por
+#                          padrao): antes era fixo e o corte real de 17s
+#                          vinha do laco de "sleep 1" do time_exit. Quem
+#                          impoe o prazo passa a ser o curl; o time_exit so
+#                          espera, sem gastar processo.
 #  -sS em vez de -s      : mantem silencio de progresso MAS mostra erros,
 #                          que antes eram engolidos ("parou e nao sei por que").
+#
+# Registra em $TMP/pagina o caminho da requisicao que esta saindo.
+#
+# CORRECAO (painel "ATIVIDADE EM CONJUNTO" congelado): esse registro ficava
+# dentro do fetch_page, com o comentario "como todo acesso passa por aqui,
+# basta uma linha para cobrir o jogo inteiro". Nao passa. allies.sh,
+# altars.sh, arena.sh, clancoliseum.sh, clandmg.sh, clanfight.sh,
+# coliseum.sh, flagfight.sh, king.sh, loginlogoff.sh e undying.sh — ou seja
+# TODO o codigo de batalha, mais de 100 pontos de chamada — usam run_curl
+# direto e nunca tocavam nesse arquivo.
+#
+# Como o unico fetch_page do fim do ciclo e o descansar(), que volta para
+# "/", o painel lia "/" e mostrava "Pagina Principal" praticamente o tempo
+# todo, sem nunca acompanhar a batalha em andamento. Registrando aqui, no
+# unico ponto por onde TODA requisicao passa de verdade, a coluna passa a
+# seguir a conta ao vivo.
+_rc_track() {
+    [ -n "$TMP" ] || return 0
+    [ -n "$URL" ] || return 0
+    for _rc_a in "$@"; do
+        case "$_rc_a" in
+            "$URL")
+                printf %s "/" > "$TMP/pagina" 2>/dev/null
+                unset _rc_a
+                return 0
+                ;;
+            "$URL"/*|"$URL"\?*)
+                _rc_pp=${_rc_a#"$URL"}
+                printf %s "$_rc_pp" > "$TMP/pagina" 2>/dev/null
+                unset _rc_a _rc_pp
+                return 0
+                ;;
+        esac
+    done
+    unset _rc_a
+    return 0
+}
+
 run_curl() {
     case "$URL" in
         http://*) _rc_p="--proto =http,https --proto-redir =http,https" ;;
         *)        _rc_p="--proto =https --proto-redir =https" ;;
     esac
 
+    _rc_mt="${TWM_MAXTIME:-45}"
+    case "$_rc_mt" in ''|*[!0-9]*) _rc_mt=45 ;; esac
+
+    _rc_track "$@"
+
     # shellcheck disable=SC2086
     if [ -n "$TMP_COOKIE" ]; then
         curl -sS -L --compressed --max-redirs 5 \
-             --connect-timeout 15 --max-time 45 \
+             --connect-timeout 15 --max-time "$_rc_mt" \
              $_rc_p -A "$vUserAgent" \
              -c "$TMP_COOKIE" -b "$TMP_COOKIE" "$@"
     else
         curl -sS -L --compressed --max-redirs 5 \
-             --connect-timeout 15 --max-time 45 \
+             --connect-timeout 15 --max-time "$_rc_mt" \
              $_rc_p -A "$vUserAgent" "$@"
     fi
 }
 
-# Acessa qualquer pagina pelo caminho relativo
+# Acessa qualquer pagina pelo caminho relativo.
+#
+# CORRECAO (SIGKILL / "signal 9"): a espera era feita com time_exit, que
+# sondava com "sleep 1" — subshell + curl + ate 17 forks de sleep, ou seja
+# ate 19 processos POR PAGINA. Com 6 contas e dezenas de paginas por ciclo,
+# o limite de processos "fantasma" do Android 12+ era estourado e a sessao
+# do Termux inteira morria com SIGKILL.
+#
+# Agora sao 3 processos fixos por pagina (subshell + curl + o sleep de
+# espacamento) e o prazo e imposto pelo proprio curl. Medido em 10 paginas
+# contra um servidor de 2,5s: 30 forks de sleep antes, 10 depois, no mesmo
+# tempo total. De quebra o codigo passa a saber POR QUE a requisicao
+# falhou, em vez de so "acabou o tempo".
 fetch_page() {
-    # Registra onde a conta esta. O painel le isso para mostrar a aba
-    # atual em vez de um rotulo generico. Como todo acesso passa por
-    # aqui, basta uma linha para cobrir o jogo inteiro.
-    printf %s "$1" > "${TMP}/pagina" 2>/dev/null
     relative_url="$1"
     output_file="${2:-$TMP/SRC}"
 
-    (
-        run_curl "${URL}${relative_url}" > "$output_file"
-    ) </dev/null > /dev/null 2>&1 &
+    TWM_MAXTIME=17
+    run_curl "${URL}${relative_url}" > "$output_file" 2>/dev/null &
+    _fp_pid=$!
+    unset TWM_MAXTIME
 
-    time_exit 17
+    # O "sleep 1" fica EM PARALELO com a requisicao, nao depois dela.
+    #
+    # E o mesmo espacamento minimo de 1s por requisicao que a versao
+    # anterior tinha — nela a primeira volta do laco de espera corria
+    # junto com o curl. Colocado depois do curl, ele viraria 1s de atraso
+    # somado a CADA pagina: com ~90 paginas por ciclo, mais de um minuto
+    # perdido por conta, por ciclo. Medido: 10 paginas em 30s (em paralelo)
+    # contra 35s (em serie).
+    sleep 1
+    wait "$_fp_pid" 2>/dev/null
+    _fp_rc=$?
+    unset _fp_pid
+
+    if [ "$_fp_rc" != "0" ]; then
+        printf "curl %s: %s\n" "$_fp_rc" "$relative_url" >> "${TMP:-.}/ERROR_DEBUG"
+        unset _fp_rc
+        return 1
+    fi
+    unset _fp_rc
+    return 0
 }
 
 hpmp() {
@@ -254,33 +349,81 @@ player_stats() {
 # Uma requisicao por ciclo de start(), e o painel apenas le o arquivo.
 atualiza_agenda() {
     _ag="$HOME/.twm/agenda"
+
+    TWM_MAXTIME=17
     _pg=`run_curl "${URL}/fights/" 2>/dev/null`
+    unset TWM_MAXTIME
     [ -n "$_pg" ] || return 1
 
-    _tmpf="${_ag}.tmp"
+    # CORRECAO 1 (corrida entre as contas): o arquivo temporario era
+    # "$_ag.tmp" — o MESMO para as 6 contas, porque a agenda mora em
+    # ~/.twm e nao no diretorio da conta. Os workers escreviam nele ao
+    # mesmo tempo e o "mv" de um publicava o arquivo pela metade do outro.
+    # Agora o temporario leva o PID.
+    _tmpf="${_ag}.$$.tmp"
+    _rawf="${_ag}.$$.raw"
     : > "$_tmpf"
 
     printf '%s' "$_pg" \
         | sed 's/<br[^>]*>/\n/g; s/<\/div>/\n/g; s/<[^>]*>//g' \
         | grep -oE "(Vale dos Imortais|Coliseu do clã|Torneio dos Clãs|Rei dos Imortais|Altares dos Deuses|Batalha de Bandeiras)|Para iniciar: [0-9]{1,2}:[0-9]{2}:[0-9]{2}" \
-        | paste - - 2>/dev/null \
-        | while IFS='	' read -r _nome _falta; do
-            _falta=`printf '%s' "$_falta" | grep -oE '[0-9]{1,2}:[0-9]{2}:[0-9]{2}'`
-            [ -n "$_nome" ] && [ -n "$_falta" ] || continue
-            _h=`printf '%s' "$_falta" | cut -d: -f1 | sed 's/^0//'`
-            _m=`printf '%s' "$_falta" | cut -d: -f2 | sed 's/^0//'`
-            [ -z "$_h" ] && _h=0; [ -z "$_m" ] && _m=0
-            _s=`printf %s "$_falta" | cut -d: -f3 | sed "s/^0//"`; [ -z "$_s" ] && _s=0
-            _abs=$(( $(date +%s) + _h*3600 + _m*60 + _s ))
-            printf '%s|%s\n' "$(date -d "@$_abs" +%H%M 2>/dev/null || echo '')" "$_nome" >> "$_tmpf"
-        done
+        > "$_rawf" 2>/dev/null
 
+    # CORRECAO 2 (portabilidade — este e o motivo de a agenda nunca
+    # aparecer no Termux): a conversao da contagem regressiva para horario
+    # absoluto era feita com `date -d "@epoch"`, que e EXTENSAO DO GNU
+    # coreutils. O toybox/busybox do Android nao aceita -d: a substituicao
+    # devolvia vazio e o arquivo saia com linhas "|Nome". Como o painel so
+    # testa se o arquivo tem conteudo, ele trocava a agenda fixa (correta)
+    # por essa lista sem horario. A conta agora e aritmetica pura, com o
+    # date usado apenas para ler a hora atual — o que funciona em qualquer
+    # implementacao.
+    #
+    # CORRECAO 3 (pareamento): o "paste - -" assumia que todo nome vem
+    # seguido do seu contador. Um evento em andamento aparece SEM contador
+    # e desalinhava todos os horarios seguintes — cada evento herdava o
+    # horario do proximo. O laco abaixo so fecha um par quando o contador
+    # vem logo depois do nome, e descarta nome solto.
+    _nh=`date +%H | sed 's/^0//'`; [ -z "$_nh" ] && _nh=0
+    _nm=`date +%M | sed 's/^0//'`; [ -z "$_nm" ] && _nm=0
+    _ns=`date +%S | sed 's/^0//'`; [ -z "$_ns" ] && _ns=0
+    _base=$(( _nh * 3600 + _nm * 60 + _ns ))
+
+    _nome=""
+    # Le de ARQUIVO, nao de pipe: num pipe o laco roda em subshell e o
+    # "$_nome" guardado de uma volta para a outra se perderia.
+    while IFS= read -r _ln; do
+        case "$_ln" in
+            "Para iniciar: "*)
+                [ -n "$_nome" ] || continue
+                _falta=${_ln#Para iniciar: }
+                _h=`printf %s "$_falta" | cut -d: -f1 | sed 's/^0//'`; [ -z "$_h" ] && _h=0
+                _m=`printf %s "$_falta" | cut -d: -f2 | sed 's/^0//'`; [ -z "$_m" ] && _m=0
+                _s=`printf %s "$_falta" | cut -d: -f3 | sed 's/^0//'`; [ -z "$_s" ] && _s=0
+                _abs=$(( (_base + _h * 3600 + _m * 60 + _s) % 86400 ))
+                printf '%02d%02d|%s\n' \
+                    $(( _abs / 3600 )) $(( _abs % 3600 / 60 )) "$_nome" >> "$_tmpf"
+                _nome=""
+                ;;
+            *)
+                _nome="$_ln"
+                ;;
+        esac
+    done < "$_rawf"
+    rm -f "$_rawf"
+
+    # CORRECAO 4 (ordem): o proximo_evento do play.sh percorre a lista de
+    # cima para baixo e para no primeiro horario MAIOR que agora — ele
+    # espera uma agenda diaria ordenada, como a lista fixa. A pagina
+    # /fights/ nao vem em ordem cronologica, entao o painel apontava um
+    # evento qualquer. Ordena antes de publicar.
     if [ -s "$_tmpf" ]; then
+        sort -n "$_tmpf" > "${_tmpf}.s" 2>/dev/null && mv "${_tmpf}.s" "$_tmpf"
         mv "$_tmpf" "$_ag"
     else
         rm -f "$_tmpf"
     fi
-    unset _ag _pg _tmpf
+    unset _ag _pg _tmpf _rawf _nome _nh _nm _ns _base
 }
 
 # Converte "408,7M" / "12K" / "1.234" em numero inteiro.

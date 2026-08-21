@@ -10,12 +10,56 @@ if [ ! -x "$TOYBOX" ]; then
 fi
 export TOYBOX
 
-_dir=$(dirname "$0")
-TWMDIR=$(cd "$_dir" && pwd)
-unset _dir
+# Resolve o caminho real do script, seguindo links simbolicos.
+#
+# CORRECAO: era so "dirname $0". Chamado por um link simbolico (ou por um
+# atalho em $PREFIX/bin), o TWMDIR apontava para a pasta do LINK e nao para
+# a do repositorio — e o accounts.conf lido era outro.
+_self="$0"
+_hops=0
+while [ -L "$_self" ] && [ "$_hops" -lt 20 ]; do
+    _link=$(readlink "$_self")
+    case "$_link" in
+        /*) _self="$_link" ;;
+        *)  _self="$(dirname "$_self")/$_link" ;;
+    esac
+    _hops=$((_hops + 1))
+done
+_dir=$(dirname "$_self")
+TWMDIR=$(cd "$_dir" && pwd -P)
+unset _dir _self _link _hops
 export TWMDIR
 
-ACCOUNTS_FILE="$TWMDIR/accounts.conf"
+# Localiza o arquivo de contas.
+#
+# CORRECAO: o caminho vinha exclusivamente do diretorio do script. Com mais
+# de uma copia do repositorio no aparelho — o caso mais comum e clonar de
+# novo depois de um problema — o ./setup.sh cadastrava num accounts.conf e
+# o ./play.sh lia outro. O sintoma e justamente o menu anunciar
+# "Contas cadastradas: 0" enquanto o ./play.sh sobe as contas normalmente.
+#
+# Agora, se o arquivo local nao existir, os lugares conhecidos sao
+# procurados antes de desistir — e o caminho em uso passa a ser SEMPRE
+# impresso, para o numero nunca mais ficar sem explicacao.
+resolve_accounts_file() {
+    if [ -s "$TWMDIR/accounts.conf" ]; then
+        printf '%s' "$TWMDIR/accounts.conf"
+        return 0
+    fi
+    for _cand in "$HOME/Furia-de-titas/accounts.conf" \
+                 "$HOME/.twm/accounts.conf" \
+                 "$HOME/twm/accounts.conf"; do
+        if [ -s "$_cand" ]; then
+            printf '%s' "$_cand"
+            unset _cand
+            return 0
+        fi
+    done
+    unset _cand
+    printf '%s' "$TWMDIR/accounts.conf"
+}
+
+ACCOUNTS_FILE=$(resolve_accounts_file)
 
 termux-wake-lock 2>/dev/null
 STATUS_DIR="$HOME/.twm/status"
@@ -159,7 +203,22 @@ total=$(grep -c -E '^[0-9]+\|' "$ACCOUNTS_FILE" 2>/dev/null)
 case "$total" in *[!0-9]*) total=0 ;; esac
 [ -z "$total" ] && total=0
 
-printf "${CYAN}TWM Multi-contas - %s conta(s) [%s]${RESET}\n\n" "$total" "$TOYBOX"
+printf "${CYAN}TWM Multi-contas - %s conta(s) [%s]${RESET}\n" "$total" "$TOYBOX"
+printf "${GOLD}Contas:${RESET} %s\n\n" "$ACCOUNTS_FILE"
+
+# Android 12+ derruba a sessao inteira com SIGKILL.
+#
+# O sistema classifica como "processo fantasma" todo filho do Termux que
+# ele nao reconhece e, passando de 32 simultaneos, mata sem aviso — o
+# "[Process completed (signal 9)]" no meio do lancamento das contas. O
+# consumo por conta foi cortado (veja info.sh: fetch_page e time_exit nao
+# gastam mais um fork de "sleep" por segundo de espera), mas com muitas
+# contas ainda vale desligar o monitor.
+if [ -d /data/data/com.termux ] && [ "$total" -gt 3 ]; then
+    printf "${YELLOW}AVISO (Android 12+): o sistema pode matar o bot com SIGKILL (signal 9).${RESET}\n"
+    printf "  Deixe o Termux em ${CYAN}Bateria > Sem restricoes${RESET} e, com o celular no PC:\n"
+    printf "  ${CYAN}adb shell settings put global settings_enable_monitor_phantom_procs false${RESET}\n\n"
+fi
 
 n=0
 
@@ -386,6 +445,8 @@ aba_de() {
     _p=`cat "$1/pagina" 2>/dev/null`
     case "$_p" in
         ""|"/"|"/?out_gate_confirm=true") echo "Página Principal" ;;
+        "/?sign_in=1")    echo "Entrando" ;;
+        /fights*)         echo "Agenda de Batalhas" ;;
         /arena*)          echo "Arena" ;;
         /career*)         echo "Carreira" ;;
         /cave*)           echo "Caverna" ;;
@@ -542,9 +603,9 @@ while true; do
         printf "%b%s%b\n" "$C_BLUE" "$LINHA" "$C_RESET"
     fi
 
-    _i=0
-    while [ "$_i" -lt 20 ]; do
-        sleep 1
-        _i=$((_i + 1))
-    done
+    # CORRECAO: eram 20 chamadas de "sleep 1" a cada volta do painel, ou
+    # seja 60 forks por minuto so para nao fazer nada. Um unico sleep tem
+    # o mesmo efeito e conta um processo em vez de vinte — o que importa
+    # no Android, onde o total de processos filhos e limitado.
+    sleep 20
 done
