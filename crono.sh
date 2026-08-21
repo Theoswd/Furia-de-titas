@@ -93,22 +93,48 @@ func_sleep() {
 # Janelas fixas da Masmorra do Cla.
 # A propria pagina informa: "10 acessos gratis a cada 8 horas a partir
 # das 10:00" — ou seja 02:00, 10:00 e 18:00. Nao ha o que calcular.
+# Intervalo do checklist de missoes do cla.
+cq_liberado() {
+    _m=${FUNC_cq_min:-15}
+    case "$_m" in ''|*[!0-9]*) _m=15 ;; esac
+    _u=`cat "$TMP/last_cq" 2>/dev/null`
+    case "$_u" in ''|*[!0-9]*) _u=0 ;; esac
+    [ $(( $(date +%s) - _u )) -ge $((_m * 60)) ]
+}
+cq_marcar() { date +%s > "$TMP/last_cq" 2>/dev/null; }
+
 # Tarefas que NAO dependem da agenda de eventos.
 #
-# A arena deve sair a cada 30 minutos, mas o start() so era chamado
-# nos minutos da agenda — que tem vaos de 60 a 120 minutos, e nenhum
-# durante as 4 horas do Coliseu. Medido em producao: a arena saia a
-# cada ~52 minutos, e contas recem-cadastradas ficavam com 1 unica
-# execucao enquanto as antigas tinham 9.
+# A arena deve sair a cada 30 minutos, mas o start() so era chamado nos
+# minutos da agenda — que tem vaos de 60 a 120 minutos, e nenhum durante
+# as 4 horas do Coliseu. Medido em producao: a arena saia a cada ~52
+# minutos, e contas recem-cadastradas ficavam com 1 unica execucao
+# enquanto as antigas tinham 9.
 #
-# Isto roda a cada volta do laco principal (~1 min). Cada atividade
-# tem o proprio temporizador, entao nada executa fora de hora.
+# Aqui tambem entra o CHECKLIST DE MISSOES DO CLA. Durante a janela do
+# Coliseu o bot passa a pausar entre as lutas para conferir a lista:
+# recolhe as concluidas, apoia as dos companheiros e conclui com ouro as
+# que estao paradas. Antes, essas quatro horas passavam sem nada disso.
 #
-# Nao e chamado durante os cinco eventos de prioridade: enquanto a
-# conta esta aplicada num deles, nada mais deve competir. Assim que
-# o evento termina, o start() roda o checklist do cla e as demais
-# atividades normalmente.
+# Cada bloco tem temporizador proprio, entao rodar a cada volta do laco
+# (~1 min) nao significa executar a cada minuto.
+#
+# NAO e chamado durante os cinco eventos de prioridade: enquanto a conta
+# esta aplicada num deles nada mais deve competir. Ao terminar o evento,
+# o start() roda o checklist completo e as demais atividades.
 tarefas_livres() {
+    [ -n "$CLD" ] || clan_id 2>/dev/null
+
+    # --- Checklist das missoes do cla
+    if [ -n "$CLD" ] && cq_liberado; then
+        printf "Checklist do cla\n"
+        cq_concluir    2>/dev/null
+        cq_ajudar      2>/dev/null
+        cq_forcar_ouro 2>/dev/null
+        cq_marcar
+    fi
+
+    # --- Arena, sempre tomando antes a missao do cla que ela completa
     if arena_liberada; then
         cq_antes arena 2>/dev/null
         arena_duel

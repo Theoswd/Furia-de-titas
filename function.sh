@@ -169,6 +169,7 @@ FUNC_clan_help=y
 FUNC_quest_force_gold=y
 FUNC_quest_gold_min=1200
 FUNC_arena_min=30
+FUNC_cq_min=15
 FUNC_clan_statue=y
 FUNC_cave_boost=y
 SCRIPT_PAUSED=n
