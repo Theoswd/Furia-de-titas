@@ -178,8 +178,15 @@ conf_allies() {
         *)
             clear
             if [ -n "$AL" ]; then
-                printf "Invalid option: %s\n" "$AL"
-                kill -9 $$
+                # CORRECAO: aqui era "kill -9 $$" — SIGKILL no proprio
+                # shell por causa de uma opcao de menu invalida. Num worker
+                # isso derruba a conta sem deixar rastro, e $$ e o PID do
+                # shell PRINCIPAL mesmo quando avaliado dentro de subshell,
+                # entao o estrago ia muito alem da funcao. Uma opcao
+                # invalida e para ser recusada, nao para matar o processo.
+                printf "Opcao invalida: %s — configuracao de aliados ignorada\n" "$AL"
+                printf "conf_allies: opcao invalida (%s)\n" "$AL" >> "$TMP/ERROR_DEBUG"
+                return 1
             else
                 printf "Time exceeded!\n" >> "$TMP/ERROR_DEBUG"
             fi

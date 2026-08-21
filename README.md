@@ -163,6 +163,7 @@ cd ~/Furia-de-titas && ./play.sh
 | Parar tudo | `cd ~/Furia-de-titas && ./stop.sh` |
 | Cadastrar contas | `cd ~/Furia-de-titas && ./setup.sh` |
 | Diagnosticar login | `cd ~/Furia-de-titas && ./diagnose.sh` |
+| Investigar `signal 9` | `cd ~/Furia-de-titas && ./sigkill.sh` |
 | Ver log de uma conta | `tail -f ~/.twm/BR_NomeConta/twm.log` |
 
 > **Para só olhar as contas, use o `./status.sh`, não o `./play.sh`.** O `status.sh` é somente leitura: desenha o painel e não sobe, não mata e não reinicia worker nenhum — sair com **Ctrl+C** não para nada. O `./play.sh` continua sendo o comando para *iniciar*; rodá-lo de novo agora preserva as contas que já estão rodando, e só sobe as que faltam.
@@ -307,6 +308,29 @@ Sem `tmux`, basta abrir o Termux e rodar `./status.sh` — o painel volta e as c
 <summary><b>"[Process completed (signal 9)]" — o bot morre sozinho no meio do lançamento</b></summary>
 
 `signal 9` é `SIGKILL`: **o Android matou o processo**, o bot não travou nem deu erro. Duas causas, nesta ordem:
+
+### Primeiro, descubra a causa
+
+`signal 9` é `SIGKILL` — o processo foi morto de fora e não consegue registrar nada sobre a própria morte. Em vez de tentar ajustes no escuro, deixe o bot rodar sob observação:
+
+```bash
+cd ~/Furia-de-titas && ./sigkill.sh
+```
+
+Ele inicia o bot normalmente (com o painel) e grava o estado do sistema a cada 2 s em `~/.twm/sigkill.log` — o arquivo sobrevive mesmo que o Termux inteiro morra. Quando parar, reabra o Termux e rode:
+
+```bash
+cd ~/Furia-de-titas && ./sigkill.sh relatorio
+```
+
+Como ler o resultado:
+
+| No relatório | Causa provável | O que fazer |
+|---|---|---|
+| `mem_disp` caindo para perto de zero | Falta de memória | Rodar menos contas, fechar outros apps |
+| `proc_bot` chegando perto de 32 | Limite de processos fantasma | Item 1 abaixo |
+| `setsid: NAO` | Falta o `util-linux` | `pkg install util-linux -y` |
+| Memória folgada e `proc_bot` baixo | Nenhuma das duas | Mande o relatório — a causa é outra |
 
 **1. Limite de processos "fantasma" (Android 12 ou superior).** O sistema classifica como *phantom process* todo processo filho do Termux que ele não reconhece e, passando de **32 simultâneos**, mata sem avisar.
 
