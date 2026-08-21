@@ -61,7 +61,49 @@ else
     A_NONE="-"
 fi
 
-LINHA="--------------------------------------------------------------------"
+# Largura do terminal.
+#
+# CORRECAO: o painel era fixo em 68 colunas. A tela de um celular no Termux
+# tem por volta de 56, entao cada conta quebrava no meio ("Ouro 3" numa
+# linha e "16" na seguinte), o rodape partia "Proximo: Eve / nto especial" e
+# o painel virava um bloco ilegivel.
+#
+# Tres fontes, da mais confiavel para a menos: stty (sempre presente e le o
+# tamanho REAL da janela), tput (precisa do ncurses) e $COLUMNS (so existe
+# em shell interativo, e nao acompanha o giro da tela).
+painel_largura() {
+    # Override manual: TWM_COLS=50 ./status.sh
+    # Serve para quem usa fonte grande no Termux, onde a deteccao acerta o
+    # numero de colunas mas o texto ainda estoura.
+    case "${TWM_COLS:-}" in
+        ''|*[!0-9]*) ;;
+        *) printf '%s' "$TWM_COLS"; return 0 ;;
+    esac
+
+    _pw=$(stty size 2>/dev/null | cut -d" " -f2)
+    case "$_pw" in ''|*[!0-9]*) _pw="" ;; esac
+    if [ -z "$_pw" ] && command -v tput > /dev/null 2>&1; then
+        _pw=$(tput cols 2>/dev/null)
+        case "$_pw" in ''|*[!0-9]*) _pw="" ;; esac
+    fi
+    [ -z "$_pw" ] && _pw="$COLUMNS"
+    case "$_pw" in ''|*[!0-9]*) _pw=80 ;; esac
+    # 36 e a largura minima em que todo o painel cabe (verificado de 36 a 120).
+    [ "$_pw" -lt 36 ] && _pw=36
+    [ "$_pw" -gt 120 ] && _pw=120
+    printf '%s' "$_pw"
+}
+
+# Desenha a linha separadora na largura da tela.
+painel_regua() {
+    _rn=$1
+    _rs=""
+    while [ "${#_rs}" -lt "$_rn" ]; do
+        _rs="$_rs----------"
+    done
+    printf '%b%.*s%b\n' "$C_BLUE" "$_rn" "$_rs" "$C_RESET"
+    unset _rn _rs
+}
 
 # Agenda de eventos, extraida do case de horarios do run.sh.
 # Horarios em America/Bahia (BRT), que e o fuso usado pelos workers.
@@ -236,6 +278,13 @@ while true; do
     [ -t 1 ] && [ "${PANEL_ONCE:-0}" != "1" ] && clear
     agora=$(date +%H:%M:%S)
 
+    # Remede a cada volta: o celular pode ser girado com o painel aberto.
+    LARG=$(painel_largura)
+    # 86 e a largura que o layout de coluna unica realmente ocupa:
+    # indice + simbolo + nome(18) + os cinco pares rotulo/valor. Medido, nao
+    # estimado — com 72 ele ainda estourava em telas de 72 e 80 colunas.
+    if [ "$LARG" -lt 86 ]; then ESTREITO=1; else ESTREITO=0; fi
+
     n_on=0; n_up=0; n_off=0; idx=0
     LISTA=""; ATIV=""
 
@@ -288,54 +337,157 @@ while true; do
 
         cor=$(estado_cor "$status")
         sim=$(estado_simbolo "$status")
-        LISTA="${LISTA}$(printf "%b%2s %s %b%-18.18s %b%s %-7s %b%s %-6s %b%s %-4s %b%s %-8s %b%s %s%b" \
-            "$C_DIM" "$idx" "$C_RESET" \
-            "$cor$sim $C_WHITE" "$nome" \
-            "$C_RED" "$I_HP" "$hp" \
-            "$C_YELLOW" "$I_EN" "$ene" \
-            "$C_MAG" "$I_LV" "$lvl" \
-            "$C_GOLD" "$I_GO" "$ouro" \
-            "$C_GRAY" "$I_SI" "$prata" "$C_RESET")
-"
+
         # Aba atual + relatorio de combate (HP ao vivo, dano, morte)
         _aba=$(aba_de "$acc_dir")
-        _cbt=$(combate_de "$acc_dir")
-        if [ -n "$_cbt" ]; then
-            case "$_cbt" in
-                *MORTO*) _cor_c="$C_RED" ;;
-                *dano*)  _cor_c="$C_YELLOW" ;;
-                *)       _cor_c="$C_GREEN" ;;
-            esac
-            ATIV="${ATIV}$(printf "    %b%-18.18s %b%s %b%-22.22s %b%s%b" \
-                "$C_WHITE" "$nome" "$C_DIM" "$I_ARROW" "$C_CYAN" "$_aba" "$_cor_c" "$_cbt" "$C_RESET")
+        # Os arquivos HP/old_HP ficam no disco depois que o worker morre.
+        # Mostrar "-1110 de dano recebido" numa conta fora do ar e uma
+        # leitura falsa de combate — o combate acabou junto com o processo.
+        if [ "$status" = "running" ] || [ "$status" = "paused" ]; then
+            _cbt=$(combate_de "$acc_dir")
+        else
+            _cbt=""
+        fi
+        case "$_cbt" in
+            *MORTO*) _cor_c="$C_RED" ;;
+            *dano*)  _cor_c="$C_YELLOW" ;;
+            *)       _cor_c="$C_GREEN" ;;
+        esac
+
+        if [ "$ESTREITO" = 1 ]; then
+            # TELA ESTREITA (celular): duas linhas por conta, com a aba na
+            # primeira. As duas secoes se fundem — repetir os seis nomes
+            # numa lista separada nao cabe e nao acrescenta nada.
+            # Nome com largura util, nao esticado ate a borda: o resto do
+            # espaco vai para a aba, que e a informacao que muda.
+            _nw=$((LARG - 32))
+            [ "$_nw" -gt 18 ] && _nw=18
+            [ "$_nw" -lt 8 ]  && _nw=8
+            _aw=$((LARG - _nw - 13))
+            [ "$_aw" -lt 6 ] && _aw=6
+            LISTA="${LISTA}$(printf "%b%2s %b%-5s %b%-*.*s %b%s %b%-.*s%b" \
+                "$C_DIM" "$idx" "$cor" "$sim" \
+                "$C_WHITE" "$_nw" "$_nw" "$nome" \
+                "$C_DIM" "$I_ARROW" \
+                "$C_CYAN" "$_aw" "$_aba" "$C_RESET")
+"
+            # Rotulos curtos e truncamento na largura da tela.
+            #
+            # "HP 98062 Eng 2195 LV 104 Ouro 5,2M PR 1477,8M" tem 45
+            # colunas: cabe em 56, estoura em 46 e quebra a linha, que era
+            # justamente o defeito. Abreviando fica em 42; o corte final
+            # garante que NENHUMA largura quebre, mesmo com valores maiores
+            # do que os de hoje.
+            if [ "$LARG" -lt 56 ]; then
+                _l1="HP"; _l2="En"; _l3="LV"; _l4="Ou"; _l5="PR"
+            else
+                _l1="$I_HP"; _l2="$I_EN"; _l3="$I_LV"; _l4="$I_GO"; _l5="$I_SI"
+            fi
+            _num=$((LARG - 4))
+            LISTA="${LISTA}$(printf "    %b%.*s%b" "$C_GRAY" "$_num" \
+                "$(printf "%s %s %s %s %s %s %s %s %s %s" \
+                    "$_l1" "$hp" "$_l2" "$ene" "$_l3" "$lvl" \
+                    "$_l4" "$ouro" "$_l5" "$prata")" "$C_RESET")
+"
+            [ -n "$_cbt" ] && LISTA="${LISTA}$(printf "    %b%s%b" "$_cor_c" "$_cbt" "$C_RESET")
 "
         else
-            ATIV="${ATIV}$(printf "    %b%-18.18s %b%s %b%s%b" \
-                "$C_WHITE" "$nome" "$C_DIM" "$I_ARROW" "$C_CYAN" "$_aba" "$C_RESET")
+            # CORRECAO: o simbolo ia embutido no %b, sem largura, entao
+            # "[on]" (4 colunas) e "[off]" (5) empurravam o nome para
+            # posicoes diferentes e a coluna inteira ficava torta. Agora o
+            # simbolo tem campo proprio de largura fixa.
+            LISTA="${LISTA}$(printf "%b%2s %b%-5s %b%-18.18s %b%s %-7s %b%s %-6s %b%s %-4s %b%s %-8s %b%s %s%b" \
+                "$C_DIM" "$idx" "$cor" "$sim" \
+                "$C_WHITE" "$nome" \
+                "$C_RED" "$I_HP" "$hp" \
+                "$C_YELLOW" "$I_EN" "$ene" \
+                "$C_MAG" "$I_LV" "$lvl" \
+                "$C_GOLD" "$I_GO" "$ouro" \
+                "$C_GRAY" "$I_SI" "$prata" "$C_RESET")
 "
+            if [ -n "$_cbt" ]; then
+                ATIV="${ATIV}$(printf "    %b%-18.18s %b%s %b%-22.22s %b%s%b" \
+                    "$C_WHITE" "$nome" "$C_DIM" "$I_ARROW" "$C_CYAN" "$_aba" "$_cor_c" "$_cbt" "$C_RESET")
+"
+            else
+                ATIV="${ATIV}$(printf "    %b%-18.18s %b%s %b%s%b" \
+                    "$C_WHITE" "$nome" "$C_DIM" "$I_ARROW" "$C_CYAN" "$_aba" "$C_RESET")
+"
+            fi
         fi
     done 3< "$ACCOUNTS_FILE"
 
     if [ "${PANEL_DRAW:-$HAS_TTY}" = 1 ]; then
-        printf "%b%s%b\n" "$C_BLUE" "$LINHA" "$C_RESET"
+        painel_regua "$LARG"
+        # O relogio e alinhado a direita pela largura real, nao por um
+        # recuo fixo de 26 espacos que so servia para uma tela de 68.
+        _tit="  TWM Multi-contas · BR"
+        _pad=$((LARG - ${#_tit} - ${#agora} - 1))
+        [ "$_pad" -lt 1 ] && _pad=1
         printf "  %b%sTWM Multi-contas%b %b· BR%b%*s%b%s%b\n" \
-               "$C_CYAN$C_BOLD" "$I_TIT" "$C_RESET" "$C_DIM" "$C_RESET" 26 '' "$C_WHITE" "$agora" "$C_RESET"
-        printf "%b%s%b\n" "$C_BLUE" "$LINHA" "$C_RESET"
+               "$C_CYAN$C_BOLD" "$I_TIT" "$C_RESET" "$C_DIM" "$C_RESET" \
+               "$_pad" '' "$C_WHITE" "$agora" "$C_RESET"
+        painel_regua "$LARG"
         printf "%b" "$LISTA"
-        printf "%b%s%b\n" "$C_BLUE" "$LINHA" "$C_RESET"
-        printf "  %b%sATIVIDADE EM CONJUNTO%b\n" "$C_CYAN$C_BOLD" "$I_ACT" "$C_RESET"
-        printf "%b" "$ATIV"
-        printf "%b%s%b\n" "$C_BLUE" "$LINHA" "$C_RESET"
-        printf "  %b%s %s online%b  %b%s %s subindo%b  %b%s %s parada(s)%b   %b%sProximo: %s%b\n" \
-               "$C_GREEN" "$S_ON" "$n_on" "$C_RESET" \
-               "$C_YELLOW" "$S_WAIT" "$n_up" "$C_RESET" \
-               "$C_RED" "$S_ERR" "$n_off" "$C_RESET" \
-               "$C_YELLOW" "$I_EVT" "$(proximo_evento)" "$C_RESET"
-        if [ "${PANEL_SUPERVISE:-0}" != "1" ]; then
-            printf "  %bsomente leitura — nao interfere nas contas; ctrl+c sai sem parar nada%b\n" \
-                   "$C_DIM" "$C_RESET"
+        painel_regua "$LARG"
+
+        # Numa tela estreita a aba ja vai junto do nome, entao a secao
+        # separada seria so uma repeticao dos mesmos seis nomes.
+        if [ "$ESTREITO" != 1 ]; then
+            printf "  %b%sATIVIDADE EM CONJUNTO%b\n" "$C_CYAN$C_BOLD" "$I_ACT" "$C_RESET"
+            printf "%b" "$ATIV"
+            painel_regua "$LARG"
         fi
-        printf "%b%s%b\n" "$C_BLUE" "$LINHA" "$C_RESET"
+
+        # O contador e o proximo evento so cabem na MESMA linha a partir de
+        # 100 colunas. Abaixo disso vao em duas — a versao anterior somava
+        # 100 caracteres fixos e quebrava em qualquer tela menor.
+        if [ "$LARG" -ge 100 ]; then
+            printf "  %b%s %s online%b  %b%s %s subindo%b  %b%s %s parada(s)%b   %b%sProximo: %s%b\n" \
+                   "$C_GREEN" "$S_ON" "$n_on" "$C_RESET" \
+                   "$C_YELLOW" "$S_WAIT" "$n_up" "$C_RESET" \
+                   "$C_RED" "$S_ERR" "$n_off" "$C_RESET" \
+                   "$C_YELLOW" "$I_EVT" "$(proximo_evento)" "$C_RESET"
+        else
+            if [ "$ESTREITO" = 1 ]; then
+                printf "  %b%s %s%b  %b%s %s%b  %b%s %s%b\n" \
+                       "$C_GREEN" "$S_ON" "$n_on" "$C_RESET" \
+                       "$C_YELLOW" "$S_WAIT" "$n_up" "$C_RESET" \
+                       "$C_RED" "$S_ERR" "$n_off" "$C_RESET"
+            else
+                printf "  %b%s %s online%b  %b%s %s subindo%b  %b%s %s parada(s)%b\n" \
+                       "$C_GREEN" "$S_ON" "$n_on" "$C_RESET" \
+                       "$C_YELLOW" "$S_WAIT" "$n_up" "$C_RESET" \
+                       "$C_RED" "$S_ERR" "$n_off" "$C_RESET"
+            fi
+            # Truncado na largura: numa tela muito estreita o nome do evento
+            # sozinho ja passa da borda.
+            printf "  %b%s%.*s%b\n" "$C_YELLOW" "$I_EVT" \
+                   "$((LARG - 2))" "$(proximo_evento)" "$C_RESET"
+        fi
+
+        # Aviso curto no celular; a frase longa quebrava em duas linhas.
+        if [ "${PANEL_SUPERVISE:-0}" != "1" ]; then
+            if [ "$LARG" -lt 44 ]; then
+                _msg="somente leitura"
+            elif [ "$ESTREITO" = 1 ]; then
+                _msg="somente leitura — ctrl+c nao para nada"
+            else
+                _msg="somente leitura — nao interfere nas contas; ctrl+c sai sem parar nada"
+            fi
+            printf "  %b%.*s%b\n" "$C_DIM" "$((LARG - 2))" "$_msg" "$C_RESET"
+        fi
+
+        # Quantas contas precisam de atencao, e o que fazer.
+        if [ "$n_off" -gt 0 ] && [ "${PANEL_SUPERVISE:-0}" != "1" ]; then
+            if [ "$LARG" -lt 50 ]; then
+                _msg="$n_off fora do ar - rode ./play.sh"
+            else
+                _msg="$n_off conta(s) fora do ar — suba com: ./play.sh"
+            fi
+            printf "  %b%.*s%b\n" "$C_RED" "$((LARG - 2))" "$_msg" "$C_RESET"
+        fi
+        painel_regua "$LARG"
     fi
 
     # CORRECAO: eram 20 chamadas de "sleep 1" a cada volta do painel, ou

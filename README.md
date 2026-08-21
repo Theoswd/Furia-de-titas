@@ -354,6 +354,18 @@ E em **Configurações → Bateria → Termux**, marque **"Sem restrições"**.
 </details>
 
 <details>
+<summary><b>O painel quebra as linhas / fica embaralhado no celular</b></summary>
+
+Corrigido. O painel era fixo em 68 colunas e a tela de um celular no Termux tem por volta de 56, então cada conta partia no meio. Agora ele mede a largura do terminal a cada atualização (inclusive ao girar o aparelho) e usa um layout de duas linhas por conta abaixo de 86 colunas, com os rótulos abreviados abaixo de 56.
+
+Se ainda estourar — fonte muito grande, por exemplo — force a largura:
+
+```bash
+TWM_COLS=48 ./status.sh
+```
+</details>
+
+<details>
 <summary><b>Emoji aparecem como quadrados</b></summary>
 
 A fonte do terminal não os suporta. Use o modo padrão, sem a variável `TWM_EMOJI`.
