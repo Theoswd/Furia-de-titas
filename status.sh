@@ -92,13 +92,13 @@ resolve_accounts_file() {
 ACCOUNTS_FILE=$(resolve_accounts_file)
 
 if [ ! -s "$ACCOUNTS_FILE" ]; then
-    printf "Nenhuma conta cadastrada em %s\n" "$ACCOUNTS_FILE"
+    printf "Nenhuma conta cadastrada.\n"
     printf "Execute: ./setup.sh\n"
     exit 1
 fi
 
 if [ ! -d "$STATUS_DIR" ]; then
-    printf "As contas nunca foram iniciadas neste aparelho (%s nao existe).\n" "$STATUS_DIR"
+    printf "As contas nunca foram iniciadas neste aparelho.\n"
     printf "Execute: ./play.sh\n"
     exit 1
 fi

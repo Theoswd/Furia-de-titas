@@ -61,6 +61,18 @@ else
     A_NONE="-"
 fi
 
+# Assinatura do mod.
+#
+# Os caracteres estilizados vivem em blocos Unicode altos, que nem toda
+# fonte de terminal desenha — em fonte incompleta viram quadrados. Por
+# isso TWM_ASCII=1 devolve a versao simples, mesmo criterio que o projeto
+# ja usa para os emoji (TWM_EMOJI).
+if [ "${TWM_ASCII:-0}" = "1" ]; then
+    ASSINATURA="MOD AUTHOR: Stephenn Curry"
+else
+    ASSINATURA="ᴍᴏᴅ ᴀᴜᴛʜᴏʀ: 𝘚𝘵𝘦𝘱𝘩𝘦𝘯𝘯 𝘊𝘶𝘳𝘳𝘺"
+fi
+
 # Largura do terminal.
 #
 # CORRECAO: o painel era fixo em 68 colunas. A tela de um celular no Termux
@@ -522,6 +534,10 @@ while true; do
         printf "  %b%sTWM Multi-contas%b %b· BR%b%*s%b%s%b\n" \
                "$C_CYAN$C_BOLD" "$I_TIT" "$C_RESET" "$C_DIM" "$C_RESET" \
                "$_pad" '' "$C_WHITE" "$agora" "$C_RESET"
+        # Linha propria de proposito: ${#var} conta BYTES no shell, e os
+        # caracteres estilizados ocupam varios bytes cada — calcular recuo
+        # com eles na mesma linha desalinharia o relogio.
+        printf "  %b%s%b\n" "$C_DIM" "$ASSINATURA" "$C_RESET"
         painel_regua "$LARG"
         printf "%b" "$LISTA"
         painel_regua "$LARG"

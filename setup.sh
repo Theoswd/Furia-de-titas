@@ -73,6 +73,14 @@ case "$_seed" in
     *) A1='[1;31m'; A2='[1;36m' ;;
 esac
 
+# Assinatura do mod. TWM_ASCII=1 devolve a versao simples, para fonte de
+# terminal que nao desenha os caracteres estilizados.
+if [ "${TWM_ASCII:-0}" = "1" ]; then
+    ASSINATURA="MOD AUTHOR: Stephenn Curry"
+else
+    ASSINATURA="ᴍᴏᴅ ᴀᴜᴛʜᴏʀ: 𝘚𝘵𝘦𝘱𝘩𝘦𝘯𝘯 𝘊𝘶𝘳𝘳𝘺"
+fi
+
 GREEN='[1;32m'
 GOLD='[1;33m'
 RED='[1;31m'
@@ -104,11 +112,9 @@ show_menu() {
     printf "%b%s%b\n" "$A2" "$_L" "$RESET"
     printf "  %bTWM%b %b· Gerenciador de Contas%b%*s%bBR%b\n" \
            "$A1" "$RESET" "$DIM" "$RESET" 26 '' "$WHITE" "$RESET"
+    printf "  %b%s%b\n" "$DIM" "$ASSINATURA" "$RESET"
     printf "%b%s%b\n" "$A2" "$_L" "$RESET"
-    printf "  %bContas cadastradas:%b %b%s%b\n" "$DIM" "$RESET" "$WHITE" "$n" "$RESET"
-    # O caminho e impresso sempre: um "0" sem o arquivo ao lado nao permite
-    # distinguir "nenhuma conta" de "estou lendo o arquivo errado".
-    printf "  %bArquivo:%b %b%s%b\n\n" "$DIM" "$RESET" "$DIM" "$ACCOUNTS_FILE" "$RESET"
+    printf "  %bContas cadastradas:%b %b%s%b\n\n" "$DIM" "$RESET" "$WHITE" "$n" "$RESET"
     printf "   %b1%b  Listar contas\n"   "$A1" "$RESET"
     printf "   %b2%b  Adicionar conta\n" "$A1" "$RESET"
     printf "   %b3%b  Remover conta\n"   "$A1" "$RESET"

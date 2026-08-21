@@ -82,6 +82,7 @@ GOLD='\033[0;33m'
 RED='\033[0;31m'
 CYAN='\033[01;36m'
 YELLOW='\033[1;33m'
+DIM_='\033[2m'
 RESET='\033[00m'
 
 mkdir -p "$STATUS_DIR"
@@ -222,7 +223,7 @@ launch_worker() {
     if [ -f "$lw_pidf" ]; then
         lw_old=$(cat "$lw_pidf" 2>/dev/null)
         if [ "$FORCE_RESTART" != "1" ] && worker_vivo "$lw_old"; then
-            printf "   ${GREEN}ja rodando${RESET} (PID %s) - mantida\n" "$lw_old"
+            printf "   ${GREEN}ja rodando - mantida${RESET}\n"
             unset lw_old
             return 2
         fi
@@ -259,8 +260,7 @@ total=$(grep -c -E '^[0-9]+\|' "$ACCOUNTS_FILE" 2>/dev/null)
 case "$total" in *[!0-9]*) total=0 ;; esac
 [ -z "$total" ] && total=0
 
-printf "${CYAN}TWM Multi-contas - %s conta(s) [%s]${RESET}\n" "$total" "$TOYBOX"
-printf "${GOLD}Contas:${RESET} %s\n\n" "$ACCOUNTS_FILE"
+printf "${CYAN}TWM Multi-contas - %s conta(s)${RESET}\n\n" "$total"
 
 # Android 12+ derruba a sessao inteira com SIGKILL.
 #
@@ -316,11 +316,9 @@ if [ -d /data/data/com.termux ] && [ "$total" -gt 3 ] && [ -z "$TWM_PACING" ]; t
     export TWM_PACING
 fi
 
-if [ -d /data/data/com.termux ] && [ "$total" -gt 3 ]; then
-    printf "${YELLOW}AVISO (Android 12+): o sistema pode matar o bot com SIGKILL (signal 9).${RESET}\n"
-    printf "  Deixe o Termux em ${CYAN}Bateria > Sem restricoes${RESET} e, com o celular no PC:\n"
-    printf "  ${CYAN}adb shell settings put global settings_enable_monitor_phantom_procs false${RESET}\n\n"
-fi
+# O aviso sobre o limite de processos do Android saiu da tela: comando de
+# ADB e nome de flag do sistema sao assunto de documentacao, nao de tela de
+# inicializacao. Esta no README, em "Solucao de problemas".
 
 n=0
 n_kept=0
@@ -370,8 +368,11 @@ while IFS='|' read -r srv user encoded <&3; do
         pid=$(cat "$pid_file" 2>/dev/null)
         _w=$((_w + 1))
     done
-    printf "   PID: %s | Log: %s\n" "${pid:-FALHOU}" "$log_file"
-    [ -z "$pid" ] && printf "   ${RED}AVISO: worker nao iniciou. Verifique %s${RESET}\n" "$log_file"
+    if [ -n "$pid" ]; then
+        printf "   ${GREEN}iniciada${RESET}\n"
+    else
+        printf "   ${RED}nao iniciou${RESET}\n"
+    fi
 
     # Espacamento entre contas. Sem isso todas autenticavam no mesmo segundo,
     # do mesmo IP: o rate-limit derrubava quase todas e o backoff exponencial
@@ -386,7 +387,7 @@ while IFS='|' read -r srv user encoded <&3; do
         [ "$_base" -lt 3 ] && _base=3
         [ "$_base" -gt 15 ] && _base=15
         _jit=$(( _base + (n + $$) % 4 ))
-        printf "   aguardando %ss antes da proxima conta\n" "$_jit"
+        printf "   ${DIM_}aguardando...${RESET}\n"
         sleep "$_jit"
     fi
 
@@ -400,8 +401,7 @@ fi
 
 printf "\n${GREEN}%s conta(s): %s iniciada(s), %s ja rodando.${RESET}\n\n" \
     "$n" "$((n - n_kept))" "$n_kept"
-printf "Ver o painel:  ${CYAN}./status.sh${RESET}  (nao mexe nas contas)\n"
-printf "Log de conta:  ${CYAN}tail -f ~/.twm/BR_NomeConta/twm.log${RESET}\n"
+printf "Ver o painel:  ${CYAN}./status.sh${RESET}\n"
 printf "Reiniciar:     ${CYAN}./play.sh --restart${RESET}\n"
 printf "Parar tudo:    ${CYAN}./stop.sh${RESET}\n\n"
 

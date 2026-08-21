@@ -422,6 +422,37 @@ TWM_COLS=48 ./status.sh
 </details>
 
 <details>
+<summary><b>Onde ficam os arquivos</b></summary>
+
+As telas não mostram caminhos de propósito — eles expõem o nome de usuário do sistema e não ajudam no uso diário. Ficam aqui:
+
+| O quê | Onde |
+|---|---|
+| Contas cadastradas | `~/Furia-de-titas/accounts.conf` |
+| Dados de cada conta | `~/.twm/BR_NomeConta/` |
+| Log de uma conta | `~/.twm/BR_NomeConta/twm.log` |
+| Estado dos workers | `~/.twm/status/` |
+
+Se o `./setup.sh` e o `./play.sh` discordarem sobre quantas contas existem, é porque há mais de uma cópia do repositório. Confira com:
+
+```bash
+ls -la ~/Furia-de-titas/accounts.conf
+```
+</details>
+
+<details>
+<summary><b>A assinatura do mod aparece como quadrados</b></summary>
+
+A fonte do terminal não desenha os caracteres estilizados. Use a versão simples:
+
+```bash
+TWM_ASCII=1 ./play.sh
+```
+
+Vale também para o `./status.sh` e o `./setup.sh`.
+</details>
+
+<details>
 <summary><b>Emoji aparecem como quadrados</b></summary>
 
 A fonte do terminal não os suporta. Use o modo padrão, sem a variável `TWM_EMOJI`.
