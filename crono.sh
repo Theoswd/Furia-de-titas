@@ -284,10 +284,19 @@ start() {
 
     campaign_func
 
-    if masmorra_na_janela; then
+    # Masmorra do cla: mesmo portao de 8h que tarefas_livres usa. Antes
+    # so checava a janela, entao reentrava a cada ciclo enquanto a janela
+    # estivesse aberta e nunca registrava a execucao, deixando o portao
+    # de tarefas_livres cego.
+    if masmorra_na_janela && [ -n "$CLD" ] && masmorra_liberada; then
         clanDungeon
+        masmorra_marcar
     fi
 
+    # Missao 8 do cla ("Obtenha 3 pedras ou ervas") e cumprida na loja.
+    # O mapa em cq_ids ja previa a chave "loja", mas nenhuma atividade a
+    # invocava: a missao nunca era tomada e o progresso nao contava.
+    cq_antes loja 2>/dev/null
     func_trade
 
     # Cabana do Sabio: missoes, colecoes e reliquias
