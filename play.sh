@@ -262,7 +262,7 @@ C_GOLD='\033[0;33m'; C_GRAY='\033[0;37m';  C_BLUE='\033[1;34m'
 if [ "${TWM_EMOJI:-0}" = "1" ]; then
     I_HP="❤️ "; I_EN="⚡ "; I_LV="⭐ "; I_GO="🪙 "; I_SI="🥈 "
     I_TIT="🎮 "; I_ACT="📋 "; I_EVT="⏰ "; I_ARROW="▸"
-    S_ON="🟢"; S_WAIT="🟡"; S_ERR="🔴"; S_OFF="⚫"; S_UNK="⚪"
+    S_ON="🟢"; S_WAIT="🟡"; S_ERR="🔴"; S_OFF="⚫"; S_UNK="⚪"; S_PAUSE="⏸️"
     A_CLANFIGHT="🏆  Torneio do Clã";   A_ALTARES="🔥  Altares dos Deuses"
     A_VALE="🌘  Vale dos Imortais";     A_REI="👑  Rei dos Imortais"
     A_CLANCOL="🏛️  Coliseu do Clã";     A_MASMORRA="🗝️  Masmorra do Clã"
@@ -276,7 +276,7 @@ if [ "${TWM_EMOJI:-0}" = "1" ]; then
 else
     I_HP="HP"; I_EN="EN"; I_LV="LV"; I_GO="OU"; I_SI="PR"
     I_TIT=""; I_ACT=""; I_EVT=""; I_ARROW="->"
-    S_ON="[on]"; S_WAIT="[..]"; S_ERR="[ER]"; S_OFF="[--]"; S_UNK="[??]"
+    S_ON="[on]"; S_WAIT="[..]"; S_ERR="[ER]"; S_OFF="[--]"; S_UNK="[??]"; S_PAUSE="[||]"
     A_CLANFIGHT="Torneio do Clã";   A_ALTARES="Altares dos Deuses"
     A_VALE="Vale dos Imortais";     A_REI="Rei dos Imortais"
     A_CLANCOL="Coliseu do Clã";     A_MASMORRA="Masmorra do Clã"
@@ -348,6 +348,7 @@ proximo_evento() {
 estado_cor() {
     case "$1" in
         running)                                echo "$C_GREEN" ;;
+        paused)                                 echo "$C_CYAN" ;;
         starting|loading|login_retry|restarting) echo "$C_YELLOW" ;;
         dead)                                   echo "$C_RED" ;;
         stopped)                                echo "$C_GRAY" ;;
@@ -357,6 +358,7 @@ estado_cor() {
 estado_simbolo() {
     case "$1" in
         running)                                echo "$S_ON" ;;
+        paused)                                 echo "$S_PAUSE" ;;
         starting|loading|login_retry|restarting) echo "$S_WAIT" ;;
         dead)                                   echo "$S_ERR" ;;
         stopped)                                echo "$S_OFF" ;;

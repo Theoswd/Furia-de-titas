@@ -18,7 +18,12 @@ undying_fight() {
   > BREAK_LOOP
   echo $(($(date +%s) - LA)) > last_atk
 
-  until [ -s "BREAK_LOOP" ]; do
+  # LIMITE DE TEMPO: BREAK_LOOP so e gravado quando a luta termina.
+  # Se o estado nunca resolver (pagina muda, servidor devolve algo
+  # inesperado), o laco ficava requisitando para sempre e a conta
+  # travava naquela batalha. Teto de 10 minutos.
+  FIGHT_BREAK=$(($(date +%s) + 600))
+  until [ -s "BREAK_LOOP" ] || [ "$(date +%s)" -gt "$FIGHT_BREAK" ]; do
     cf_access
     if awk -v latk="$(($(date +%s) - $(cat last_atk)))" -v atktime="$LA" 'BEGIN { exit !(latk > atktime) }'; then
       (

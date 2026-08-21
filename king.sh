@@ -57,7 +57,12 @@ king_fight() {
   echo $(($(date +%s) - LA)) > last_atk
   : > BREAK_LOOP
 
-  until [ -s "BREAK_LOOP" ]; do
+  # LIMITE DE TEMPO: BREAK_LOOP so e gravado quando a luta termina.
+  # Se o estado nunca resolver (pagina muda, servidor devolve algo
+  # inesperado), o laco ficava requisitando para sempre e a conta
+  # travava naquela batalha. Teto de 10 minutos.
+  FIGHT_BREAK=$(($(date +%s) + 600))
+  until [ -s "BREAK_LOOP" ] || [ "$(date +%s)" -gt "$FIGHT_BREAK" ]; do
     : > BREAK_LOOP
 
     KPCT=`king_percent`

@@ -154,6 +154,8 @@ sha256sum -c .integrity --quiet && echo "Scripts integros"
 | O quê | Comando |
 |---|---|
 | Iniciar | `./play.sh` |
+| Pausar / retomar | `./pause.sh` |
+| Ver estado | `./pause.sh status` |
 | Parar tudo | `./stop.sh` |
 | Cadastrar contas | `./setup.sh` |
 | Diagnosticar login | `./diagnose.sh` |

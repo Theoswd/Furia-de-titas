@@ -232,6 +232,20 @@ func_unset() {
 [ -n "$TWM_STATUS_FILE" ] && echo "running" > "$TWM_STATUS_FILE"
 printf "[%s] %s — loop principal iniciado\n" "$TWM_TAG" "$ACC"
 
+# PAUSA
+#
+# Pausar nao desloga: o worker apenas deixa de agir e continua vivo,
+# com a sessao intacta. Ao retomar, ele volta de onde parou sem
+# precisar autenticar de novo.
+#
+#   $HOME/.twm/PAUSED   pausa todas as contas
+#   $TMP/PAUSED         pausa somente esta conta
 while true; do
+    if [ -f "$HOME/.twm/PAUSED" ] || [ -f "$TMP/PAUSED" ]; then
+        [ -n "$TWM_STATUS_FILE" ] && echo "paused" > "$TWM_STATUS_FILE"
+        sleep 30
+        continue
+    fi
+    [ -n "$TWM_STATUS_FILE" ] && echo "running" > "$TWM_STATUS_FILE"
     twm_start
 done

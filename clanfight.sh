@@ -40,7 +40,12 @@ clanfight_fight() {
   echo $(($(date +%s) - 90)) > last_heal
   echo $(($(date +%s) - LA)) > last_atk
 
-  until [ -s "BREAK_LOOP" ]; do
+  # LIMITE DE TEMPO: BREAK_LOOP so e gravado quando a luta termina.
+  # Se o estado nunca resolver (pagina muda, servidor devolve algo
+  # inesperado), o laco ficava requisitando para sempre e a conta
+  # travava naquela batalha. Teto de 10 minutos.
+  FIGHT_BREAK=$(($(date +%s) + 600))
+  until [ -s "BREAK_LOOP" ] || [ "$(date +%s)" -gt "$FIGHT_BREAK" ]; do
     cf_access
     if ! grep -q -o 'txt smpl grey' "$TMP/SRC" && \
        [ "$(($(date +%s) - $(cat last_dodge)))" -gt 20 ] && \
