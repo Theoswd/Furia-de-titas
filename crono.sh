@@ -155,6 +155,9 @@ start() {
         arena_marcar
     fi
 
+    # Agenda oficial do jogo, para o painel
+    atualiza_agenda 2>/dev/null
+
     cq_antes carreira 2>/dev/null
     career_func
 

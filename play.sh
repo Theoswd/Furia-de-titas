@@ -313,6 +313,17 @@ EVENTOS="0030|Coliseu
 
 # Devolve: "Nome  HH:MM BRT  (em Xh Ym)"
 proximo_evento() {
+    # Agenda oficial do jogo, escrita pelo worker a partir de /fights/.
+    # Usada quando tiver menos de 2 horas; caso contrario cai na lista
+    # fixa abaixo, que foi conferida contra o jogo e bate com folga de
+    # 2 a 5 minutos (janela em que o bot se prepara para entrar).
+    _ag="$HOME/.twm/agenda"
+    if [ -s "$_ag" ]; then
+        _idade=$(( $(date +%s) - $(stat -c %Y "$_ag" 2>/dev/null || echo 0) ))
+        if [ "$_idade" -lt 7200 ]; then
+            EVENTOS=`cat "$_ag"`
+        fi
+    fi
     _agora=`TZ=America/Bahia date +%H%M`
     _ai=`printf %s "$_agora" | sed "s/^0*//"`; [ -z "$_ai" ] && _ai=0
     _pn=""; _pt=""

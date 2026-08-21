@@ -242,3 +242,59 @@ player_stats() {
     PLAYER_STRENGTH=`echo "$STRENGTH" | tr -cd '[:digit:]'`
     echo "$PLAYER_STRENGTH"
 }
+
+# Le a agenda oficial do jogo em /fights/ e grava em ~/.twm/agenda.
+#
+# A pagina traz contagem regressiva por evento ("Para iniciar: 10:12:03"),
+# confirmado comparando duas leituras espacadas: em 90 segundos o valor
+# caiu 1:31. Convertendo para horario absoluto, a agenda do jogo bate com
+# a do run.sh, que dispara de 2 a 5 minutos antes para preparar a entrada.
+#
+# Escreve uma linha por evento: HHMM|Nome
+# Uma requisicao por ciclo de start(), e o painel apenas le o arquivo.
+atualiza_agenda() {
+    _ag="$HOME/.twm/agenda"
+    _pg=`run_curl "${URL}/fights/" 2>/dev/null`
+    [ -n "$_pg" ] || return 1
+
+    _tmpf="${_ag}.tmp"
+    : > "$_tmpf"
+
+    printf '%s' "$_pg" \
+        | sed 's/<br[^>]*>/\n/g; s/<\/div>/\n/g; s/<[^>]*>//g' \
+        | grep -oE "(Vale dos Imortais|Coliseu do clã|Torneio dos Clãs|Rei dos Imortais|Altares dos Deuses|Batalha de Bandeiras)|Para iniciar: [0-9]{1,2}:[0-9]{2}:[0-9]{2}" \
+        | paste - - 2>/dev/null \
+        | while IFS='	' read -r _nome _falta; do
+            _falta=`printf '%s' "$_falta" | grep -oE '[0-9]{1,2}:[0-9]{2}:[0-9]{2}'`
+            [ -n "$_nome" ] && [ -n "$_falta" ] || continue
+            _h=`printf '%s' "$_falta" | cut -d: -f1 | sed 's/^0//'`
+            _m=`printf '%s' "$_falta" | cut -d: -f2 | sed 's/^0//'`
+            [ -z "$_h" ] && _h=0; [ -z "$_m" ] && _m=0
+            _s=`printf %s "$_falta" | cut -d: -f3 | sed "s/^0//"`; [ -z "$_s" ] && _s=0
+            _abs=$(( $(date +%s) + _h*3600 + _m*60 + _s ))
+            printf '%s|%s\n' "$(date -d "@$_abs" +%H%M 2>/dev/null || echo '')" "$_nome" >> "$_tmpf"
+        done
+
+    if [ -s "$_tmpf" ]; then
+        mv "$_tmpf" "$_ag"
+    else
+        rm -f "$_tmpf"
+    fi
+    unset _ag _pg _tmpf
+}
+
+# Converte "408,7M" / "12K" / "1.234" em numero inteiro.
+# O jogo abrevia valores grandes; sem isto "408,7M" viraria 4087.
+valor_num() {
+    _v=`printf '%s' "$1" | tr -d ' '`
+    case "$_v" in
+        *K|*k) _mu=1000 ;;
+        *M|*m) _mu=1000000 ;;
+        *B|*b) _mu=1000000000 ;;
+        *)     _mu=1 ;;
+    esac
+    _dg=`printf '%s' "$_v" | tr ',' '.' | tr -cd '0-9.'`
+    [ -z "$_dg" ] && { echo 0; return; }
+    awk -v d="$_dg" -v m="$_mu" 'BEGIN{ printf "%.0f", d*m }'
+    unset _v _mu _dg
+}
