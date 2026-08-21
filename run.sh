@@ -58,8 +58,10 @@ twm_play() {
         # --- Coliseu comum: 00:30 as 04:30
         (00:3[0-9]|00:[45][0-9]|0[123]:[0-5][0-9]|04:[0-2][0-9]|04:30)
             coliseum_fight
-            # O Coliseu comum nao e um dos cinco eventos de prioridade:
-            # a arena continua saindo no intervalo dela durante a janela.
+              # PAUSA PARA CHECAR MISSOES. O Coliseu comum nao esta entre os
+              # cinco eventos de prioridade, entao entre as lutas o bot
+              # confere o checklist do cla e roda a arena no intervalo dela.
+              # Antes, as quatro horas da janela passavam sem nada disso.
             tarefas_livres
             ;;
 
