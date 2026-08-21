@@ -32,24 +32,53 @@ unset _self _link _hops
 LOG="$HOME/.twm/sigkill.log"
 mkdir -p "$HOME/.twm"
 
-reg() { printf '%s %s\n' "$(date '+%H:%M:%S')" "$*" >> "$LOG"; }
+# ATENCAO — POR QUE ESTE ARQUIVO EVITA SUBPROCESSOS
+#
+# No Android 12+ o limite de 32 processos "fantasma" e comparado com o
+# total de processos do app. O amostrador anterior gastava cerca de 37
+# forks por amostra, a cada segundo:
+#   - date               1 por linha de log
+#   - grep + tr          2 (memoria)
+#   - ls + wc            2 (total de processos)
+#   - tr por processo   ~30 (classificacao do n_bot)
+#
+# Com o bot em ~15 processos e o Termux em ~12, cada amostra levava o
+# total a ~34 e o Android matava a sessao. Ou seja: o diagnostico
+# provocava o signal 9 que ele existia para medir.
+#
+# Agora o caminho rapido usa so recursos internos do shell (glob e read),
+# com zero forks. A classificacao cara roda uma vez a cada 10 amostras.
 
-# Memoria disponivel, em MB. O MemAvailable e o numero que o Android usa
-# para decidir quem matar — o MemFree sozinho engana.
-mem_mb() {
-    _m=$(grep -E '^MemAvailable:' /proc/meminfo 2>/dev/null | tr -cd '0-9')
-    [ -n "$_m" ] || _m=$(grep -E '^MemFree:' /proc/meminfo 2>/dev/null | tr -cd '0-9')
-    case "$_m" in ''|*[!0-9]*) echo "?" ; return ;; esac
-    echo $((_m / 1024))
+_HMS=""          # carimbo de hora da amostra, calculado uma vez por volta
+reg() { printf '%s %s\n' "${_HMS:-$(date '+%H:%M:%S')}" "$*" >> "$LOG"; }
+
+# ATENCAO: estas duas atribuem em variavel global em vez de imprimir.
+# Usar $(funcao) criaria um subshell — ou seja, um fork — mesmo que o
+# corpo da funcao nao chame programa nenhum. Chamadas como "le_mem"
+# custam zero processos.
+#
+# Memoria disponivel, em MB -> define _MEM
+le_mem() {
+    _m=""
+    while read -r _k _v _rest; do
+        case "$_k" in
+            MemAvailable:) _m=$_v; break ;;
+            MemFree:)      [ -z "$_m" ] && _m=$_v ;;
+        esac
+    done < /proc/meminfo
+    case "$_m" in ''|*[!0-9]*) _MEM="?" ; return ;; esac
+    _MEM=$((_m / 1024))
 }
 
-# Processos do usuario. E este numero que o Android 12+ compara com o
-# limite de 32 processos "fantasma".
-n_proc() {
-    _n=$(ls -d /proc/[0-9]* 2>/dev/null | wc -l)
-    case "$_n" in ''|*[!0-9]*) echo "?" ;; *) echo "$_n" ;; esac
+# Total de processos do usuario -> define _TOT
+# A expansao do glob e feita pelo shell, sem criar processo nenhum.
+le_tot() {
+    set -- /proc/[0-9]*
+    case "$1" in '/proc/[0-9]*') _TOT=0 ;; *) _TOT=$# ;; esac
 }
 
+# Classificacao dos processos do bot. Esta e cara (um "tr" por processo),
+# entao o laco principal so chama de tempos em tempos.
 n_bot() {
     _c=0
     for _p in /proc/[0-9]*; do
@@ -109,17 +138,29 @@ printf "Registro: %s\n\n" "$LOG"
 # O observador roda ao lado e escreve em disco.
 (
     _pico_proc=0
+    _pico_tot=0
+    _volta=0
+    _p=0
     _min_mem=999999
     while :; do
-        _p=$(n_bot); _m=$(mem_mb); _t=$(n_proc)
+        # Caminho rapido: total de processos e memoria, sem nenhum fork.
+        # E o proc_total que o Android compara com o limite de 32.
+        _volta=$((_volta + 1))
+        le_tot; _t=$_TOT
+        le_mem; _m=$_MEM
+        _HMS=$(date '+%H:%M:%S')
+
+        # Classificacao do bot: cara (um tr por processo). So a cada
+        # 10 voltas, para o proprio diagnostico nao inflar a contagem.
+        if [ $((_volta % 10)) -eq 1 ]; then
+            _p=$(n_bot)
+        fi
         case "$_p" in ''|*[!0-9]*) _p=0 ;; esac
         [ "$_p" -gt "$_pico_proc" ] && _pico_proc="$_p"
+        case "$_t" in ''|*[!0-9]*) ;; *) [ "$_t" -gt "$_pico_tot" ] && _pico_tot="$_t" ;; esac
         case "$_m" in ''|*[!0-9]*) ;; *) [ "$_m" -lt "$_min_mem" ] && _min_mem="$_m" ;; esac
-        reg "proc_bot=$_p  proc_total=$_t  mem_disp=${_m}MB  (pico $_pico_proc)"
-        echo "$_pico_proc $_min_mem" > "$HOME/.twm/.sigkill_pico"
-        # 1s, nao 2: os processos de parsing (grep, sed) duram
-        # milissegundos, e uma amostragem lenta simplesmente nao ve o pico
-        # — que e justamente o numero que o Android compara com o limite.
+        reg "proc_bot=$_p  proc_total=$_t  mem_disp=${_m}MB  (pico bot $_pico_proc / total $_pico_tot)"
+        echo "$_pico_proc $_min_mem $_pico_tot" > "$HOME/.twm/.sigkill_pico"
         sleep 1
     done
 ) &
