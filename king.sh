@@ -21,13 +21,13 @@ king_fight() {
       printf "Em batalha - HP: %s\n" "`cat HP`"
     else
       (
-        run_curl "${URL}/king" > "$TMP/SRC"
+        run_curl_exec "${URL}/king" > "$TMP/SRC"
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       grep -o -E '(/king/unrip/[^A-Za-z0-9_]r[^A-Za-z0-9_][0-9]+)' "$TMP/SRC" | sed -n 1p > UNRIP 2>/dev/null
       if grep -q -o -E '(/king/unrip/[^A-Za-z0-9_]r[^A-Za-z0-9_][0-9]+)' "$TMP/SRC"; then
         (
-          run_curl "${URL}$(cat UNRIP)" > "$TMP/SRC"
+          run_curl_exec "${URL}$(cat UNRIP)" > "$TMP/SRC"
         ) </dev/null > /dev/null 2>&1 &
         time_exit 17
       else
@@ -76,7 +76,7 @@ king_fight() {
          [ "$(($(date +%s) - $(cat last_heal)))" -gt 90 ] && \
          [ "$(($(date +%s) - $(cat last_heal)))" -lt 300 ]; then
         (
-          run_curl "${URL}$(cat HEAL)" > "$TMP/SRC"
+          run_curl_exec "${URL}$(cat HEAL)" > "$TMP/SRC"
         ) </dev/null > /dev/null 2>&1 &
         time_exit 17
         cl_access
@@ -88,14 +88,14 @@ king_fight() {
         if grep -q -o -E '(king/kingatk/[^A-Za-z0-9_]r[^A-Za-z0-9_][0-9]+)' "$TMP/SRC"; then
           # kingatk disponivel — prioridade maxima
           (
-            run_curl "${URL}$(cat KINGATK)" > "$TMP/SRC"
+            run_curl_exec "${URL}$(cat KINGATK)" > "$TMP/SRC"
           ) </dev/null > /dev/null 2>&1 &
           time_exit 17
           cl_access
           # Stone se rei com HP baixo
           if awk -v ush="$(cat HP2)" 'BEGIN { exit !(ush < 25) }'; then
             (
-              run_curl "${URL}$(cat STONE)" > "$TMP/SRC"
+              run_curl_exec "${URL}$(cat STONE)" > "$TMP/SRC"
             ) </dev/null > /dev/null 2>&1 &
             time_exit 17
             cl_access
@@ -109,14 +109,14 @@ king_fight() {
              ! grep -q -o 'txt smpl grey' "$TMP/SRC" && \
              grep -q -o "$(cat USER)" allies.txt; then
             (
-              run_curl "${URL}$(cat ATKRND)" > "$TMP/SRC"
+              run_curl_exec "${URL}$(cat ATKRND)" > "$TMP/SRC"
             ) </dev/null > /dev/null 2>&1 &
             time_exit 17
             cl_access
             date +%s > last_atk
           fi
           (
-            run_curl "${URL}$(cat ATK)" > "$TMP/SRC"
+            run_curl_exec "${URL}$(cat ATK)" > "$TMP/SRC"
           ) </dev/null > /dev/null 2>&1 &
           time_exit 17
           cl_access
@@ -126,7 +126,7 @@ king_fight() {
       else
         # Aguarda cooldown — apenas atualiza pagina
         (
-          run_curl "${URL}/king" > "$TMP/SRC"
+          run_curl_exec "${URL}/king" > "$TMP/SRC"
         ) </dev/null > /dev/null 2>&1 &
         time_exit 17
         cl_access
@@ -141,7 +141,7 @@ king_fight() {
       # Apenas kingatk e permitido nesse intervalo
       if grep -q -o -E '(king/kingatk/[^A-Za-z0-9_]r[^A-Za-z0-9_][0-9]+)' "$TMP/SRC"; then
         (
-          run_curl "${URL}$(cat KINGATK)" > "$TMP/SRC"
+          run_curl_exec "${URL}$(cat KINGATK)" > "$TMP/SRC"
         ) </dev/null > /dev/null 2>&1 &
         time_exit 17
         cl_access
@@ -149,7 +149,7 @@ king_fight() {
       else
         # Sem kingatk — apenas atualiza e monitora HP
         (
-          run_curl "${URL}/king" > "$TMP/SRC"
+          run_curl_exec "${URL}/king" > "$TMP/SRC"
         ) </dev/null > /dev/null 2>&1 &
         time_exit 17
         cl_access
@@ -165,14 +165,14 @@ king_fight() {
       if grep -q -o -E '(king/kingatk/[^A-Za-z0-9_]r[^A-Za-z0-9_][0-9]+)' "$TMP/SRC"; then
         # 1. kingatk — prioridade absoluta
         (
-          run_curl "${URL}$(cat KINGATK)" > "$TMP/SRC"
+          run_curl_exec "${URL}$(cat KINGATK)" > "$TMP/SRC"
         ) </dev/null > /dev/null 2>&1 &
         time_exit 17
         cl_access
         # 2. stone imediatamente apos kingatk
         if [ -s STONE ]; then
           (
-            run_curl "${URL}$(cat STONE)" > "$TMP/SRC"
+            run_curl_exec "${URL}$(cat STONE)" > "$TMP/SRC"
           ) </dev/null > /dev/null 2>&1 &
           time_exit 17
           cl_access
@@ -181,17 +181,17 @@ king_fight() {
 
       # 3-5. Spam ataque normal — sem delay
       (
-        run_curl "${URL}$(cat ATK)" > "$TMP/SRC"
+        run_curl_exec "${URL}$(cat ATK)" > "$TMP/SRC"
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       cl_access
       (
-        run_curl "${URL}$(cat ATK)" > "$TMP/SRC"
+        run_curl_exec "${URL}$(cat ATK)" > "$TMP/SRC"
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       cl_access
       (
-        run_curl "${URL}$(cat ATK)" > "$TMP/SRC"
+        run_curl_exec "${URL}$(cat ATK)" > "$TMP/SRC"
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       cl_access
@@ -199,7 +199,7 @@ king_fight() {
       # 6. kingatk novamente se disponivel
       if grep -q -o -E '(king/kingatk/[^A-Za-z0-9_]r[^A-Za-z0-9_][0-9]+)' "$TMP/SRC"; then
         (
-          run_curl "${URL}$(cat KINGATK)" > "$TMP/SRC"
+          run_curl_exec "${URL}$(cat KINGATK)" > "$TMP/SRC"
         ) </dev/null > /dev/null 2>&1 &
         time_exit 17
         cl_access
@@ -216,7 +216,7 @@ king_fight() {
   if [ -s DODGE ]; then
     printf "King morto — executando dodge pos-morte\n"
     (
-      run_curl "${URL}$(cat DODGE)" > "$TMP/SRC"
+      run_curl_exec "${URL}$(cat DODGE)" > "$TMP/SRC"
     ) </dev/null > /dev/null 2>&1 &
     time_exit 17
   fi
@@ -233,11 +233,11 @@ king_start() {
   case `date +%H:%M` in
   (12:2[5-9]|16:2[5-9]|22:2[5-9])
     (
-      run_curl "$URL/train" | grep -o -E '\(([0-9]+)\)' | sed 's/[()]//g' > "$TMP/FULL"
+      run_curl_exec "$URL/train" | grep -o -E '\(([0-9]+)\)' | sed 's/[()]//g' > "$TMP/FULL"
     ) </dev/null > /dev/null 2>&1 &
     time_exit 17
     (
-      run_curl "$URL/king/enterGame" > "$TMP/SRC"
+      run_curl_exec "$URL/king/enterGame" > "$TMP/SRC"
     ) </dev/null > /dev/null 2>&1 &
     time_exit 17
     printf "King of the Immortals will be started...\n"
@@ -245,7 +245,7 @@ king_start() {
       sleep 3
     done
     (
-      run_curl "$URL/king/enterGame" > "$TMP/SRC"
+      run_curl_exec "$URL/king/enterGame" > "$TMP/SRC"
     ) </dev/null > /dev/null 2>&1 &
     time_exit 17
     printf "\nKing\n%s\n" "$URL"
@@ -257,7 +257,7 @@ king_start() {
     until [ -s "$TMP/EXIT" ] || [ "$(date +%s)" -gt "$BREAK" ]; do
       printf " ...\n%s\n" "`cat "$TMP/ACCESS"`"
       (
-        run_curl "${URL}$(cat "$TMP/ACCESS")" > "$TMP/SRC"
+        run_curl_exec "${URL}$(cat "$TMP/ACCESS")" > "$TMP/SRC"
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       cat "$TMP/SRC" | sed 's/href=/\n/g' | grep '/king/' | head -n 1 | awk -F"[']" '{ print $2 }' > "$TMP/ACCESS" 2>/dev/null

@@ -139,7 +139,10 @@ _rc_track() {
     return 0
 }
 
-run_curl() {
+_rc_run() {
+    _rc_mode="$1"
+    shift
+
     case "$URL" in
         http://*) _rc_p="--proto =http,https --proto-redir =http,https" ;;
         *)        _rc_p="--proto =https --proto-redir =https" ;;
@@ -149,6 +152,20 @@ run_curl() {
     case "$_rc_mt" in ''|*[!0-9]*) _rc_mt=45 ;; esac
 
     _rc_track "$@"
+
+    # shellcheck disable=SC2086
+    if [ "$_rc_mode" = "exec" ]; then
+        if [ -n "$TMP_COOKIE" ]; then
+            exec curl -sS -L --compressed --max-redirs 5 \
+                 --connect-timeout 15 --max-time "$_rc_mt" \
+                 $_rc_p -A "$vUserAgent" \
+                 -c "$TMP_COOKIE" -b "$TMP_COOKIE" "$@"
+        else
+            exec curl -sS -L --compressed --max-redirs 5 \
+                 --connect-timeout 15 --max-time "$_rc_mt" \
+                 $_rc_p -A "$vUserAgent" "$@"
+        fi
+    fi
 
     # shellcheck disable=SC2086
     if [ -n "$TMP_COOKIE" ]; then
@@ -162,6 +179,25 @@ run_curl() {
              $_rc_p -A "$vUserAgent" "$@"
     fi
 }
+
+# Uso normal: roda o curl como filho e devolve a saida.
+run_curl() { _rc_run "" "$@"; }
+
+# Uso em segundo plano: SUBSTITUI o processo pelo curl, em vez de deixar um
+# shell parado esperando por ele.
+#
+# CORRECAO (SIGKILL / "signal 9"): "run_curl ... &" forka um shell que so
+# serve para lancar o curl e esperar — dois processos onde um basta. Com o
+# exec o filho VIRA o curl (comprovado: sem exec ficam dash+sleep, com exec
+# fica so o sleep).
+#
+# Isso importa porque o Android 12+ mata a sessao inteira acima de 32
+# processos filhos, e a conta estava justamente no limite:
+#     13 persistentes (play.sh + 6 worker.sh + 6 twm.sh)
+#   + 6 x 3 por requisicao (subshell + curl + sleep)  = 31
+# Qualquer grep de parsing que nascesse junto estourava. Sem o subshell:
+#     13 + 6 x 2 = 25, com folga para os processos transitorios.
+run_curl_exec() { _rc_run "exec" "$@"; }
 
 # Acessa qualquer pagina pelo caminho relativo.
 #
@@ -181,7 +217,7 @@ fetch_page() {
     output_file="${2:-$TMP/SRC}"
 
     TWM_MAXTIME=17
-    run_curl "${URL}${relative_url}" > "$output_file" 2>/dev/null &
+    run_curl_exec "${URL}${relative_url}" > "$output_file" 2>/dev/null &
     _fp_pid=$!
     unset TWM_MAXTIME
 
@@ -210,7 +246,7 @@ fetch_page() {
 hpmp() {
     if echo "$@" | grep -q '\-fix'; then
         (
-            run_curl "$URL/train" > "$TMP/TRAIN"
+            run_curl_exec "$URL/train" > "$TMP/TRAIN"
         ) </dev/null > /dev/null 2>&1 &
         time_exit 20
         FIXHP=`grep -o -E '\(([0-9]+)\)' "$TMP/TRAIN" | sed 's/[()]//g'`

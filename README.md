@@ -308,17 +308,34 @@ Sem `tmux`, basta abrir o Termux e rodar `./status.sh` — o painel volta e as c
 
 `signal 9` é `SIGKILL`: **o Android matou o processo**, o bot não travou nem deu erro. Duas causas, nesta ordem:
 
-**1. Limite de processos "fantasma" (Android 12 ou superior).** O sistema classifica como *phantom process* todo processo filho do Termux que ele não reconhece e, passando de **32 simultâneos**, mata sem avisar. Com o celular ligado no PC:
+**1. Limite de processos "fantasma" (Android 12 ou superior).** O sistema classifica como *phantom process* todo processo filho do Termux que ele não reconhece e, passando de **32 simultâneos**, mata sem avisar.
+
+*Sem PC:* procure em **Configurações → Sistema → Opções do desenvolvedor** por uma opção de **restrições de processos filhos** (o nome varia: "Disable child process restrictions", "Suspensão de apps em segundo plano"). Nem todo aparelho a expõe.
+
+*Com o celular ligado no PC:*
 
 ```bash
 adb shell settings put global settings_enable_monitor_phantom_procs false
 ```
 
-O ajuste volta ao normal quando o aparelho reinicia — é preciso repetir.
+Nos dois casos o ajuste **volta ao normal quando o aparelho reinicia** — é preciso repetir.
 
 **2. Restrição de bateria.** Em **Configurações → Bateria → Termux**, marque **"Sem restrições"**, e mantenha o `termux-wake-lock` ativo.
 
-> O consumo de processos por conta foi reduzido: cada página baixada gastava até 19 processos (um subshell, o `curl` e até 17 execuções de `sleep`), e agora gasta 3 fixos. Ainda assim, acima de 6 contas o ajuste do item 1 é recomendado.
+### Quanto o bot já foi enxugado
+
+A conta de processos simultâneos com 6 contas, que é o que o Android mede:
+
+| | antes | agora |
+|---|---|---|
+| Fixos (`play.sh` + 6 `worker.sh` + 6 `twm.sh`) | 13 | 13 |
+| Por requisição, nas 6 contas | 18 | **12** |
+| Rajada ao desenhar o painel, a cada 20 s | ~72 | **~0** |
+| **Pico** | **~103** | **~25** |
+
+Cada página baixada gastava até 19 processos (um subshell, o `curl` e até 17 execuções de `sleep`); hoje gasta 2. O painel lia cada arquivo com `cat` dentro de substituição de comando — 12 processos por conta a cada desenho — e agora usa `read`, que é interno ao shell.
+
+> Com 6 contas isso deixa o pico bem abaixo do limite de 32. Acima disso, ou se o `signal 9` voltar, o ajuste do item 1 continua sendo a solução definitiva.
 </details>
 
 <details>

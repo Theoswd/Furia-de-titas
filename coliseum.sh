@@ -12,30 +12,30 @@ coliseum_fight() {
 
     # HP maximo
     (
-        run_curl "$URL/train" | grep -o -E '\(([0-9]+)\)' | sed 's/[()]//g' > "$full_ram"
+        run_curl_exec "$URL/train" | grep -o -E '\(([0-9]+)\)' | sed 's/[()]//g' > "$full_ram"
     ) </dev/null > /dev/null 2>&1 &
     time_exit 20
 
     # Desativa graficos
     (
-        run_curl "$URL/settings/graphics/0" > /dev/null
+        run_curl_exec "$URL/settings/graphics/0" > /dev/null
     ) </dev/null > /dev/null 2>&1 &
     time_exit 17
 
     # Pagina do coliseu
     (
-        run_curl "$URL/coliseum" > "$src_ram"
+        run_curl_exec "$URL/coliseum" > "$src_ram"
     ) </dev/null > /dev/null 2>&1 &
     time_exit 17
 
     # Encerra luta pendente
     if grep -q -o '?end_fight' "$src_ram"; then
         (
-            run_curl "$URL/coliseum/?end_fight=true" > /dev/null
+            run_curl_exec "$URL/coliseum/?end_fight=true" > /dev/null
         ) </dev/null > /dev/null 2>&1 &
         time_exit 17
         (
-            run_curl "$URL/coliseum" > "$src_ram"
+            run_curl_exec "$URL/coliseum" > "$src_ram"
         ) </dev/null > /dev/null 2>&1 &
         time_exit 17
     fi
@@ -46,7 +46,7 @@ coliseum_fight() {
     if [ -n "$go_stop" ]; then
         printf "  Entering...\n"
         (
-            run_curl "${URL}${go_stop}" > "$src_ram"
+            run_curl_exec "${URL}${go_stop}" > "$src_ram"
         ) </dev/null > /dev/null 2>&1 &
         time_exit 17
 
@@ -56,7 +56,7 @@ coliseum_fight() {
         first_time=`date +%s`
         until grep -q -o 'coliseum/dodge/' "$src_ram" || awk -v ltime="$(($(date +%s) - first_time))" 'BEGIN { exit !(ltime > 30) }'; do
             (
-                run_curl "${URL}${access_link}" > "$src_ram"
+                run_curl_exec "${URL}${access_link}" > "$src_ram"
             ) </dev/null > /dev/null 2>&1 &
             time_exit 17
             access_link=`grep -o -E '/(coliseum/[A-Za-z]+/[?]r[=][0-9]+|coliseum)' "$src_ram" | grep -v 'dodge' | sed -n 1p`
@@ -87,7 +87,7 @@ coliseum_fight() {
                 if grep -q -o '?end_fight=true' "$src_ram"; then
                     if awk -v ltime="$(($(date +%s) - first_time))" 'BEGIN { exit !(ltime < 300) }'; then
                         (
-                            run_curl "${URL}/coliseum" > "$src_ram"
+                            run_curl_exec "${URL}/coliseum" > "$src_ram"
                         ) </dev/null > /dev/null 2>&1 &
                         time_exit 17
                         printf "Fim de batalha detectado.\n"
@@ -117,7 +117,7 @@ coliseum_fight() {
             if awk -v ush="$USH" -v hlhp="$HLHP" 'BEGIN { exit !(ush < hlhp) }' && \
                [ "$time_since_last_heal" -gt 90 ] && [ "$time_since_last_heal" -lt 300 ]; then
                 (
-                    run_curl "${URL}${HEAL}" > "$src_ram"
+                    run_curl_exec "${URL}${HEAL}" > "$src_ram"
                 ) </dev/null > /dev/null 2>&1 &
                 time_exit 17
                 cl_access
@@ -129,7 +129,7 @@ coliseum_fight() {
                  [ "$time_since_last_dodge" -gt 20 ] && [ "$time_since_last_dodge" -lt 300 ] && \
                  awk -v ush="$USH" -v oldhp="$OLDHP" 'BEGIN { exit !(ush < oldhp) }'; then
                 (
-                    run_curl "${URL}${DODGE}" > "$src_ram"
+                    run_curl_exec "${URL}${DODGE}" > "$src_ram"
                 ) </dev/null > /dev/null 2>&1 &
                 time_exit 17
                 cl_access
@@ -141,7 +141,7 @@ coliseum_fight() {
                  ! grep -q -o 'txt smpl grey' "$src_ram" && \
                  awk -v rhp="$RHP" -v enh="$ENH" 'BEGIN { exit !(rhp < enh) }'; then
                 (
-                    run_curl "${URL}${ATKRND}" > "$src_ram"
+                    run_curl_exec "${URL}${ATKRND}" > "$src_ram"
                 ) </dev/null > /dev/null 2>&1 &
                 time_exit 17
                 cl_access
@@ -149,7 +149,7 @@ coliseum_fight() {
 
             elif awk -v latk="$time_since_last_atk" -v atktime="$LA" 'BEGIN { exit !(latk > atktime) }'; then
                 (
-                    run_curl "${URL}${ATK}" > "$src_ram"
+                    run_curl_exec "${URL}${ATK}" > "$src_ram"
                 ) </dev/null > /dev/null 2>&1 &
                 time_exit 17
                 cl_access
@@ -157,7 +157,7 @@ coliseum_fight() {
 
             else
                 (
-                    run_curl "${URL}/coliseum" > "$src_ram"
+                    run_curl_exec "${URL}/coliseum" > "$src_ram"
                 ) </dev/null > /dev/null 2>&1 &
                 time_exit 17
                 cl_access
@@ -188,21 +188,21 @@ coliseum_start() {
     then
         if echo "$RUN" | grep -q -E '[-]boot'; then
             (
-                run_curl "${URL}/quest/" > "$TMP/SRC"
+                run_curl_exec "${URL}/quest/" > "$TMP/SRC"
             ) </dev/null > /dev/null 2>&1 &
             time_exit 20
 
             while grep -q -o -E '/coliseum/[?]quest_t[=]quest&quest_id[=]11&qz[=][a-z0-9]+' "$TMP/SRC"; do
                 coliseum_fight
                 (
-                    run_curl "${URL}/quest/" > "$TMP/SRC"
+                    run_curl_exec "${URL}/quest/" > "$TMP/SRC"
                 ) </dev/null > /dev/null 2>&1 &
                 time_exit 20
 
                 ENDQUEST=`grep -o -E '/quest/end/11[?]r[=][A_z0-9]+' "$TMP/SRC"`
                 if [ -n "$ENDQUEST" ]; then
                     (
-                        run_curl "${URL}${ENDQUEST}" > "$TMP/SRC"
+                        run_curl_exec "${URL}${ENDQUEST}" > "$TMP/SRC"
                     ) </dev/null > /dev/null 2>&1 &
                     time_exit 20
                 fi

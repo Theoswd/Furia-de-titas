@@ -27,14 +27,14 @@ undying_fight() {
     cf_access
     if awk -v latk="$(($(date +%s) - $(cat last_atk)))" -v atktime="$LA" 'BEGIN { exit !(latk > atktime) }'; then
       (
-        run_curl "${URL}$(cat HITMANA)" > "$TMP/SRC"
+        run_curl_exec "${URL}$(cat HITMANA)" > "$TMP/SRC"
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       cf_access
       date +%s > last_atk
     else
       (
-        run_curl "${URL}/undying" > "$TMP/SRC"
+        run_curl_exec "${URL}/undying" > "$TMP/SRC"
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       cf_access
@@ -74,7 +74,7 @@ undying_start() {
     done
 
     (
-      run_curl "$URL/undying/" > "$TMP/SRC"
+      run_curl_exec "$URL/undying/" > "$TMP/SRC"
     ) </dev/null > /dev/null 2>&1 &
     time_exit 17
     grep -o -E '/undying/(mana|hit)/[?][r][=][0-9]+' "$TMP/SRC" | head -n 1 > "$TMP/HITMANA" 2>/dev/null
@@ -84,7 +84,7 @@ undying_start() {
 
     until [ -s "BREAK_LOOP" ] || [ "$(date +%s)" -gt "$BREAK" ]; do
       (
-        run_curl "$URL/undying" > "$TMP/SRC"
+        run_curl_exec "$URL/undying" > "$TMP/SRC"
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
 
@@ -92,7 +92,7 @@ undying_start() {
 
       if grep -q -o -E '/undying/(hit|mana)' "$TMP/SRC"; then
         (
-          run_curl "${URL}$(cat "$TMP/HITMANA")" > "$TMP/SRC"
+          run_curl_exec "${URL}$(cat "$TMP/HITMANA")" > "$TMP/SRC"
         ) </dev/null > /dev/null 2>&1 &
         time_exit 17
         echo "1" > BREAK_LOOP

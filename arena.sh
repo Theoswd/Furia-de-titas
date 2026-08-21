@@ -1,14 +1,14 @@
 # shellcheck disable=SC2148
 arena_fault() {
     (
-        run_curl "${URL}/fault" > "$TMP/SRC"
+        run_curl_exec "${URL}/fault" > "$TMP/SRC"
     ) </dev/null > /dev/null 2>&1 &
     time_exit 17
     BREAK=$(($(date +%s) + 10))
     while grep -q -o '/fault/attack' "$TMP/SRC" || [ "$(date +%s)" -lt "$BREAK" ]; do
         ACCESS=`grep -o -E '(/fault/attack/[^A-Za-z0-9]r[^A-Za-z0-9][0-9]+)' "$TMP/SRC" | sed -n '1p'`
         (
-            run_curl "${URL}${ACCESS}" > "$TMP/SRC"
+            run_curl_exec "${URL}${ACCESS}" > "$TMP/SRC"
         ) </dev/null > /dev/null 2>&1 &
         time_exit 17
         printf "%s\n" "$ACCESS"
@@ -19,7 +19,7 @@ arena_fault() {
 
 arena_collFight() {
     (
-        run_curl "${URL}/collfight/enterFight" > "$TMP/SRC"
+        run_curl_exec "${URL}/collfight/enterFight" > "$TMP/SRC"
     ) </dev/null > /dev/null 2>&1 &
     time_exit 17
     if grep -q -o '/collfight/' "$TMP/SRC"; then
@@ -27,12 +27,12 @@ arena_collFight() {
         printf "/collfight/enterFight\n"
         ACCESS=`cat "$TMP/SRC" | sed 's/href=/\n/g' | grep 'collfight/take' | head -n1 | awk -F\' '{ print $2 }'`
         (
-            run_curl "${URL}${ACCESS}" > /dev/null
+            run_curl_exec "${URL}${ACCESS}" > /dev/null
         ) </dev/null > /dev/null 2>&1 &
         time_exit 17
         printf "%s\n" "$ACCESS"
         (
-            run_curl "${URL}/collfight/enterFight" > /dev/null
+            run_curl_exec "${URL}/collfight/enterFight" > /dev/null
         ) </dev/null > /dev/null 2>&1 &
         time_exit 17
         printf "/collfight/enterFight\n"
@@ -80,17 +80,17 @@ arena_duel() {
 arena_fullmana() {
     printf "energy arena ...\n"
     (
-        run_curl "${URL}/arena/quit" | sed "s/href='/\n/g" | grep 'attack/1' | head -n1 | awk -F/ '{ print $5 }' | tr -cd '[:digit:]' > "$TMP/ARENA"
+        run_curl_exec "${URL}/arena/quit" | sed "s/href='/\n/g" | grep 'attack/1' | head -n1 | awk -F/ '{ print $5 }' | tr -cd '[:digit:]' > "$TMP/ARENA"
     ) </dev/null > /dev/null 2>&1 &
     time_exit 17
     printf " - 1 Attack...\n"
     (
-        run_curl "${URL}/arena/attack/1/?r=`cat "$TMP/ARENA"`" | sed "s/href='/\n/g" | grep 'arena/lastPlayer' | head -n1 | awk -F\' '{ print $1 }' | tr -cd '[:digit:]' > "$TMP/ATK1"
+        run_curl_exec "${URL}/arena/attack/1/?r=`cat "$TMP/ARENA"`" | sed "s/href='/\n/g" | grep 'arena/lastPlayer' | head -n1 | awk -F\' '{ print $1 }' | tr -cd '[:digit:]' > "$TMP/ATK1"
     ) </dev/null > /dev/null 2>&1 &
     time_exit 17
     printf " - Full Attack...\n"
     (
-        run_curl "${URL}/arena/lastPlayer/?r=`cat "$TMP/ATK1"`&fullmana=true" > /dev/null
+        run_curl_exec "${URL}/arena/lastPlayer/?r=`cat "$TMP/ATK1"`&fullmana=true" > /dev/null
     ) </dev/null > /dev/null 2>&1 &
     time_exit 17
     printf "Energy arena ok\n"

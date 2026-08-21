@@ -44,7 +44,7 @@ clancoliseum_fight() {
        [ "$(($(date +%s) - $(cat last_heal)))" -gt 90 ] && \
        [ "$(($(date +%s) - $(cat last_heal)))" -lt 300 ]; then
       (
-        run_curl "${URL}$(cat HEAL)" > "$src_ram"
+        run_curl_exec "${URL}$(cat HEAL)" > "$src_ram"
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       cf_access
@@ -56,7 +56,7 @@ clancoliseum_fight() {
          [ "$(($(date +%s) - $(cat last_dodge)))" -lt 300 ] && \
          awk -v ush="$(cat USH)" -v oldhp="$(cat old_HP)" 'BEGIN { exit !(ush < oldhp) }'; then
       (
-        run_curl "${URL}$(cat DODGE)" > "$src_ram"
+        run_curl_exec "${URL}$(cat DODGE)" > "$src_ram"
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       cf_access
@@ -70,7 +70,7 @@ clancoliseum_fight() {
          ! grep -q -o 'txt smpl grey' "$src_ram" && \
          grep -q -o "$(cat CLAN)" "$TMP/callies.txt"; then
       (
-        run_curl "${URL}$(cat ATKRND)" > "$src_ram"
+        run_curl_exec "${URL}$(cat ATKRND)" > "$src_ram"
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       cf_access
@@ -78,14 +78,14 @@ clancoliseum_fight() {
 
     elif awk -v latk="$(($(date +%s) - $(cat last_atk)))" -v atktime="$LA" 'BEGIN { exit !(latk > atktime) }'; then
       (
-        run_curl "${URL}$(cat ATK)" > "$src_ram"
+        run_curl_exec "${URL}$(cat ATK)" > "$src_ram"
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       cf_access
       date +%s > last_atk
     else
       (
-        run_curl "${URL}/clancoliseum" > "$src_ram"
+        run_curl_exec "${URL}/clancoliseum" > "$src_ram"
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       cf_access
@@ -107,15 +107,15 @@ clancoliseum_start() {
   case `date +%H:%M` in
   10:2[5-9]|14:5[5-9])
     (
-      run_curl "$URL/train" | grep -o -E '\(([0-9]+)\)' | sed 's/[()]//g' > "$full_ram"
+      run_curl_exec "$URL/train" | grep -o -E '\(([0-9]+)\)' | sed 's/[()]//g' > "$full_ram"
     ) </dev/null > /dev/null 2>&1 &
     time_exit 17
     (
-      run_curl "$URL/clancoliseum/?close=reward" > "$src_ram"
+      run_curl_exec "$URL/clancoliseum/?close=reward" > "$src_ram"
     ) </dev/null > /dev/null 2>&1 &
     time_exit 17
     (
-      run_curl "$URL/clancoliseum/enterFight" > "$src_ram"
+      run_curl_exec "$URL/clancoliseum/enterFight" > "$src_ram"
     ) </dev/null > /dev/null 2>&1 &
     time_exit 17
     printf "Clan coliseum will be started...\n"
@@ -134,7 +134,7 @@ clancoliseum_start() {
     esac
 
     (
-      run_curl "$URL/clancoliseum/" > "$src_ram"
+      run_curl_exec "$URL/clancoliseum/" > "$src_ram"
     ) </dev/null > /dev/null 2>&1 &
     time_exit 17
     ACCESS=`grep -o -E '(/clancoliseum(/[a-z]+/[?]r[=][0-9]+|/))' "$src_ram" | grep -v 'dodge' | sed -n '1p'`
@@ -146,7 +146,7 @@ clancoliseum_start() {
     until grep -q -o 'clancoliseum/dodge/' "$src_ram" || [ "$(date +%s)" -gt "$BREAK" ]; do
       printf " ...\n%s\n" "$ACCESS"
       (
-        run_curl "${URL}/clancoliseum/" > "$src_ram"
+        run_curl_exec "${URL}/clancoliseum/" > "$src_ram"
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       ACCESS=`grep -o -E '(/clancoliseum/[a-z]+/[?]r[=][0-9]+)' "$src_ram" | grep -v 'dodge' | sed -n '1p'`

@@ -12,7 +12,7 @@ members_allies() {
         for num in `seq 5 -1 1`; do
             printf "/clan/%s/%s\n" "$CLD" "$num"
             (
-                run_curl "${URL}/clan/${CLD}/${num}" | grep -o -E "[/]>([[:upper:]][[:lower:]]{0,15}[[:space:]]{0,1}[[:upper:]]{0,1}[[:lower:]]{0,14},[[:space:]])<s" | awk -F"[>]" '{print $2}' | awk -F"[,]" '{print $1}' | sed 's,\ ,_,' >> allies.txt
+                run_curl_exec "${URL}/clan/${CLD}/${num}" | grep -o -E "[/]>([[:upper:]][[:lower:]]{0,15}[[:space:]]{0,1}[[:upper:]]{0,1}[[:lower:]]{0,14},[[:space:]])<s" | awk -F"[>]" '{print $2}' | awk -F"[,]" '{print $1}' | sed 's,\ ,_,' >> allies.txt
             ) </dev/null > /dev/null 2>&1 &
             time_exit 17
         done
@@ -32,7 +32,7 @@ id_allies() {
     printf "/mail/friends\n"
 
     (
-        run_curl "${URL}/mail/friends" > "$TMP/SRC"
+        run_curl_exec "${URL}/mail/friends" > "$TMP/SRC"
     ) </dev/null > /dev/null 2>&1 &
     time_exit 17
 
@@ -41,7 +41,7 @@ id_allies() {
     if [ -z "$NPG" ]; then
         printf "/mail/friends\n"
         (
-            run_curl "${URL}/mail/friends" | sed 's,/user/,\n/user/,g' | grep '/user/' | grep '/mail/' | cut -d\< -f1 >> tmp.txt
+            run_curl_exec "${URL}/mail/friends" | sed 's,/user/,\n/user/,g' | grep '/user/' | grep '/mail/' | cut -d\< -f1 >> tmp.txt
         ) </dev/null > /dev/null 2>&1 &
         time_exit 17
     fi
@@ -51,14 +51,14 @@ id_allies() {
     if [ -z "$NPG" ]; then
         printf "/mail/friends\n"
         (
-            run_curl "${URL}/mail/friends" | sed 's,/user/,\n/user/,g' | grep '/user/' | grep '/mail/' | cut -d\< -f1 >> tmp.txt
+            run_curl_exec "${URL}/mail/friends" | sed 's,/user/,\n/user/,g' | grep '/user/' | grep '/mail/' | cut -d\< -f1 >> tmp.txt
         ) </dev/null > /dev/null 2>&1 &
         time_exit 17
     else
         for num in `seq "$NPG" -1 1`; do
             printf "Friends list page %s\n" "$num"
             (
-                run_curl "${URL}/mail/friends/${num}" | sed 's,/user/,\n/user/,g' | grep '/user/' | grep '/mail/' | cut -d\< -f1 >> tmp.txt
+                run_curl_exec "${URL}/mail/friends/${num}" | sed 's,/user/,\n/user/,g' | grep '/user/' | grep '/mail/' | cut -d\< -f1 >> tmp.txt
             ) </dev/null > /dev/null 2>&1 &
             time_exit 17
         done
@@ -85,7 +85,7 @@ clan_allies() {
             if [ -n "$IDN" ]; then
                 printf "/user/%s\n" "$IDN"
                 (
-                    run_curl "${URL}/user/${IDN}" > "$TMP/SRC"
+                    run_curl_exec "${URL}/user/${IDN}" > "$TMP/SRC"
                 ) </dev/null > /dev/null 2>&1 &
                 time_exit 17
 

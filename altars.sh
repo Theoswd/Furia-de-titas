@@ -43,7 +43,7 @@ altars_fight() {
        [ "$(($(date +%s) - $(cat last_dodge)))" -lt 300 ] && \
        awk -v ush="$(cat HP)" -v oldhp="$(cat old_HP)" 'BEGIN { exit !(ush < oldhp) }'; then
       (
-        run_curl "${URL}$(cat DODGE)" > "$TMP/src.html"
+        run_curl_exec "${URL}$(cat DODGE)" > "$TMP/src.html"
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       cf_access
@@ -53,7 +53,7 @@ altars_fight() {
          [ "$(($(date +%s) - $(cat last_heal)))" -gt 90 ] && \
          [ "$(($(date +%s) - $(cat last_heal)))" -lt 300 ]; then
       (
-        run_curl "${URL}$(cat HEAL)" > "$TMP/src.html"
+        run_curl_exec "${URL}$(cat HEAL)" > "$TMP/src.html"
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       cf_access
@@ -67,7 +67,7 @@ altars_fight() {
          ! grep -q -o 'txt smpl grey' "$TMP/src.html" && \
          grep -q -o "$(cat CLAN)" "$TMP/callies.txt"; then
       (
-        run_curl "${URL}$(cat ATKRND)" > "$TMP/src.html"
+        run_curl_exec "${URL}$(cat ATKRND)" > "$TMP/src.html"
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       cf_access
@@ -75,14 +75,14 @@ altars_fight() {
 
     elif awk -v latk="$(($(date +%s) - $(cat last_atk)))" -v atktime="$LA" 'BEGIN { exit !(latk > atktime) }'; then
       (
-        run_curl "${URL}$(cat ATK)" > "$TMP/src.html"
+        run_curl_exec "${URL}$(cat ATK)" > "$TMP/src.html"
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       cf_access
       date +%s > last_atk
     else
       (
-        run_curl "${URL}/altars" > "$TMP/src.html"
+        run_curl_exec "${URL}/altars" > "$TMP/src.html"
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       cf_access
@@ -102,7 +102,7 @@ altars_start() {
   case `date +%H:%M` in
   (13:5[5-9]|20:5[5-9])
     (
-      run_curl "$URL/train" | grep -o -E '\(([0-9]+)\)' | sed 's/[()]//g' > "$TMP/FULL"
+      run_curl_exec "$URL/train" | grep -o -E '\(([0-9]+)\)' | sed 's/[()]//g' > "$TMP/FULL"
     ) </dev/null > /dev/null 2>&1 &
     time_exit 17
 

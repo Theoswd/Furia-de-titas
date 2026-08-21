@@ -52,7 +52,7 @@ clandmgfight_fight() {
        [ "$(($(date +%s) - $(cat last_dodge)))" -lt 300 ] && \
        awk -v ush="$(cat HP)" -v oldhp="$(cat old_HP)" 'BEGIN { exit !(ush < oldhp) }'; then
       (
-        run_curl "${URL}$(cat DODGE)" > "$TMP/SRC"
+        run_curl_exec "${URL}$(cat DODGE)" > "$TMP/SRC"
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       cf_access
@@ -63,12 +63,12 @@ clandmgfight_fight() {
          [ "$(($(date +%s) - $(cat last_heal)))" -gt 90 ] && \
          [ "$(($(date +%s) - $(cat last_heal)))" -lt 300 ]; then
       (
-        run_curl "${URL}$(cat HEAL)" > "$TMP/SRC"
+        run_curl_exec "${URL}$(cat HEAL)" > "$TMP/SRC"
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       sleep 0.3s
       (
-        run_curl "${URL}$(cat GRASS)" > "$TMP/SRC"
+        run_curl_exec "${URL}$(cat GRASS)" > "$TMP/SRC"
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       cf_access
@@ -83,7 +83,7 @@ clandmgfight_fight() {
          ! grep -q -o 'txt smpl grey' "$TMP/SRC" && \
          grep -q -o "$(cat CLAN)" "$TMP/callies.txt"; then
       (
-        run_curl "${URL}$(cat ATKRND)" > "$TMP/SRC"
+        run_curl_exec "${URL}$(cat ATKRND)" > "$TMP/SRC"
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       cf_access
@@ -92,14 +92,14 @@ clandmgfight_fight() {
 
     elif awk -v latk="$(($(date +%s) - $(cat last_atk)))" -v atktime="$LA" 'BEGIN { exit !(latk > atktime) }'; then
       (
-        run_curl "${URL}$(cat ATK)" > "$TMP/SRC"
+        run_curl_exec "${URL}$(cat ATK)" > "$TMP/SRC"
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       cf_access
       date +%s > last_atk
     else
       (
-        run_curl "${URL}/clandmgfight" > "$TMP/SRC"
+        run_curl_exec "${URL}/clandmgfight" > "$TMP/SRC"
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       cf_access
@@ -119,15 +119,15 @@ clandmgfight_start() {
   case `date +%H:%M` in
   09:2[5-9]|21:2[5-9])
     (
-      run_curl "$URL/train" | grep -o -E '\(([0-9]+)\)' | sed 's/[()]//g' > "$TMP/FULL"
+      run_curl_exec "$URL/train" | grep -o -E '\(([0-9]+)\)' | sed 's/[()]//g' > "$TMP/FULL"
     ) </dev/null > /dev/null 2>&1 &
     time_exit 17
     (
-      run_curl "$URL/clandmgfight/?close=reward" > "$TMP/SRC"
+      run_curl_exec "$URL/clandmgfight/?close=reward" > "$TMP/SRC"
     ) </dev/null > /dev/null 2>&1 &
     time_exit 17
     (
-      run_curl "$URL/clandmgfight/enterFight" > "$TMP/SRC"
+      run_curl_exec "$URL/clandmgfight/enterFight" > "$TMP/SRC"
     ) </dev/null > /dev/null 2>&1 &
     time_exit 17
     printf "The clan duel will be started...\n"
@@ -135,7 +135,7 @@ clandmgfight_start() {
       sleep 3
     done
     (
-      run_curl "$URL/clandmgfight/enterFight" > "$TMP/SRC"
+      run_curl_exec "$URL/clandmgfight/enterFight" > "$TMP/SRC"
     ) </dev/null > /dev/null 2>&1 &
     time_exit 17
     grep -o -E '(/[a-z]+(/[a-z]+/[^A-Za-z0-9]r[^A-Za-z0-9][0-9]+|/))' "$TMP/SRC" | sed -n '1p' > "$TMP/ACCESS" 2>/dev/null
@@ -145,7 +145,7 @@ clandmgfight_start() {
     until grep -q -o 'clandmgfight/dodge/' "$TMP/ACCESS" || [ "$(date +%s)" -gt "$BREAK" ]; do
       printf " ...\n%s\n" "`cat "$TMP/ACCESS"`"
       (
-        run_curl "${URL}/clandmgfight/" > "$TMP/SRC"
+        run_curl_exec "${URL}/clandmgfight/" > "$TMP/SRC"
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       grep -o -E '(/clandmgfight(/[a-z]+/[^A-Za-z0-9]r[^A-Za-z0-9][0-9]+|/))' "$TMP/SRC" | sed -n '1p' > "$TMP/ACCESS" 2>/dev/null
@@ -159,7 +159,7 @@ clandmgfight_start() {
   09:[3-4][0-9]|21:[3-4][0-9])
     printf "The clan duel will be started...\n"
     (
-      run_curl "$URL/clandmgfight/enterFight" > "$TMP/SRC"
+      run_curl_exec "$URL/clandmgfight/enterFight" > "$TMP/SRC"
     ) </dev/null > /dev/null 2>&1 &
     time_exit 17
     grep -o -E '(/[a-z]+(/[a-z]+/[^A-Za-z0-9]r[^A-Za-z0-9][0-9]+|/))' "$TMP/SRC" | sed -n '1p' > "$TMP/ACCESS" 2>/dev/null
@@ -169,7 +169,7 @@ clandmgfight_start() {
     until grep -q -o 'clandmgfight/dodge/' "$TMP/ACCESS" || [ "$(date +%s)" -gt "$BREAK" ]; do
       printf " ...\n%s\n" "`cat "$TMP/ACCESS"`"
       (
-        run_curl "${URL}/clandmgfight/" > "$TMP/SRC"
+        run_curl_exec "${URL}/clandmgfight/" > "$TMP/SRC"
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       grep -o -E '(/clandmgfight(/[a-z]+/[^A-Za-z0-9]r[^A-Za-z0-9][0-9]+|/))' "$TMP/SRC" | sed -n '1p' > "$TMP/ACCESS" 2>/dev/null

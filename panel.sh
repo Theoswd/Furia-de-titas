@@ -135,6 +135,8 @@ proximo_evento() {
     if [ -s "$_ag" ]; then
         _idade=$(( $(date +%s) - $(stat -c %Y "$_ag" 2>/dev/null || echo 0) ))
         if [ "$_idade" -lt 7200 ]; then
+            # Aqui o cat continua: sao varias linhas, e o read builtin le
+            # so a primeira. E uma vez por desenho, nao por conta.
             EVENTOS=`cat "$_ag"`
         fi
     fi
@@ -170,6 +172,43 @@ proximo_evento() {
 }
 
 
+# Le a primeira linha de um arquivo para $_LIDO, SEM criar processo.
+#
+# CORRECAO (SIGKILL / "signal 9"): cada `cat arquivo` numa substituicao de
+# comando e um fork+exec. O painel fazia ~12 por conta a cada desenho
+# (estado, simbolo, aba, combate, status, pid) — com 6 contas, uma rajada
+# de ~72 processos a cada 20 segundos, no mesmo instante em que os workers
+# estavam requisitando. Isso sozinho ja passava do limite de 32 processos
+# filhos do Android 12+.
+#
+# O "read" e builtin do shell: zero processos. O "|| :" existe porque o
+# arquivo e gravado com printf sem quebra de linha, e nesse caso o read
+# preenche a variavel mas devolve 1.
+# Limpa um campo do accounts.conf para $_CF, SEM criar processo.
+#
+# CORRECAO: o clean_field faz `printf | tr -d | tr -d` — um subshell e dois
+# tr por chamada. O painel o chamava duas vezes por conta (servidor e
+# usuario): 36 processos por desenho, so para tirar um \r que quase nunca
+# existe. Aqui a limpeza e feita com substituicao de parametro, que e
+# interna ao shell.
+_CR=$(printf '\r')
+limpa_campo() {
+    _CF="$1"
+    while :; do
+        case "$_CF" in
+            *"$_CR") _CF="${_CF%"$_CR"}" ;;
+            *)       break ;;
+        esac
+    done
+}
+
+ler_arq() {
+    _LIDO=""
+    [ -r "$1" ] || return 0
+    read -r _LIDO < "$1" 2>/dev/null || :
+    return 0
+}
+
 estado_cor() {
     case "$1" in
         running)                                echo "$C_GREEN" ;;
@@ -197,7 +236,7 @@ estado_simbolo() {
 # traduzir. Descanso deixa de ser um rotulo generico: quando a conta volta
 # para "/", o painel mostra "Pagina Principal", que e onde ela de fato esta.
 aba_de() {
-    _p=`cat "$1/pagina" 2>/dev/null`
+    ler_arq "$1/pagina"; _p="$_LIDO"
     case "$_p" in
         ""|"/"|"/?out_gate_confirm=true") echo "Página Principal" ;;
         "/?sign_in=1")    echo "Entrando" ;;
@@ -248,8 +287,12 @@ aba_de() {
 #   ""                           fora de combate
 combate_de() {
     _d="$1"
-    _hp=`cat "$_d/HP" 2>/dev/null | tr -cd '0-9'`
-    _old=`cat "$_d/old_HP" 2>/dev/null | tr -cd '0-9'`
+    # Antes: `cat X | tr -cd 0-9` — dois processos por arquivo, quatro por
+    # conta. O read e builtin e o case valida sem chamar o tr.
+    ler_arq "$_d/HP";     _hp="$_LIDO"
+    ler_arq "$_d/old_HP"; _old="$_LIDO"
+    case "$_hp"  in ''|*[!0-9]*) _hp=""  ;; esac
+    case "$_old" in ''|*[!0-9]*) _old="" ;; esac
     [ -n "$_hp" ] || { echo ""; return; }
 
     if [ "$_hp" -eq 0 ] 2>/dev/null; then
@@ -289,19 +332,18 @@ while true; do
     LISTA=""; ATIV=""
 
     while IFS='|' read -r srv user _enc <&3; do
-        srv=$(clean_field "$srv")
-        user=$(clean_field "$user")
+        limpa_campo "$srv";  srv="$_CF"
+        limpa_campo "$user"; user="$_CF"
         case "$srv" in ''|\#*|*[!0-9]*) continue ;; esac
         [ -z "$user" ] && continue
-        tag=$(server_tag "$srv")
-        [ -z "$tag" ] && continue
+        case "$srv" in 1) tag="BR" ;; *) continue ;; esac
 
         acc_id="${tag}_${user}"
         acc_dir="$HOME/.twm/${acc_id}"
         status_file="$STATUS_DIR/${acc_id}.status"
         pid_file="$STATUS_DIR/${acc_id}.pid"
-        status=$(cat "$status_file" 2>/dev/null || echo "?")
-        pid=$(cat "$pid_file" 2>/dev/null)
+        ler_arq "$status_file"; status="${_LIDO:-?}"
+        ler_arq "$pid_file";    pid="$_LIDO"
 
         # O PID esta gravado mas o processo sumiu.
         #
@@ -335,8 +377,17 @@ while true; do
             [ -z "$nome" ] && nome="$user"
         fi
 
-        cor=$(estado_cor "$status")
-        sim=$(estado_simbolo "$status")
+        # Atribuicao direta no lugar de "cor=$(estado_cor ...)": a
+        # substituicao de comando forka mesmo para uma funcao de uma linha.
+        case "$status" in
+            running)     cor="$C_GREEN";  sim="$S_ON" ;;
+            paused)      cor="$C_CYAN";   sim="$S_PAUSE" ;;
+            starting|loading|login_retry|restarting)
+                         cor="$C_YELLOW"; sim="$S_WAIT" ;;
+            dead)        cor="$C_RED";    sim="$S_ERR" ;;
+            stopped)     cor="$C_GRAY";   sim="$S_OFF" ;;
+            *)           cor="$C_GRAY";   sim="$S_UNK" ;;
+        esac
 
         # Aba atual + relatorio de combate (HP ao vivo, dano, morte)
         _aba=$(aba_de "$acc_dir")
