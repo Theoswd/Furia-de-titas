@@ -91,6 +91,48 @@ export vUserAgent
 printf "[%s] %s — iniciando (modo %s)\n" "$TWM_TAG" "$TWM_USER" "$RUN"
 
 # Login com retry — delay crescente com jitter, nunca mata o worker
+# TRAVA GLOBAL DE LOGIN
+#
+# O servidor limita autenticacao por IP e, quando estrangula,
+# responde com a MESMA mensagem de "senha incorreta". Com varias
+# contas subindo juntas, viram dezenas de POSTs de login em poucos
+# minutos: contas boas passam a parecer contas com senha errada e
+# caem no backoff longo.
+#
+# Medido com 10 contas: 5 a 8 recusas por conta, inclusive nas que
+# depois entraram normalmente.
+#
+# Aqui so uma conta autentica por vez. O mkdir e atomico em POSIX,
+# entao serve de trava sem precisar de flock (que o toybox nao tem).
+# O PID de quem segura fica gravado: se o dono morrer, a trava e
+# liberada em vez de bloquear todo mundo para sempre.
+LOCKDIR="$HOME/.twm/.login.lock"
+
+login_lock() {
+    _n=0
+    while [ "$_n" -lt 180 ]; do
+        if mkdir "$LOCKDIR" 2>/dev/null; then
+            echo $$ > "$LOCKDIR/pid" 2>/dev/null
+            return 0
+        fi
+        _dono=`cat "$LOCKDIR/pid" 2>/dev/null`
+        case "$_dono" in
+            # PID ainda nao gravado: o dono acabou de criar a trava e
+            # esta a caminho de escrever. Apagar aqui era uma corrida —
+            # dois processos entravam ao mesmo tempo. So espera.
+            ''|*[!0-9]*) : ;;
+            *) kill -0 "$_dono" 2>/dev/null || rm -rf "$LOCKDIR" 2>/dev/null ;;
+        esac
+        sleep 1
+        _n=$((_n + 1))
+    done
+    # Nao conseguiu em 3 minutos: segue assim mesmo, para uma trava
+    # presa nunca impedir a conta de tentar.
+    return 0
+}
+
+login_unlock() { rm -rf "$LOCKDIR" 2>/dev/null; }
+
 do_login() {
     # REAPROVEITA A SESSAO EXISTENTE.
     #
@@ -165,6 +207,7 @@ do_login() {
     # primeiro POST parecia duplicacao inutil e foi removido, mas era ele que
     # inicializava o fluxo de login. Agora um GET na propria pagina de login
     # cumpre esse papel, sem enviar a credencial duas vezes.
+    login_lock
     run_curl "${URL}/?sign_in=1" > /dev/null 2>&1
 
     run_curl --data-urlencode "login=${luser}" \
@@ -172,7 +215,21 @@ do_login() {
              "${URL}/?sign_in=1" > /dev/null
     unset luser lpass
 
-    PAGE=$(run_curl "${URL}/user")
+    _rc2=$?
+    PAGE=$(run_curl "${URL}/user" 2>/dev/null)
+    _rc3=$?
+
+    # A trava cobre apenas a autenticacao. Liberar aqui, antes de
+    # avaliar o resultado, garante que ela sai em qualquer caminho —
+    # sucesso, recusa ou erro de rede.
+    login_unlock
+
+    if [ "$_rc2" -ne 0 ] || [ "$_rc3" -ne 0 ] || [ -z "$PAGE" ]; then
+        LOGIN_ERRO=rede
+        unset PAGE
+        return 1
+    fi
+    LOGIN_ERRO=credencial
     if is_logged_in "$PAGE"; then
         ACC=$(extract_username "$PAGE")
         [ -z "$ACC" ] && ACC="$TWM_USER"
