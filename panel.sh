@@ -63,14 +63,22 @@ fi
 
 # Assinatura do mod.
 #
-# Os caracteres estilizados vivem em blocos Unicode altos, que nem toda
-# fonte de terminal desenha — em fonte incompleta viram quadrados. Por
-# isso TWM_ASCII=1 devolve a versao simples, mesmo criterio que o projeto
-# ja usa para os emoji (TWM_EMOJI).
+# CORRECAO: o nome vinha em Mathematical Sans-Serif Italic (U+1D5xx), que
+# fica no PLANO ASTRAL do Unicode — a fonte do Termux nao tem esses
+# desenhos e o nome saia como quadrados com interrogacao, enquanto o
+# "ᴍᴏᴅ ᴀᴜᴛʜᴏʀ" ao lado aparecia normalmente.
+#
+# Agora a linha inteira usa o mesmo conjunto que funcionou: versalete do
+# plano basico (U+1D00-U+1D7F e U+0250-U+02AF). As iniciais S e C ficam em
+# ASCII maiusculo de proposito — o versalete de S e o U+A731, de outro
+# bloco, que traria de volta o mesmo risco.
+#
+# TWM_ASCII=1 continua devolvendo a versao sem estilo, para terminal que
+# nao desenhe nem isso.
 if [ "${TWM_ASCII:-0}" = "1" ]; then
     ASSINATURA="MOD AUTHOR: Stephenn Curry"
 else
-    ASSINATURA="ᴍᴏᴅ ᴀᴜᴛʜᴏʀ: 𝘚𝘵𝘦𝘱𝘩𝘦𝘯𝘯 𝘊𝘶𝘳𝘳𝘺"
+    ASSINATURA="ᴍᴏᴅ ᴀᴜᴛʜᴏʀ: Sᴛᴇᴘʜᴇɴɴ Cᴜʀʀʏ"
 fi
 
 # Largura do terminal.

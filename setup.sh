@@ -78,7 +78,7 @@ esac
 if [ "${TWM_ASCII:-0}" = "1" ]; then
     ASSINATURA="MOD AUTHOR: Stephenn Curry"
 else
-    ASSINATURA="ᴍᴏᴅ ᴀᴜᴛʜᴏʀ: 𝘚𝘵𝘦𝘱𝘩𝘦𝘯𝘯 𝘊𝘶𝘳𝘳𝘺"
+    ASSINATURA="ᴍᴏᴅ ᴀᴜᴛʜᴏʀ: Sᴛᴇᴘʜᴇɴɴ Cᴜʀʀʏ"
 fi
 
 GREEN='[1;32m'
