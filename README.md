@@ -161,6 +161,7 @@ sha256sum -c .integrity --quiet && echo "Scripts integros"
 | Diagnosticar login | `./diagnose.sh` |
 | Ver log de uma conta | `tail -f ~/.twm/BR_NomeConta/twm.log` |
 
+> **Pausar não desloga.** Os processos continuam vivos e a sessão no jogo permanece válida — ao retomar não há novo login. A pausa entra em vigor **ao fim do ciclo em andamento**, então uma conta no meio de uma batalha pode levar alguns minutos para parar. Para encerrar de vez, use `./stop.sh`.
 ---
 
 ## Atualização
