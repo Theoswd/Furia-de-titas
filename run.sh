@@ -58,6 +58,9 @@ twm_play() {
         # --- Coliseu comum: 00:30 as 04:30
         (00:3[0-9]|00:[45][0-9]|0[123]:[0-5][0-9]|04:[0-2][0-9]|04:30)
             coliseum_fight
+            # O Coliseu comum nao e um dos cinco eventos de prioridade:
+            # a arena continua saindo no intervalo dela durante a janela.
+            tarefas_livres
             ;;
 
         # --- Batalha de Bandeiras
@@ -84,6 +87,8 @@ twm_play() {
                 coliseum_start
                 messages_info
             fi
+            # Arena a cada 30 min, mesmo fora dos minutos da agenda.
+            tarefas_livres
             func_sleep
             func_crono
             ;;

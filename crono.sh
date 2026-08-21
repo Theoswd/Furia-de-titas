@@ -93,6 +93,29 @@ func_sleep() {
 # Janelas fixas da Masmorra do Cla.
 # A propria pagina informa: "10 acessos gratis a cada 8 horas a partir
 # das 10:00" — ou seja 02:00, 10:00 e 18:00. Nao ha o que calcular.
+# Tarefas que NAO dependem da agenda de eventos.
+#
+# A arena deve sair a cada 30 minutos, mas o start() so era chamado
+# nos minutos da agenda — que tem vaos de 60 a 120 minutos, e nenhum
+# durante as 4 horas do Coliseu. Medido em producao: a arena saia a
+# cada ~52 minutos, e contas recem-cadastradas ficavam com 1 unica
+# execucao enquanto as antigas tinham 9.
+#
+# Isto roda a cada volta do laco principal (~1 min). Cada atividade
+# tem o proprio temporizador, entao nada executa fora de hora.
+#
+# Nao e chamado durante os cinco eventos de prioridade: enquanto a
+# conta esta aplicada num deles, nada mais deve competir. Assim que
+# o evento termina, o start() roda o checklist do cla e as demais
+# atividades normalmente.
+tarefas_livres() {
+    if arena_liberada; then
+        cq_antes arena 2>/dev/null
+        arena_duel
+        arena_marcar
+    fi
+}
+
 masmorra_na_janela() {
     _h=`date +%H`
     case "$_h" in
