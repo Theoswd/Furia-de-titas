@@ -109,6 +109,7 @@ sha256sum -c .integrity --quiet && echo "Scripts integros"
 > ```
 >
 > Rode o `./play.sh` dentro da sessão e saia com **Ctrl+B** depois **D**. Para voltar: `tmux attach -t twm`.
+> cd ~/Furia-de-titas (caso o o play.sh de erro de diretório use esse comando e depois tente novamente)
 
 ---
 
