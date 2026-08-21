@@ -84,9 +84,17 @@ clanDungeon() {
     # nenhum link de compra — verificado: nada com gold, pay, buy ou
     # chance. Quando os gratuitos acabam o link some e o laco encerra,
     # entao nao ha como gastar ouro por golpe extra.
+    # Teto duplo: tempo E numero de golpes.
+    #
+    # A janela da 10 acessos gratis, entao mais de 15 ataques significa que
+    # o link continua na pagina sem o golpe estar sendo consumido — algum
+    # dia o jogo muda e isso vira um laco de 180s martelando o servidor. O
+    # limite de tempo sozinho nao protege disso.
     _br=$(($(date +%s) + 180))
+    _max=${FUNC_masmorra_max:-15}
+    case "$_max" in ''|*[!0-9]*) _max=15 ;; esac
     _n=0
-    while [ "$(date +%s)" -lt "$_br" ]; do
+    while [ "$(date +%s)" -lt "$_br" ] && [ "$_n" -lt "$_max" ]; do
         _cl=`grep -o -E '/clandungeon/attack/[?]r=[0-9]+' "$TMP/DUNGEON" | sed -n 1p`
         [ -n "$_cl" ] || break
         fetch_page "$_cl" "$TMP/DUNGEON"
@@ -100,7 +108,7 @@ clanDungeon() {
     else
         printf "Masmorra: sem ataque disponivel agora\n"
     fi
-    unset _golpes _br _n _cl
+    unset _golpes _br _n _cl _max
 }
 
 # Conta e lider/oficial do cla?

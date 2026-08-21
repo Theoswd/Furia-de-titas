@@ -92,11 +92,23 @@ func_trade() {
 use_blessing() {
     [ "${FUNC_use_blessing:-y}" = "y" ] || return 1
 
+    # A bencao vale 3 dias. Sem este portao a loja era reaberta e a bencao
+    # recomprada a CADA ciclo de start(), queimando 100 de ouro por volta
+    # com a bencao anterior ainda valendo.
+    bencao_liberada || return 1
+
     fetch_page "/effshop/" "$TMP/EFFSHOP"
     [ -s "$TMP/EFFSHOP" ] || return 1
 
     _cl=`grep -o -E "/effshop/blessing/[?]r=[0-9]+" "$TMP/EFFSHOP" | sed -n 1p`
     if [ -z "$_cl" ]; then
+        # Loja aberta, mas sem link de compra. A leitura mais provavel e
+        # que a bencao ja esteja ativa — o jogo costuma esconder a compra
+        # nesse caso. Como e inferencia e nao leitura direta, adia 6 horas
+        # em vez de assumir os 3 dias: nao reabre a loja a cada ciclo e
+        # tambem nao fica dias sem bencao se o motivo for outro.
+        bencao_adiar 6
+        printf "Bencao: sem link de compra — provavelmente ja ativa\n"
         unset _cl
         return 1
     fi
@@ -113,7 +125,8 @@ use_blessing() {
     fi
 
     fetch_page "$_cl"
-    printf "Bencao comprada (%s ouro disponiveis)\n" "$_ouro"
+    bencao_marcar
+    printf "Bencao comprada por 3 dias (%s ouro antes da compra)\n" "$_ouro"
     unset _cl _ouro
     return 0
 }

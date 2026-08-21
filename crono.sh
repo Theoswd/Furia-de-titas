@@ -211,6 +211,38 @@ masmorra_na_janela() {
     esac
 }
 
+# Bencao dos Deuses: vale 3 DIAS, nao um ciclo.
+#
+# CORRECAO: o use_blessing era chamado direto em start(), sem portao
+# nenhum. Como start() roda varias vezes por dia, o bot reabria a loja e
+# recomprava a bencao a cada volta — 100 de ouro por compra, jogados fora
+# enquanto a bencao anterior ainda estava valendo.
+#
+# Mesmo padrao dos outros portoes: marcador em disco, que sobrevive a
+# reinicio do worker. FUNC_blessing_dias=0 desliga o portao.
+bencao_liberada() {
+    _d=${FUNC_blessing_dias:-3}
+    case "$_d" in ''|*[!0-9]*) _d=3 ;; esac
+    [ "$_d" -eq 0 ] && return 0
+    _u=`cat "$TMP/last_blessing" 2>/dev/null`
+    case "$_u" in ''|*[!0-9]*) _u=0 ;; esac
+    [ $(( $(date +%s) - _u )) -ge $((_d * 86400)) ]
+}
+bencao_marcar() { date +%s > "$TMP/last_blessing" 2>/dev/null; }
+
+# Adia a proxima tentativa em N horas (padrao 6), em vez dos 3 dias
+# cheios. Usado quando a loja nao oferece o link de compra: a leitura mais
+# provavel e que a bencao ja esteja ativa, mas isso e inferencia — nao vale
+# travar tres dias por causa dela. Seis horas ja evitam reabrir a loja a
+# cada ciclo.
+bencao_adiar() {
+    _d=${FUNC_blessing_dias:-3}
+    case "$_d" in ''|*[!0-9]*) _d=3 ;; esac
+    _h=${1:-6}
+    echo $(( `date +%s` - _d * 86400 + _h * 3600 )) > "$TMP/last_blessing" 2>/dev/null
+    unset _d _h
+}
+
 # Arena a cada 30 minutos, controlada por marcador em disco para
 # sobreviver a reinicios do worker.
 arena_liberada() {
