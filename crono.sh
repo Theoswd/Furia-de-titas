@@ -103,6 +103,15 @@ cq_liberado() {
 }
 cq_marcar() { date +%s > "$TMP/last_cq" 2>/dev/null; }
 
+# A masmorra libera 10 golpes por janela de 8h. Um marcador por
+# janela evita repetir a rotina a cada volta do laco.
+masmorra_liberada() {
+    _u=`cat "$TMP/last_masmorra" 2>/dev/null`
+    case "$_u" in ''|*[!0-9]*) _u=0 ;; esac
+    [ $(( $(date +%s) - _u )) -ge 25200 ]
+}
+masmorra_marcar() { date +%s > "$TMP/last_masmorra" 2>/dev/null; }
+
 # Tarefas que NAO dependem da agenda de eventos.
 #
 # A arena deve sair a cada 30 minutos, mas o start() so era chamado nos
@@ -132,6 +141,16 @@ tarefas_livres() {
         cq_ajudar      2>/dev/null
         cq_forcar_ouro 2>/dev/null
         cq_marcar
+    fi
+
+    # --- Masmorra do cla nas janelas de 8h (02h, 10h, 18h)
+    #
+    # Depender da agenda nao funcionava: as 02:00 o ramo do Coliseu
+    # vence e nunca chama start(), e 10:00 nem esta na lista da rotina
+    # comum. Das tres janelas do dia, so a das 18h tinha chance.
+    if masmorra_na_janela && [ -n "$CLD" ] && masmorra_liberada; then
+        clanDungeon
+        masmorra_marcar
     fi
 
     # --- Arena, sempre tomando antes a missao do cla que ela completa

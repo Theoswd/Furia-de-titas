@@ -57,20 +57,42 @@ checkQuest() {
     return 1
 }
 
+# Masmorra do Cla.
+#
+# A versao anterior acessava /clan/<CLD>/dungeon/, URL que NAO existe no
+# jogo — por isso o log registrava "Clan Dungeon" dezenas de vezes e
+# nenhum ataque. A pagina real e /clandungeon/, e o ataque sai por
+# /clandungeon/attack/?r=N. A propria pagina informa:
+#   "10 acessos gratis disponiveis a cada 8 horas a partir das 10:00"
+# e mostra "Golpes mais: N" com os golpes restantes.
 clanDungeon() {
-    if [ -z "$CLD" ]; then
-        return
+    [ -n "$CLD" ] || return 1
+
+    printf "Masmorra do cla\n"
+    fetch_page "/clandungeon/" "$TMP/DUNGEON"
+    [ -s "$TMP/DUNGEON" ] || return 1
+
+    # Golpes restantes, so para registrar no log
+    _golpes=`grep -oE "Golpes mais:[^0-9]{0,8}[0-9]{1,3}" "$TMP/DUNGEON" | grep -oE '[0-9]{1,3}$' | head -n1`
+    [ -n "$_golpes" ] && printf "Masmorra: %s golpes disponiveis\n" "$_golpes"
+
+    _br=$(($(date +%s) + 180))
+    _n=0
+    while [ "$(date +%s)" -lt "$_br" ]; do
+        _cl=`grep -o -E '/clandungeon/attack/[?]r=[0-9]+' "$TMP/DUNGEON" | sed -n 1p`
+        [ -n "$_cl" ] || break
+        fetch_page "$_cl" "$TMP/DUNGEON"
+        _n=$((_n + 1))
+        printf "Masmorra: ataque %s\n" "$_n"
+        sleep 1
+    done
+
+    if [ "$_n" -gt 0 ]; then
+        printf "Masmorra do cla ok (%s ataques)\n" "$_n"
+    else
+        printf "Masmorra: sem ataque disponivel agora\n"
     fi
-
-    printf "Clan Dungeon\n"
-    fetch_page "/clan/${CLD}/dungeon/"
-
-    DUNGEON=`grep -o -E '/clan/[0-9]+/dungeon/(fight|take)/[?]r=[0-9]+' "$TMP/SRC" | head -n1`
-
-    if [ -n "$DUNGEON" ]; then
-        fetch_page "$DUNGEON"
-        printf "Clan Dungeon ok\n"
-    fi
+    unset _golpes _br _n _cl
 }
 
 # Conta e lider/oficial do cla?
@@ -108,11 +130,29 @@ clan_statue() {
     for _up in goldUpgrade silverUpgrade; do
         _cl=`grep -o -E "/clan/${CLD}/built/[?]${_up}=true&r=[0-9]+" "$TMP/STATUE" | sed -n 1p`
         if [ -n "$_cl" ]; then
-            fetch_page "$_cl"
-            case "$_up" in
-                goldUpgrade)   printf "Estatua do cla: bonus de OURO ativado\n" ;;
-                silverUpgrade) printf "Estatua do cla: bonus de PRATA ativado\n" ;;
-            esac
+            fetch_page "$_cl" "$TMP/STATUE2"
+            # VERIFICA o resultado em vez de assumir sucesso.
+            #
+            # A versao anterior clicava e registrava "ativado" sempre. Em
+            # producao isso gerou 31 mensagens de sucesso enquanto o link
+            # de ativacao continuava na pagina — ou seja, nenhuma ativacao
+            # tinha ocorrido. O bonus custa 222.000 de prata do cla e a
+            # tesouraria nao cobria; o bot insistia a cada ciclo.
+            if grep -q "${_up}=true" "$TMP/STATUE2" 2>/dev/null; then
+                case "$_up" in
+                    goldUpgrade)   printf "Estatua: bonus de OURO nao ativou (tesouraria insuficiente?)
+" ;;
+                    silverUpgrade) printf "Estatua: bonus de PRATA nao ativou (tesouraria insuficiente?)
+" ;;
+                esac
+            else
+                case "$_up" in
+                    goldUpgrade)   printf "Estatua do cla: bonus de OURO ativado
+" ;;
+                    silverUpgrade) printf "Estatua do cla: bonus de PRATA ativado
+" ;;
+                esac
+            fi
         fi
     done
     unset _up _cl
