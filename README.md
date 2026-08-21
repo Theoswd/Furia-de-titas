@@ -161,6 +161,7 @@ cd ~/Furia-de-titas && ./play.sh
 | Pausar / retomar | `cd ~/Furia-de-titas && ./pause.sh` |
 | Ver estado | `cd ~/Furia-de-titas && ./pause.sh status` |
 | Parar tudo | `cd ~/Furia-de-titas && ./stop.sh` |
+| Deslogar todas as contas | `cd ~/Furia-de-titas && ./logout.sh` |
 | Cadastrar contas | `cd ~/Furia-de-titas && ./setup.sh` |
 | Diagnosticar login | `cd ~/Furia-de-titas && ./diagnose.sh` |
 | Investigar `signal 9` | `cd ~/Furia-de-titas && ./sigkill.sh` |
