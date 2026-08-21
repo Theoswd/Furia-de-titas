@@ -130,6 +130,24 @@ _rc_track() {
             "$URL"/*|"$URL"\?*)
                 _rc_pp=${_rc_a#"$URL"}
                 printf %s "$_rc_pp" > "$TMP/pagina" 2>/dev/null
+
+                # Guarda tambem a ultima ATIVIDADE de verdade.
+                #
+                # Entre um ciclo e outro o bot chama descansar(), que volta
+                # para "/" de proposito — parar numa pagina de combate faz o
+                # jogo manter o personagem "em batalha". So que a conta passa
+                # a maior parte do tempo justamente nesse descanso, entao o
+                # painel exibia "Pagina Principal" quase sempre e nao dizia
+                # nada sobre o que a conta andou fazendo.
+                #
+                # Home, portao de saida e o /user das consultas de saldo nao
+                # sao atividade: sao passagem. O resto e, e fica registrado
+                # para o painel mostrar durante o descanso.
+                case "$_rc_pp" in
+                    /|/\?out_gate_confirm=*|/user|/user/*|/\?sign_in=*) ;;
+                    *) printf %s "$_rc_pp" > "$TMP/atividade" 2>/dev/null ;;
+                esac
+
                 unset _rc_a _rc_pp
                 return 0
                 ;;

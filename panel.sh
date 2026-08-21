@@ -255,45 +255,77 @@ estado_simbolo() {
 # O fetch_page grava o caminho acessado em $TMP/pagina, entao aqui e so
 # traduzir. Descanso deixa de ser um rotulo generico: quando a conta volta
 # para "/", o painel mostra "Pagina Principal", que e onde ela de fato esta.
+# Traduz um caminho do jogo para o nome da tela, em $_TRAD.
+#
+# Funcao separada porque agora dois campos precisam da mesma traducao: a
+# pagina atual e a ultima atividade registrada.
+traduz_pagina() {
+    _tp="$1"
+    _TRAD=""          # sem isto, o valor de uma conta vaza para a seguinte
+    case "$_tp" in
+        "/?sign_in=1")    _TRAD="Entrando" ;;
+        /fights*)         _TRAD="Agenda de Batalhas" ;;
+        /arena*)          _TRAD="Arena" ;;
+        /career*)         _TRAD="Carreira" ;;
+        /cave*)           _TRAD="Caverna" ;;
+        /campaign*)       _TRAD="Campanha" ;;
+        /coliseum*)       _TRAD="Coliseu" ;;
+        /clancoliseum*)   _TRAD="Coliseu do Clã" ;;
+        /clanfight*)      _TRAD="Torneio dos Clãs" ;;
+        /clandungeon*|/clandmgfight*) _TRAD="Masmorra do Clã" ;;
+        /clan/*quest*)    _TRAD="Missões do Clã" ;;
+        /clan/*built*)    _TRAD="Estátua do Clã" ;;
+        /clan*)           _TRAD="Clã" ;;
+        /altars*)         _TRAD="Altares dos Deuses" ;;
+        /undying*)        _TRAD="Vale dos Imortais" ;;
+        /king*)           _TRAD="Rei dos Imortais" ;;
+        /flagfight*)      _TRAD="Batalha de Bandeiras" ;;
+        /league*)         _TRAD="Liga dos Favoritos" ;;
+        /trade*)          _TRAD="Troca" ;;
+        /effshop*|/lab*)  _TRAD="Aprimoramento" ;;
+        /quest*)          _TRAD="Missões" ;;
+        /collector*)      _TRAD="Coleções" ;;
+        /relic*)          _TRAD="Relíquias" ;;
+        /sage*)           _TRAD="Cabana do Sábio" ;;
+        /inv*)            _TRAD="Inventário" ;;
+        /train*)          _TRAD="Treino" ;;
+        /fault*)          _TRAD="Falha" ;;
+        /collfight*)      _TRAD="Batalha Coletiva" ;;
+        /marathon*)       _TRAD="Maratona" ;;
+        /user*)           _TRAD="Meu Herói" ;;
+        /settings*)       _TRAD="Configurações" ;;
+        /mail*)           _TRAD="Mensagens" ;;
+        /questrnd*)       _TRAD="Missão Aleatória" ;;
+        /logout*)         _TRAD="Saindo" ;;
+        *)                _TRAD="$_p" ;;    esac
+    unset _tp
+}
+
+# Onde a conta esta, em $_ABA.
+#
+# Entre os ciclos o bot descansa na pagina inicial de proposito, e e ali que
+# ele passa a maior parte do tempo — por isso o painel vivia em "Pagina
+# Principal" sem informar nada. Agora, durante o descanso, mostra a ultima
+# atividade de verdade em vez de so o destino do descanso.
+#
+# Atribui em variavel em vez de ecoar: "_aba=$(aba_de ...)" custava um fork
+# por conta a cada desenho.
 aba_de() {
     ler_arq "$1/pagina"; _p="$_LIDO"
     case "$_p" in
-        ""|"/"|"/?out_gate_confirm=true") echo "Página Principal" ;;
-        "/?sign_in=1")    echo "Entrando" ;;
-        /fights*)         echo "Agenda de Batalhas" ;;
-        /arena*)          echo "Arena" ;;
-        /career*)         echo "Carreira" ;;
-        /cave*)           echo "Caverna" ;;
-        /campaign*)       echo "Campanha" ;;
-        /coliseum*)       echo "Coliseu" ;;
-        /clancoliseum*)   echo "Coliseu do Clã" ;;
-        /clanfight*)      echo "Torneio dos Clãs" ;;
-        /clandungeon*|/clandmgfight*) echo "Masmorra do Clã" ;;
-        /clan/*quest*)    echo "Missões do Clã" ;;
-        /clan/*built*)    echo "Estátua do Clã" ;;
-        /clan*)           echo "Clã" ;;
-        /altars*)         echo "Altares dos Deuses" ;;
-        /undying*)        echo "Vale dos Imortais" ;;
-        /king*)           echo "Rei dos Imortais" ;;
-        /flagfight*)      echo "Batalha de Bandeiras" ;;
-        /league*)         echo "Liga dos Favoritos" ;;
-        /trade*)          echo "Troca" ;;
-        /effshop*|/lab*)  echo "Aprimoramento" ;;
-        /quest*)          echo "Missões" ;;
-        /collector*)      echo "Coleções" ;;
-        /relic*)          echo "Relíquias" ;;
-        /sage*)           echo "Cabana do Sábio" ;;
-        /inv*)            echo "Inventário" ;;
-        /train*)          echo "Treino" ;;
-        /fault*)          echo "Falha" ;;
-        /collfight*)      echo "Batalha Coletiva" ;;
-        /marathon*)       echo "Maratona" ;;
-        /user*)           echo "Meu Herói" ;;
-        /settings*)       echo "Configurações" ;;
-        /mail*)           echo "Mensagens" ;;
-        /questrnd*)       echo "Missão Aleatória" ;;
-        /logout*)         echo "Saindo" ;;
-        *)                echo "$_p" ;;
+        ""|"/"|"/?out_gate_confirm=true")
+            ler_arq "$1/atividade"
+            if [ -n "$_LIDO" ]; then
+                traduz_pagina "$_LIDO"
+                _ABA="Descanso · $_TRAD"
+            else
+                _ABA="Página Principal"
+            fi
+            ;;
+        *)
+            traduz_pagina "$_p"
+            _ABA="$_TRAD"
+            ;;
     esac
     unset _p
 }
@@ -451,7 +483,7 @@ while true; do
         esac
 
         # Aba atual + relatorio de combate (HP ao vivo, dano, morte)
-        _aba=$(aba_de "$acc_dir")
+        aba_de "$acc_dir"; _aba="$_ABA"
         # Os arquivos HP/old_HP ficam no disco depois que o worker morre.
         # Mostrar "-1110 de dano recebido" numa conta fora do ar e uma
         # leitura falsa de combate — o combate acabou junto com o processo.
