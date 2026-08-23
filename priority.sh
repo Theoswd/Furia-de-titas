@@ -117,7 +117,9 @@ priority_secondary() {
     if priority_event_window || priority_clan_pending; then return 0; fi
     priority_state missoes_gerais /quest/ running; check_missions; check_rewards
     if priority_event_window || priority_clan_pending; then return 0; fi
-    priority_state laboratorio /lab/ running; use_elixir 2>/dev/null; use_blessing 2>/dev/null
+    # Bencao NAO e ativada automaticamente. O laboratorio continua apenas
+    # com o uso de elixir solicitado pelo fluxo existente.
+    priority_state laboratorio /lab/ running; use_elixir 2>/dev/null
     if priority_event_window || priority_clan_pending; then return 0; fi
     priority_state economia /trade/ running; func_trade
     if [ -n "$CLD" ]; then priority_state tesouraria_cla "/clan/${CLD}/money/" running; clan_money; fi
