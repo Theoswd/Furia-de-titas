@@ -1,8 +1,59 @@
 # shellcheck disable=SC2155
+
+# ============================================================
+# RELATORIO DE LUTA - SOMENTE MEMORIA DA BATALHA ATUAL
+# ============================================================
+# O jogo mostra o historico da luta em texto dentro da pagina do Coliseu.
+# Capturamos somente linhas que envolvem "Você/Voce" — isto elimina acoes
+# entre outros jogadores e deixa o painel focado na conta correspondente.
+# O arquivo vive em $TMP e e apagado assim que a luta termina.
+col_report_clear() {
+    rm -f "$TMP/col_report" "$TMP/col_report.prev" "$TMP/col_report.new" 2>/dev/null
+}
+
+col_report_capture() {
+    [ -s "$src_ram" ] || return 0
+    [ -n "$TMP" ] || return 0
+
+    # Converte o HTML da pagina em linhas de texto. O parser nao envia nada
+    # ao jogo; e apenas uma leitura local da resposta que a conta ja recebeu.
+    sed -e 's/<br[^>]*>/\n/Ig' \
+        -e 's/<\/p>/\n/Ig' \
+        -e 's/<\/li>/\n/Ig' \
+        -e 's/<\/div>/\n/Ig' \
+        -e 's/<[^>]*>/ /g' \
+        -e 's/&nbsp;/ /g' \
+        -e 's/&amp;/\&/g' \
+        -e 's/&quot;/"/g' \
+        -e 's/&#39;/'"'"'/g' \
+        "$src_ram" |
+        sed -e 's/[[:space:]][[:space:]]*/ /g' -e 's/^ //' -e 's/ $//' |
+        grep -E '(^|[[:space:]])(Você|Voce)([[:space:]]|$)' > "$TMP/col_report.new" 2>/dev/null || :
+
+    # Mantem somente linhas novas, para o letreiro nao repetir todo o
+    # historico a cada consulta da pagina.
+    : > "$TMP/col_report"
+    if [ -s "$TMP/col_report.new" ]; then
+        while IFS= read -r _line; do
+            [ -n "$_line" ] || continue
+            grep -F -qx -- "$_line" "$TMP/col_report" 2>/dev/null || \
+                printf '%s\n' "$_line" >> "$TMP/col_report"
+        done < "$TMP/col_report.new"
+    fi
+    rm -f "$TMP/col_report.new" 2>/dev/null
+}
+
+col_report_line() {
+    [ -s "$TMP/col_report" ] || return 0
+    # Ultima acao relevante da conta. O painel exibe como LED/letreiro.
+    tail -n 1 "$TMP/col_report" 2>/dev/null
+}
+
 coliseum_fight() {
     # Arquivos de batalha gravados no diretorio da conta (sem mktemp)
     src_ram="$TMP/col_src"
     full_ram="$TMP/col_full"
+    col_report_clear
 
     LA=5
     HPER=38
@@ -27,6 +78,7 @@ coliseum_fight() {
         run_curl_exec "$URL/coliseum" > "$src_ram"
     ) </dev/null > /dev/null 2>&1 &
     time_exit 17
+    col_report_capture
 
     # Encerra luta pendente
     if grep -q -o '?end_fight' "$src_ram"; then
@@ -38,6 +90,7 @@ coliseum_fight() {
             run_curl_exec "$URL/coliseum" > "$src_ram"
         ) </dev/null > /dev/null 2>&1 &
         time_exit 17
+        col_report_clear
     fi
 
     access_link=`grep -o -E '/coliseum(/[A-Za-z]+/[?]r[=][0-9]+|/)' "$src_ram" | sed -n '1p'`
@@ -49,8 +102,9 @@ coliseum_fight() {
             run_curl_exec "${URL}${go_stop}" > "$src_ram"
         ) </dev/null > /dev/null 2>&1 &
         time_exit 17
+        col_report_capture
 
-        access_link=`grep -o -E '/coliseum(/[A-Za-z]+/[?]r[=][0-9]+|/)' "$src_ram" | grep -v 'dodge' | sed -n 1p`
+        access_link=`grep -o -E '/coliseum(/[A-Za-z]+/[?]r[=][0-9]+|/)' "$src_ram" | grep -v 'dodge' | sed -n '1p'`
         printf " Preparing for battle, waiting for other players...\n"
 
         first_time=`date +%s`
@@ -59,7 +113,8 @@ coliseum_fight() {
                 run_curl_exec "${URL}${access_link}" > "$src_ram"
             ) </dev/null > /dev/null 2>&1 &
             time_exit 17
-            access_link=`grep -o -E '/(coliseum/[A-Za-z]+/[?]r[=][0-9]+|coliseum)' "$src_ram" | grep -v 'dodge' | sed -n 1p`
+            col_report_capture
+            access_link=`grep -o -E '/(coliseum/[A-Za-z]+/[?]r[=][0-9]+|coliseum)' "$src_ram" | grep -v 'dodge' | sed -n '1p'`
             printf " Preparing...\n"
             sleep 3s
         done
@@ -73,7 +128,7 @@ coliseum_fight() {
             ENH=`grep -o -E '(nbsp)[^A-Za-z0-9]{1,2}[0-9]{1,6}' "$src_ram" | sed -n 's,nbsp[;],,;s,\ ,,;1p'`
             USER=`grep -o -E '([[:upper:]][[:lower:]]{0,15}( [[:upper:]][[:lower:]]{0,13})?)[[:space:]][^[:alnum:]]s' "$src_ram" | sed -n 's,\ [<]s,,;s,\ ,_,;2p'`
 
-            ATK=`grep -o -E '/coliseum/atk/[?]r[=][0-9]+' "$src_ram" | sed -n 1p`
+            ATK=`grep -o -E '/coliseum/atk/[?]r[=][0-9]+' "$src_ram" | sed -n '1p'`
             ATKRND=`grep -o -E '/coliseum/atkrnd/[?]r[=][0-9]+' "$src_ram"`
             DODGE=`grep -o -E '/coliseum/dodge/[?]r[=][0-9]+' "$src_ram"`
             HEAL=`grep -o -E '/coliseum/heal/[?]r[=][0-9]+' "$src_ram"`
@@ -81,6 +136,7 @@ coliseum_fight() {
             RHP=`awk -v ush="$USH" -v rper="$RPER" 'BEGIN { printf "%.0f", ush * rper / 100 + ush }'`
             HLHP=`awk -v ush="$(cat "$full_ram")" -v hper="$HPER" 'BEGIN { printf "%.0f", ush * hper / 100 }'`
 
+            col_report_capture
             if grep -q -o '/dodge/' "$src_ram"; then
                 printf "Em batalha - HP: %s\n" "$USH"
             else
@@ -90,6 +146,7 @@ coliseum_fight() {
                             run_curl_exec "${URL}/coliseum" > "$src_ram"
                         ) </dev/null > /dev/null 2>&1 &
                         time_exit 17
+                        col_report_capture
                         printf "Fim de batalha detectado.\n"
                     fi
                 else
@@ -105,8 +162,6 @@ coliseum_fight() {
         BREAK_LOOP=""
         first_time=`date +%s`
 
-        # Limite de tempo: BREAK_LOOP so e definido quando a luta
-        # termina. Se o estado nunca resolver, o laco era infinito.
         COL_BREAK=$(($(date +%s) + 600))
         until [ -n "$BREAK_LOOP" ] || [ "$(date +%s)" -gt "$COL_BREAK" ]; do
             now=`date +%s`
@@ -120,6 +175,7 @@ coliseum_fight() {
                     run_curl_exec "${URL}${HEAL}" > "$src_ram"
                 ) </dev/null > /dev/null 2>&1 &
                 time_exit 17
+                col_report_capture
                 cl_access
                 echo "$USH" > "$full_ram"
                 last_heal=$now
@@ -132,6 +188,7 @@ coliseum_fight() {
                     run_curl_exec "${URL}${DODGE}" > "$src_ram"
                 ) </dev/null > /dev/null 2>&1 &
                 time_exit 17
+                col_report_capture
                 cl_access
                 OLDHP=$USH
                 last_dodge=$now
@@ -144,6 +201,7 @@ coliseum_fight() {
                     run_curl_exec "${URL}${ATKRND}" > "$src_ram"
                 ) </dev/null > /dev/null 2>&1 &
                 time_exit 17
+                col_report_capture
                 cl_access
                 last_atk=$now
 
@@ -152,6 +210,7 @@ coliseum_fight() {
                     run_curl_exec "${URL}${ATK}" > "$src_ram"
                 ) </dev/null > /dev/null 2>&1 &
                 time_exit 17
+                col_report_capture
                 cl_access
                 last_atk=$now
 
@@ -160,17 +219,21 @@ coliseum_fight() {
                     run_curl_exec "${URL}/coliseum" > "$src_ram"
                 ) </dev/null > /dev/null 2>&1 &
                 time_exit 17
+                col_report_capture
                 cl_access
                 sleep 1s
             fi
         done
 
+        # Fim da luta: nada de dano/acoes da luta anterior deve ficar no painel.
+        col_report_clear
         rm -f "$src_ram" "$full_ram"
         unset last_heal last_dodge last_atk USH ENH USER ATK ATKRND DODGE HEAL BREAK_LOOP
         func_unset
 
         printf "The battle is over!\n"
     else
+        col_report_clear
         printf "It was not possible to start the battle at this time.\n"
     fi
 }
