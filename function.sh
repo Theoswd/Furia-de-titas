@@ -116,6 +116,10 @@ request_update() {
                 printf "Use gold to collect 3 ores in the cave? (y or n): "
                 key="FUNC_cave_boost"
                 ;;
+                d|D)
+    printf "Use blessing? (y or n): "
+    key="FUNC_use_blessing"
+    ;;
             *)
                 printf "Exiting configuration update mode.\n"
                 EXIT_CONFIG="y"
