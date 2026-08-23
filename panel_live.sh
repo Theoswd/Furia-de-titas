@@ -1,12 +1,8 @@
 #!/bin/sh
-# panel_live.sh - camada de sessao ao vivo, sem alterar o desenho base do panel.sh.
-# O panel.sh continua responsavel pelo layout. Esta camada apenas substitui
-# aba_de() depois que o painel foi carregado.
+# panel_live.sh - camada de exibicao ao vivo, sem alterar o desenho base do panel.sh.
+# O panel.sh continua responsavel pelo layout. Esta camada substitui somente
+# as funcoes de sessao/combate para acrescentar o LED e a ultima acao da luta.
 
-# O worker registra em $acc_dir/pagina o ultimo caminho realmente requisitado.
-# Como run_curl/fetch_page passam por _rc_track, isso acompanha inclusive
-# paginas especificas de uma atividade, em vez de mostrar somente um nome
-# generico da secao.
 aba_de() {
     _d="$1"
     ler_arq "$_d/pagina"; _p="$_LIDO"
@@ -51,18 +47,54 @@ aba_de() {
         *) _nome="Página" ;;
     esac
 
-    # LED de sessao: indica que a conta tem um caminho de sessao conhecido.
-    # Se o worker estiver fora dessas rotas, ainda mostramos o caminho exato.
-    # A informacao fica curta o suficiente para o painel continuar cabendo
-    # com muitas contas.
     if [ -n "$_p" ] && [ "$_p" != "/" ]; then
         _led="● LIVE"
     else
         _led="○ /"
     fi
 
-    # Nome amigavel + caminho exato da sessao. Nao consulta /online/ para
-    # adivinhar a pagina: usa o estado real escrito pela propria conta.
+    # Nome amigavel + LED + caminho exato da sessao.
     printf '%s %s [%s]' "$_led" "$_nome" "$_p"
     unset _d _p _nome _led
+}
+
+# Mantem o calculo de HP/dano do painel e acrescenta a ultima linha do
+# historico da luta do Coliseu. A linha vem de $TMP/col_report e desaparece
+# quando coliseum_fight termina.
+combate_de() {
+    _d="$1"
+    ler_arq "$_d/HP"; _hp="$_LIDO"
+    ler_arq "$_d/old_HP"; _old="$_LIDO"
+    case "$_hp"  in ''|*[!0-9]*) _hp=""  ;; esac
+    case "$_old" in ''|*[!0-9]*) _old="" ;; esac
+
+    _texto=""
+    if [ -n "$_hp" ]; then
+        if [ "$_hp" -eq 0 ] 2>/dev/null; then
+            _texto="VOCÊ ESTÁ MORTO"
+        elif [ -n "$_old" ] && [ "$_old" -gt 0 ] 2>/dev/null; then
+            _dif=$((_hp - _old))
+            if [ "$_dif" -lt 0 ]; then
+                _texto="HP $_hp  (${_dif#-} dano recebido)"
+            elif [ "$_dif" -gt 0 ]; then
+                _texto="HP $_hp  (+$_dif recuperado)"
+            else
+                _texto="HP $_hp"
+            fi
+        else
+            _texto="HP $_hp"
+        fi
+    fi
+
+    if [ -s "$_d/col_report" ]; then
+        # O historico e regravado pelo worker a cada resposta do jogo. tail
+        # aqui serve apenas para pegar a ultima acao; nao e mantido depois da
+        # luta. Linhas como "Thaydark acertar Você" e "Você usou Turbilhão"
+        # entram porque afetam diretamente a conta corrente.
+        _acao=$(tail -n 1 "$_d/col_report" 2>/dev/null)
+        [ -n "$_acao" ] && _texto="${_texto:+$_texto  |  }LIVE: $_acao"
+    fi
+
+    printf '%s' "$_texto"
+    unset _d _hp _old _dif _texto _acao
 }
