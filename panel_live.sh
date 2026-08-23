@@ -1,11 +1,12 @@
 #!/bin/sh
-# panel_live.sh - camada de exibicao ao vivo, sem alterar o desenho do panel.sh.
-# O panel.sh continua responsavel pelo layout; este arquivo apenas troca a
-# fonte da informacao de sessao para o caminho real gravado pelo worker.
+# panel_live.sh - camada de sessao ao vivo, sem alterar o desenho base do panel.sh.
+# O panel.sh continua responsavel pelo layout. Esta camada apenas substitui
+# aba_de() depois que o painel foi carregado.
 
-# Mostra o caminho requisitado pelo worker, nao somente um rotulo generico.
-# Assim o painel consegue distinguir, por exemplo, /arena/ de
-# /arena/attack/1/?r=123, enquanto preserva o nome amigavel.
+# O worker registra em $acc_dir/pagina o ultimo caminho realmente requisitado.
+# Como run_curl/fetch_page passam por _rc_track, isso acompanha inclusive
+# paginas especificas de uma atividade, em vez de mostrar somente um nome
+# generico da secao.
 aba_de() {
     _d="$1"
     ler_arq "$_d/pagina"; _p="$_LIDO"
@@ -45,17 +46,23 @@ aba_de() {
         /mail*) _nome="Mensagens" ;;
         /questrnd*) _nome="Missão Aleatória" ;;
         /logout*) _nome="Saindo" ;;
-        /|/?out_gate_confirm=true|/?sign_in=1) _nome="Página Principal" ;;
+        /|/?out_gate_confirm=true) _nome="Página Principal" ;;
+        /?sign_in=1) _nome="Entrando" ;;
         *) _nome="Página" ;;
     esac
 
-    # O painel existente usa esta string em uma coluna de largura limitada.
-    # Mantemos o nome amigavel e anexamos o caminho exato em que a requisicao
-    # da sessao esta acontecendo.
-    printf '%s [%s]' "$_nome" "$_p"
-    unset _d _p _nome
-}
+    # LED de sessao: indica que a conta tem um caminho de sessao conhecido.
+    # Se o worker estiver fora dessas rotas, ainda mostramos o caminho exato.
+    # A informacao fica curta o suficiente para o painel continuar cabendo
+    # com muitas contas.
+    if [ -n "$_p" ] && [ "$_p" != "/" ]; then
+        _led="● LIVE"
+    else
+        _led="○ /"
+    fi
 
-# Mantem o relatorio de HP/dano do panel.sh, mas acrescenta os eventos que
-# forem registrados pelo battle_report.sh sem modificar o layout principal.
-# O relatorio detalhado fica em menu separado para nao poluir o painel.
+    # Nome amigavel + caminho exato da sessao. Nao consulta /online/ para
+    # adivinhar a pagina: usa o estado real escrito pela propria conta.
+    printf '%s %s [%s]' "$_led" "$_nome" "$_p"
+    unset _d _p _nome _led
+}
