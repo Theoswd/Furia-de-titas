@@ -1,45 +1,11 @@
 # Troca PRATA -> OURO.
 #
-# A implementacao anterior procurava /trade/exchange/silver/N, que e o
-# sentido contrario (comprar prata com ouro). A pagina do jogo oferece:
-#   /trade/exchange/gold/1?r=N     1800 prata  ->   1 ouro
-#   /trade/exchange/gold/10?r=N   18000 prata  ->  10 ouro
-#   /trade/exchange/gold/100?r=N 180000 prata  -> 100 ouro
-# Compra sempre pelo maior lote disponivel, que e a taxa mais eficiente.
-# Troca PRATA -> OURO, com o lote escolhido pelo saldo da conta.
-#
 # A pagina oferece tres lotes:
 #   /trade/exchange/gold/1?r=N       1800 prata ->   1 ouro
 #   /trade/exchange/gold/10?r=N     18000 prata ->  10 ouro
 #   /trade/exchange/gold/100?r=N   180000 prata -> 100 ouro
 #
-# Criterio: so usa um lote se a prata em caixa sustentar essa troca todo
-# dia por um ano (365 vezes). Assim a troca nunca compromete a economia
-# da conta — quem tem pouca prata cai para o lote menor em vez de parar.
-#
-#   lote 100 -> precisa de  65.700.000 de prata
-#   lote  10 -> precisa de   6.570.000
-#   lote   1 -> precisa de     657.000
-#   abaixo disso nao troca
-# Troca PRATA -> OURO, UMA VEZ POR DIA.
-#
-# A pagina oferece tres lotes:
-#   /trade/exchange/gold/1?r=N       1800 prata ->   1 ouro
-#   /trade/exchange/gold/10?r=N     18000 prata ->  10 ouro
-#   /trade/exchange/gold/100?r=N   180000 prata -> 100 ouro
-#
-# O lote e escolhido pela reserva de prata: so usa um lote se o saldo
-# aguentar essa mesma troca, uma por dia, durante um ano inteiro. Isso
-# mantem a economia estavel — quem tem pouca prata cai para o lote menor
-# em vez de drenar o caixa.
-#
-#   lote 100 -> reserva de 65.700.000 de prata (365 x 180.000)
-#   lote  10 -> reserva de  6.570.000
-#   lote   1 -> reserva de    657.000
-#   abaixo disso nao troca
-#
-# A troca ocorre UMA VEZ por dia. O marcador fica em $TMP/last_trade e
-# guarda a data, entao reiniciar o bot no mesmo dia nao repete a troca.
+# A troca ocorre UMA VEZ por dia. O lote e escolhido pela reserva de prata.
 func_trade() {
     [ "${FUNC_trade:-y}" = "y" ] || return 1
 
@@ -56,7 +22,6 @@ func_trade() {
     case "$_dias" in ''|*[!0-9]*) _dias=365 ;; esac
 
     fetch_page "/trade/exchange"
-    # Saldo da conta e sempre alt='s'; alt='' e taxa de cambio da propria loja.
     _pr=`grep -o -E "silver\.png' alt='s'/> ?[0-9][0-9.,']{0,14}[KMBkmb]?" "$TMP/SRC" | sed -E "s@.*/> ?@@" | head -n1`
     _prata=`valor_num "$_pr"`
     case "$_prata" in ''|*[!0-9]*) _prata=0 ;; esac
@@ -86,35 +51,10 @@ func_trade() {
     unset _hoje _ult _dias _pr _prata _lote _cl
 }
 
-# Compra a Bencao em /effshop/ (+200 em todas as estatisticas, +25%% de
-# experiencia, 100 ouro, dura 3 dias). Se ja estiver ativa o link nao
-# aparece na pagina, entao basta agir sobre o que existir.
+# BÊNÇÃO DESATIVADA POR COMPLETO.
+# Mantemos o nome da funcao para compatibilidade com codigo antigo, mas ela
+# nunca consulta /effshop, nunca segue /effshop/blessing e nunca gasta ouro.
 use_blessing() {
-    [ "${FUNC_use_blessing:-y}" = "y" ] || return 1
-
-    fetch_page "/effshop/" "$TMP/EFFSHOP"
-    [ -s "$TMP/EFFSHOP" ] || return 1
-
-    _cl=`grep -o -E "/effshop/blessing/[?]r=[0-9]+" "$TMP/EFFSHOP" | sed -n 1p`
-    if [ -z "$_cl" ]; then
-        unset _cl
-        return 1
-    fi
-
-    # So compra se houver ouro suficiente (custa 100).
-    # Saldo da conta e sempre alt='g'; alt='' sao os precos dos itens.
-    _ouro=`grep -o -E "gold\.png' alt='g'/> ?[0-9][0-9.,']{0,14}[KMBkmb]?" "$TMP/EFFSHOP" | sed -E "s@.*/> ?@@" | head -n1`
-    _ouro=`valor_num "$_ouro"`
-    case "$_ouro" in ''|*[!0-9]*) _ouro=0 ;; esac
-    if [ "$_ouro" -lt "${FUNC_blessing_gold_min:-100}" ]; then
-        printf "Bencao: ouro insuficiente (%s)\n" "$_ouro"
-        unset _cl _ouro
-        return 1
-    fi
-
-    fetch_page "$_cl"
-    printf "Bencao comprada (%s ouro disponiveis)\n" "$_ouro"
-    unset _cl _ouro
     return 0
 }
 
