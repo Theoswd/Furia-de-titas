@@ -32,12 +32,11 @@ case "$(uname -s 2>/dev/null)" in
     *) warn "plataforma nao validada: $(uname -s 2>/dev/null)" ;;
 esac
 
-for f in play.sh worker.sh twm.sh run.sh priority.sh function.sh trade.sh clanquest.sh clanid.sh info.sh panel.sh panel_live.sh; do
+for f in play.sh worker.sh twm.sh run.sh priority.sh function.sh trade.sh clanquest.sh clanid.sh info.sh panel.sh panel_live.sh coliseum.sh status.sh; do
     check_file "$f"
 done
 
-# Sintaxe POSIX/sh dos arquivos centrais.
-for f in play.sh worker.sh twm.sh run.sh priority.sh trade.sh clanquest.sh panel_live.sh status.sh; do
+for f in play.sh worker.sh twm.sh run.sh priority.sh trade.sh clanquest.sh clanid.sh panel_live.sh coliseum.sh status.sh; do
     if [ -f "$ROOT/$f" ]; then
         if sh -n "$ROOT/$f" 2>/dev/null; then
             ok "sintaxe sh: $f"
@@ -47,16 +46,12 @@ for f in play.sh worker.sh twm.sh run.sh priority.sh trade.sh clanquest.sh panel
     fi
 done
 
-# play.sh deve ser autocontido: depender de 'git show' em runtime quebraria
-# instalacoes por ZIP/shallow clone e e desnecessario em WSL/Termux.
 if grep -q 'git -C.*show' "$ROOT/play.sh" 2>/dev/null; then
     fail 'play.sh ainda depende de git show em runtime'
 else
     ok 'play.sh independente de git em runtime'
 fi
 
-# A prioridade e carregada em runtime depois dos outros modulos, impedindo que
-# trade.sh ou outro arquivo posterior sobrescreva as protecoes.
 if grep -q 'twm_play_priority_loader' "$ROOT/run.sh" 2>/dev/null && \
    grep -q '\. "$TWMDIR/priority.sh"' "$ROOT/run.sh" 2>/dev/null; then
     ok 'priority.sh carregado no momento correto'
@@ -64,7 +59,6 @@ else
     fail 'loader tardio de priority.sh nao encontrado'
 fi
 
-# Bencao: protecao no scheduler E na propria origem em trade.sh.
 if grep -Eq '^use_blessing\(\)[[:space:]]*\{[[:space:]]*return 0;[[:space:]]*\}' "$ROOT/priority.sh" 2>/dev/null; then
     ok 'bencao bloqueada no scheduler'
 else
@@ -84,7 +78,6 @@ else
     fail 'FUNC_use_blessing nao esta forcado para n'
 fi
 
-# Ordem principal do agente.
 if grep -q 'priority_event_window' "$ROOT/priority.sh" && \
    grep -q 'priority_run_clan' "$ROOT/priority.sh" && \
    grep -q 'priority_secondary' "$ROOT/priority.sh"; then
@@ -93,14 +86,12 @@ else
     fail 'camadas de prioridade incompletas'
 fi
 
-# Missoes do cla: deve reconhecer missao ativa e nao apenas concluida.
 if grep -q '(end|deleteHelp)' "$ROOT/priority.sh" 2>/dev/null; then
     ok 'missao do cla ativa reconhecida pelo scheduler'
 else
     fail 'scheduler nao reconhece missao do cla ativa'
 fi
 
-# Ajuda paga e conclusao forcada com ouro devem ficar bloqueadas no agente.
 if grep -q 'Ajuda paga ignorada' "$ROOT/clanquest.sh" 2>/dev/null; then
     ok 'ajuda paga de missao do cla ignorada'
 else
@@ -113,27 +104,62 @@ else
     fail 'FUNC_quest_force_gold nao esta bloqueado'
 fi
 
-# Caverna.
 if grep -q '^    FUNC_cave_boost=n$' "$ROOT/priority.sh" 2>/dev/null; then
     ok 'boost de ouro da caverna desativado no agente'
 else
     fail 'boost de ouro da caverna nao esta bloqueado'
 fi
 
-# Masmorra: somente golpes gratuitos.
+# Masmorra: somente golpes gratuitos, no maximo 10, e marcador apenas apos
+# ataque real. Isso evita o falso "executado" quando a pagina nao respondeu.
 if grep -q 'SOMENTE GOLPES GRATUITOS' "$ROOT/clanid.sh" 2>/dev/null && \
-   grep -q '/clandungeon/attack/' "$ROOT/clanid.sh" 2>/dev/null; then
-    ok 'masmorra configurada para golpes gratuitos'
+   grep -q '/clandungeon/attack/' "$ROOT/clanid.sh" 2>/dev/null && \
+   grep -q '"$_n" -lt 10' "$ROOT/clanid.sh" 2>/dev/null; then
+    ok 'masmorra limitada a ate 10 golpes gratuitos'
 else
-    fail 'regra de golpes gratuitos da masmorra nao confirmada'
+    fail 'limite gratuito da masmorra nao confirmado'
 fi
 
-# Painel LIVE por conta.
-if grep -q '_rc_track' "$ROOT/info.sh" 2>/dev/null && \
-   grep -q 'ler_arq "$_d/pagina"' "$ROOT/panel_live.sh" 2>/dev/null; then
-    ok 'painel LIVE usa pagina real por conta'
+if grep -q 'if clanDungeon; then' "$ROOT/priority.sh" 2>/dev/null && \
+   grep -A5 'if clanDungeon; then' "$ROOT/priority.sh" 2>/dev/null | grep -q 'masmorra_marcar'; then
+    ok 'masmorra so e marcada apos execucao real'
 else
-    fail 'rastreamento de pagina LIVE incompleto'
+    fail 'scheduler pode marcar masmorra sem executar ataques'
+fi
+
+# Painel LIVE: fonte unica deve ser o caminho real registrado por info.sh.
+if grep -q '_rc_track' "$ROOT/info.sh" 2>/dev/null && \
+   grep -q 'ler_arq "$_d/pagina"' "$ROOT/panel_live.sh" 2>/dev/null && \
+   ! grep -q 'priority_state.*aba_de' "$ROOT/panel_live.sh" 2>/dev/null; then
+    ok 'painel LIVE usa somente pagina real por conta'
+else
+    fail 'painel LIVE nao esta isolado do estado interno do scheduler'
+fi
+
+# /clan/* deve aparecer como Cla; /clandungeon/* como Masmorra; descanso /.
+if grep -q '/clandungeon.*Masmorra' "$ROOT/panel_live.sh" 2>/dev/null && \
+   grep -q '/clan\*.*Clã' "$ROOT/panel_live.sh" 2>/dev/null && \
+   grep -q 'Página Principal' "$ROOT/panel_live.sh" 2>/dev/null; then
+    ok 'nomes LIVE coerentes: Pagina Principal, Cla e Masmorra'
+else
+    fail 'mapeamento principal/cla/masmorra incompleto'
+fi
+
+# O descanso precisa ser uma requisicao real a /, nao apenas um rotulo.
+if grep -q 'descansar 2>/dev/null' "$ROOT/priority.sh" 2>/dev/null; then
+    ok 'descanso retorna de fato para a pagina principal'
+else
+    fail 'scheduler nao retorna de fato para a pagina principal'
+fi
+
+# Relatorio do Coliseu deve ser apagado no fim, e painel nao pode mostrar HP
+# antigo quando a conta ja saiu da pagina de batalha.
+if grep -q 'col_report_clear' "$ROOT/coliseum.sh" 2>/dev/null && \
+   grep -q 'Fim da luta' "$ROOT/coliseum.sh" 2>/dev/null && \
+   grep -q '/coliseum\*)' "$ROOT/panel_live.sh" 2>/dev/null; then
+    ok 'relatorio de batalha e transitorio e some apos o fim'
+else
+    fail 'limpeza de relatorio de batalha nao confirmada'
 fi
 
 printf '\nResultado: %s OK | %s WARN | %s FAIL\n' "$PASS" "$WARN" "$FAIL"
