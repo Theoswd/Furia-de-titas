@@ -1,5 +1,10 @@
 # priority.sh - Scheduler orientado por estado + prioridade + horario
-# Cronograma de batalha > missoes do cla > atividades secundarias.
+# Regra: cronograma de batalha > missao do cla > atividades secundarias.
+
+# BLOQUEIO ABSOLUTO DA BÊNÇÃO.
+# Este override é carregado por último em run.sh, portanto qualquer chamada
+# antiga a use_blessing() passa a ser um no-op. Não depende da configuração.
+use_blessing() { return 0; }
 
 priority_state() {
     _p_activity="$1"; _p_page="$2"; _p_status="$3"
@@ -98,49 +103,100 @@ priority_night_coliseum() {
 }
 
 priority_secondary() {
+    # Cada bloco abaixo é uma atividade secundária. Após cada bloco o
+    # scheduler volta ao topo e pode interromper a sequência por evento ou
+    # missão do clã. Isso evita que uma lista fixa atravesse uma prioridade.
+
     if [ "${FUNC_masmorra:-y}" = "y" ] && masmorra_na_janela && masmorra_liberada; then
         priority_state masmorra_cla /clandungeon/ running; clanDungeon; masmorra_marcar; return 0
     fi
+
     if priority_night_coliseum; then
         priority_state coliseu /coliseum/ running; coliseum_fight; return 0
     fi
+
     if arena_liberada; then
         priority_state arena /arena/ running; arena_duel; arena_marcar; return 0
     fi
+
     priority_state carreira /career/ running; career_func
     if priority_event_window || priority_clan_pending; then return 0; fi
+
     priority_state caverna /cave/ running; cave_routine
     if priority_event_window || priority_clan_pending; then return 0; fi
-    priority_state cabana_sabio /sage/ running; check_missions; check_rewards
+
+    priority_state liga /league/ running; league_play 2>/dev/null
     if priority_event_window || priority_clan_pending; then return 0; fi
+
     priority_state campanha /campaign/ running; campaign_func
     if priority_event_window || priority_clan_pending; then return 0; fi
-    priority_state missoes_gerais /quest/ running; check_missions; check_rewards
+
+    priority_state cabana_sabio /sage/ running; check_missions; check_rewards
     if priority_event_window || priority_clan_pending; then return 0; fi
-    # Bencao NAO e ativada automaticamente. O laboratorio continua apenas
-    # com o uso de elixir solicitado pelo fluxo existente.
+
+    if [ "${FUNC_auto_events:-y}" = "y" ]; then
+        priority_state evento_especial /event/ running; specialEvent
+        if priority_event_window || priority_clan_pending; then return 0; fi
+    fi
+
+    if [ "${FUNC_clan_missions:-y}" = "y" ]; then
+        priority_state missoes_cla /clan/quest/ running; clanQuests
+        if priority_event_window || priority_clan_pending; then return 0; fi
+    fi
+
+    # Elixir segue a configuração existente. Bênção continua bloqueada.
     priority_state laboratorio /lab/ running; use_elixir 2>/dev/null
     if priority_event_window || priority_clan_pending; then return 0; fi
+
     priority_state economia /trade/ running; func_trade
-    if [ -n "$CLD" ]; then priority_state tesouraria_cla "/clan/${CLD}/money/" running; clan_money; fi
+    if [ -n "$CLD" ]; then
+        priority_state tesouraria_cla "/clan/${CLD}/money/" running; clan_money
+    fi
+
+    return 0
 }
 
 twm_play() {
     echo "$RUN" > "$TMP/runmode_file" 2>/dev/null
     [ -n "$CLD" ] || clan_id 2>/dev/null
     load_config 2>/dev/null
-    # Nao usar ouro para acelerar a Caverna fora de uma missao do cla.
+
+    # Segurança adicional: mesmo que config.cfg diga y, a bênção nunca é
+    # habilitada neste agente.
+    FUNC_use_blessing=n
+    export FUNC_use_blessing
     FUNC_cave_boost=n
+    export FUNC_cave_boost
+
     while true; do
+        # 1) Cronograma de batalha é sempre a maior prioridade.
         if priority_event_window; then
-            priority_run_event; priority_poll; continue
+            priority_run_event
+            priority_poll
+            continue
         fi
+
+        # 2) Missão do clã vem antes de qualquer atividade secundária.
         if priority_run_clan; then
-            cq_concluir >/dev/null 2>&1; priority_poll; continue
+            cq_concluir >/dev/null 2>&1
+            priority_poll
+            continue
         fi
-        if priority_event_window || priority_clan_pending; then continue; fi
+
+        # Se uma prioridade apareceu durante uma consulta, não inicia uma
+        # atividade secundária.
+        if priority_event_window || priority_clan_pending; then
+            continue
+        fi
+
+        # 3) Somente então executa as atividades secundárias.
         priority_secondary
-        if priority_event_window || priority_clan_pending; then continue; fi
+
+        # Reavalia imediatamente ao terminar uma atividade.
+        if priority_event_window || priority_clan_pending; then
+            continue
+        fi
+
         messages_info 2>/dev/null
         atualiza_stats 2>/dev/null
         priority_state espera / idle
