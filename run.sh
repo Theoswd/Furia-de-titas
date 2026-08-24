@@ -1,12 +1,11 @@
-twm_play() {
+twm_play_legacy() {
     echo "$RUN" > "$TMP/runmode_file" 2>/dev/null
 
     if [ ! -s "$TMP/CLD" ]; then
         clan_id
     fi
 
-    # ORDEM DE PRIORIDADE DOS EVENTOS
-    # O case original e preservado como fallback de compatibilidade.
+    # Fluxo antigo mantido somente como fallback caso priority.sh esteja ausente.
     case `date +%H:%M` in
         (10:5[5-9]|18:5[5-9])
             if [ -n "$CLD" ]; then clanfight_start; fi
@@ -46,5 +45,21 @@ restart_script() {
     exit 0
 }
 
-# Scheduler de prioridade carregado por ultimo, substituindo twm_play.
-[ -f "$TWMDIR/priority.sh" ] && . "$TWMDIR/priority.sh"
+# IMPORTANTE: run.sh e carregado antes de trade.sh/check.sh/function.sh pelo
+# twm.sh. Portanto priority.sh NAO pode ser sourced aqui no topo, senao uma
+# funcao definida depois (como use_blessing em trade.sh) sobrescreve o
+# bloqueio do agente. Este loader so e executado quando twm_play e chamado,
+# isto e, depois que o twm.sh terminou de carregar todos os modulos.
+twm_play_priority_loader() {
+    if [ -f "$TWMDIR/priority.sh" ]; then
+        . "$TWMDIR/priority.sh"
+        # priority.sh redefine twm_play; esta chamada entra no scheduler novo.
+        twm_play "$@"
+        return $?
+    fi
+    twm_play_legacy "$@"
+}
+
+twm_play() {
+    twm_play_priority_loader "$@"
+}
