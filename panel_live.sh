@@ -1,68 +1,95 @@
 #!/bin/sh
-# panel_live.sh - camada de exibicao ao vivo, sem alterar o desenho base do panel.sh.
-# O panel.sh continua responsavel pelo layout. Esta camada substitui somente
-# as funcoes de sessao/combate para acrescentar o LED e a ultima acao da luta.
+# panel_live.sh - camada LIVE do painel.
+#
+# Regra: a coluna de atividade NAO usa scheduler, priority_state ou apelidos
+# internos do bot. A unica fonte e $TMP/pagina, gravado por info.sh a cada
+# requisicao real feita pela conta. O rotulo e apenas a area correspondente
+# ao caminho atual do jogo, no mesmo sentido usado pelas paginas /online/.
+
+pagina_nome_online() {
+    _po="$1"
+    [ -n "$_po" ] || _po="/"
+
+    # A ordem importa: /clandungeon, /clanfight etc. precisam ser tratados
+    # antes do prefixo generico /clan.
+    case "$_po" in
+        "/"|"/?out_gate_confirm=true"|"/?out_gate_confirm=true"*) _PO_NOME="Página Principal" ;;
+        "/?sign_in=1"*)     _PO_NOME="Entrando" ;;
+        /online*)            _PO_NOME="Online" ;;
+        /clandungeon*)       _PO_NOME="Masmorra" ;;
+        /clandmgfight*)      _PO_NOME="Duelo do Clã" ;;
+        /clanfight*)         _PO_NOME="Torneio dos Clãs" ;;
+        /clancoliseum*)      _PO_NOME="Coliseu do Clã" ;;
+        /clan*)              _PO_NOME="Clã" ;;
+        /fights*)            _PO_NOME="Cronograma de Batalhas" ;;
+        /arena*)             _PO_NOME="Arena" ;;
+        /career*)            _PO_NOME="Carreira" ;;
+        /cave*)              _PO_NOME="Caverna" ;;
+        /campaign*)          _PO_NOME="Campanha" ;;
+        /coliseum*)          _PO_NOME="Coliseu" ;;
+        /altars*)            _PO_NOME="Altares" ;;
+        /undying*)           _PO_NOME="Vale dos Imortais" ;;
+        /king*)              _PO_NOME="Rei dos Imortais" ;;
+        /flagfight*)         _PO_NOME="Batalha de Bandeiras" ;;
+        /league*)            _PO_NOME="Liga" ;;
+        /trade*)             _PO_NOME="Troca" ;;
+        /effshop*|/lab*)     _PO_NOME="Laboratório" ;;
+        /quest*)             _PO_NOME="Missões" ;;
+        /collector*)         _PO_NOME="Coleções" ;;
+        /relic*)             _PO_NOME="Relíquias" ;;
+        /sage*)              _PO_NOME="Cabana do Sábio" ;;
+        /inv*)               _PO_NOME="Inventário" ;;
+        /train*)             _PO_NOME="Treino" ;;
+        /fault*)             _PO_NOME="Falha" ;;
+        /collfight*)         _PO_NOME="Batalha Coletiva" ;;
+        /marathon*)          _PO_NOME="Maratona" ;;
+        /user*)              _PO_NOME="Herói" ;;
+        /settings*)          _PO_NOME="Configurações" ;;
+        /mail*)              _PO_NOME="Mensagens" ;;
+        /questrnd*)          _PO_NOME="Missão Aleatória" ;;
+        /logout*)            _PO_NOME="Saindo" ;;
+        *)                   _PO_NOME="Página" ;;
+    esac
+}
 
 aba_de() {
     _d="$1"
     ler_arq "$_d/pagina"; _p="$_LIDO"
-    [ -z "$_p" ] && _p="/"
+    [ -n "$_p" ] || _p="/"
 
-    case "$_p" in
-        /fights*) _nome="Agenda de Batalhas" ;;
-        /arena*) _nome="Arena" ;;
-        /career*) _nome="Carreira" ;;
-        /cave*) _nome="Caverna" ;;
-        /campaign*) _nome="Campanha" ;;
-        /coliseum*) _nome="Coliseu" ;;
-        /clancoliseum*) _nome="Coliseu do Clã" ;;
-        /clanfight*) _nome="Torneio dos Clãs" ;;
-        /clandungeon*|/clandmgfight*) _nome="Masmorra do Clã" ;;
-        /clan/*quest*) _nome="Missões do Clã" ;;
-        /clan/*built*) _nome="Estátua do Clã" ;;
-        /clan*) _nome="Clã" ;;
-        /altars*) _nome="Altares dos Deuses" ;;
-        /undying*) _nome="Vale dos Imortais" ;;
-        /king*) _nome="Rei dos Imortais" ;;
-        /flagfight*) _nome="Batalha de Bandeiras" ;;
-        /league*) _nome="Liga dos Favoritos" ;;
-        /trade*) _nome="Troca" ;;
-        /effshop*|/lab*) _nome="Aprimoramento" ;;
-        /quest*) _nome="Missões" ;;
-        /collector*) _nome="Coleções" ;;
-        /relic*) _nome="Relíquias" ;;
-        /sage*) _nome="Cabana do Sábio" ;;
-        /inv*) _nome="Inventário" ;;
-        /train*) _nome="Treino" ;;
-        /fault*) _nome="Falha" ;;
-        /collfight*) _nome="Batalha Coletiva" ;;
-        /marathon*) _nome="Maratona" ;;
-        /user*) _nome="Meu Herói" ;;
-        /settings*) _nome="Configurações" ;;
-        /mail*) _nome="Mensagens" ;;
-        /questrnd*) _nome="Missão Aleatória" ;;
-        /logout*) _nome="Saindo" ;;
-        /|/?out_gate_confirm=true) _nome="Página Principal" ;;
-        /?sign_in=1) _nome="Entrando" ;;
-        *) _nome="Página" ;;
-    esac
+    pagina_nome_online "$_p"
 
-    if [ -n "$_p" ] && [ "$_p" != "/" ]; then
-        _led="● LIVE"
+    # Mostra somente a localizacao atual. O caminho bruto continua disponivel
+    # em ~/.twm/BR_<conta>/pagina para diagnostico, mas nao polui o painel.
+    if [ "$_p" = "/" ] || [ "$_p" = "/?out_gate_confirm=true" ]; then
+        printf '○ %s' "$_PO_NOME"
     else
-        _led="○ /"
+        printf '● LIVE %s' "$_PO_NOME"
     fi
-
-    # Nome amigavel + LED + caminho exato da sessao.
-    printf '%s %s [%s]' "$_led" "$_nome" "$_p"
-    unset _d _p _nome _led
+    unset _d _p _PO_NOME
 }
 
-# Mantem o calculo de HP/dano do painel e acrescenta a ultima linha do
-# historico da luta do Coliseu. A linha vem de $TMP/col_report e desaparece
-# quando coliseum_fight termina.
+# Relatorio de combate somente enquanto a conta ESTA numa pagina de batalha.
+# HP/old_HP podem permanecer no disco depois da luta; por isso nunca usamos a
+# mera existencia desses arquivos como prova de combate ativo.
 combate_de() {
     _d="$1"
+    ler_arq "$_d/pagina"; _p="$_LIDO"
+
+    case "$_p" in
+        /coliseum*)
+            # No Coliseu o relatorio transitorio e a prova adicional de que a
+            # luta atual ainda esta ativa. coliseum.sh o apaga ao terminar.
+            [ -s "$_d/col_report" ] || { unset _d _p; return 0; }
+            ;;
+        /clanfight*|/clancoliseum*|/clandmgfight*|/flagfight*|/altars*|/undying*|/king*|/collfight*)
+            ;;
+        *)
+            unset _d _p
+            return 0
+            ;;
+    esac
+
     ler_arq "$_d/HP"; _hp="$_LIDO"
     ler_arq "$_d/old_HP"; _old="$_LIDO"
     case "$_hp"  in ''|*[!0-9]*) _hp=""  ;; esac
@@ -87,14 +114,15 @@ combate_de() {
     fi
 
     if [ -s "$_d/col_report" ]; then
-        # O historico e regravado pelo worker a cada resposta do jogo. tail
-        # aqui serve apenas para pegar a ultima acao; nao e mantido depois da
-        # luta. Linhas como "Thaydark acertar Você" e "Você usou Turbilhão"
-        # entram porque afetam diretamente a conta corrente.
-        _acao=$(tail -n 1 "$_d/col_report" 2>/dev/null)
+        # Pega a ultima linha usando apenas builtins do shell. Evita criar um
+        # processo tail por conta a cada redesenho, importante no Android.
+        _acao=""
+        while IFS= read -r _linha; do
+            [ -n "$_linha" ] && _acao="$_linha"
+        done < "$_d/col_report"
         [ -n "$_acao" ] && _texto="${_texto:+$_texto  |  }LIVE: $_acao"
     fi
 
     printf '%s' "$_texto"
-    unset _d _hp _old _dif _texto _acao
+    unset _d _p _hp _old _dif _texto _acao _linha
 }
