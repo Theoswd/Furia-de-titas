@@ -104,6 +104,11 @@ cq_ajudar() {
 # Missao parada com ouro suficiente: conclui pagando.
 # O limite vem de FUNC_quest_gold_min (padrao 1200).
 cq_forcar_ouro() {
+    # Concluir missao do cla pagando ouro e gasto de OURO, e a politica
+    # nega qualquer gasto de ouro. A funcao continua existindo para nao
+    # quebrar quem a chama, mas a tentativa para aqui e fica no ledger.
+    resource_allow gold "${FUNC_quest_gold_min:-1200}" quest_force_gold || return 1
+
     [ "${FUNC_quest_force_gold:-y}" = "y" ] || return 1
     _min=${FUNC_quest_gold_min:-1200}
     case "$_min" in ''|*[!0-9]*) _min=1200 ;; esac

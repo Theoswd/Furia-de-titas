@@ -166,7 +166,7 @@ FUNC_auto_events=y
 FUNC_clan_missions=y
 FUNC_clan_quests=y
 FUNC_clan_help=y
-FUNC_quest_force_gold=y
+FUNC_quest_force_gold=n
 FUNC_quest_gold_min=1200
 FUNC_arena_min=30
 FUNC_cq_min=15
@@ -174,7 +174,7 @@ FUNC_masmorra=y
 FUNC_estatua_horas=6
 FUNC_stats_min=3
 FUNC_clan_statue=y
-FUNC_cave_boost=y
+FUNC_cave_boost=n
 SCRIPT_PAUSED=n
 ALLIES=
 EOF

@@ -154,11 +154,16 @@ cave_start() {
 
         if [ "$MINERALS_FOUND" -eq 3 ] && [ "$HERBS_FOUND" -eq 0 ] && [ -n "$BOOST_LINK" ]; then
             read_boost_gold_cost
-            printf "3 ores detected! Increasing chance by 100%%\n"
-            fetch_page "$BOOST_LINK"
-            if [ "$BOOST_GOLD_COST" -gt 0 ]; then
-                GOLD_SPENT_TOTAL=$((GOLD_SPENT_TOTAL + BOOST_GOLD_COST))
-                CAN_ATTACK_MONSTER=1
+            # /cave/chance/2/ custa OURO. A politica nega, entao o link nao
+            # e acessado e CAN_ATTACK_MONSTER fica 0: o monstro logo abaixo
+            # e evitado em vez de enfrentado.
+            if resource_allow gold "$BOOST_GOLD_COST" cave_gold_boost; then
+                printf "3 ores detected! Increasing chance by 100%%\n"
+                fetch_page "$BOOST_LINK"
+                if [ "$BOOST_GOLD_COST" -gt 0 ]; then
+                    GOLD_SPENT_TOTAL=$((GOLD_SPENT_TOTAL + BOOST_GOLD_COST))
+                    CAN_ATTACK_MONSTER=1
+                fi
             fi
         fi
 
@@ -234,10 +239,14 @@ cave_routine() {
         HERBS_FOUND=`echo "$RESOURCES" | grep -E '^(6|7|8|9)$' | wc -l`
         BOOST_LINK=`grep -o -E '/cave/chance/2/[?]r=[0-9]+' "$TMP/SRC" | head -n 1`
 
+        # Segundo ponto de boost. Mesma politica: custa ouro, entao nao vai.
         if [ "$FUNC_cave_boost" = "y" ]; then
             if [ "$MINERALS_FOUND" -eq 3 ] && [ "$HERBS_FOUND" -eq 0 ] && [ -n "$BOOST_LINK" ]; then
-                printf "3 ores detected! Increasing chance by 100%%\n"
-                fetch_page "$BOOST_LINK"
+                read_boost_gold_cost
+                if resource_allow gold "$BOOST_GOLD_COST" cave_gold_boost; then
+                    printf "3 ores detected! Increasing chance by 100%%\n"
+                    fetch_page "$BOOST_LINK"
+                fi
             fi
         fi
 
