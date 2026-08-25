@@ -1,157 +1,194 @@
-#
-#/clanfight/dodge/?r=0
-#/clanfight/attack/?r=0
-#/clanfight/attackrandom/?r=0
-#/clanfight/heal/?r=0
-#/clanfight/stone/?r=0
-#/clanfight/grass/?r=0
-#/clanfight/?out_gate
+# clanfight.sh - Torneio do Cla
+# Mantem os nomes e caminhos do jogo; evita URL vazia e falso "ok".
+
+clanfight_parse() {
+    _cf_file="${1:-$TMP/SRC}"
+    [ -s "$_cf_file" ] || return 1
+
+    CF_ATK=`grep -o -E '/clanfight/attack/[?]r=[0-9]+' "$_cf_file" | sed -n '1p'`
+    CF_ATKRND=`grep -o -E '/clanfight/attackrandom/[?]r=[0-9]+' "$_cf_file" | sed -n '1p'`
+    CF_DODGE=`grep -o -E '/clanfight/dodge/[?]r=[0-9]+' "$_cf_file" | sed -n '1p'`
+    CF_HEAL=`grep -o -E '/clanfight/heal/[?]r=[0-9]+' "$_cf_file" | sed -n '1p'`
+    CF_GRASS=`grep -o -E '/clanfight/grass/[?]r=[0-9]+' "$_cf_file" | sed -n '1p'`
+
+    CF_HP=`grep -o -E "(hp)[^A-Za-z0-9]{1,4}[0-9]{1,7}" "$_cf_file" | grep -o -E '[0-9]{1,7}' | sed -n '1p'`
+    CF_ENEMY_HP=`grep -o -E "(nbsp)[^A-Za-z0-9]{1,2}[0-9]{1,7}" "$_cf_file" | grep -o -E '[0-9]{1,7}' | sed -n '1p'`
+    CF_CLAN=`grep -o -E '([[:upper:]][[:lower:]]{0,20}( [[:upper:]][[:lower:]]{0,17})?)[[:space:]]\(' "$_cf_file" | sed -n 's, [(],,;s, ,_,;2p'`
+
+    case "$CF_HP" in ''|*[!0-9]*) CF_HP=0 ;; esac
+    case "$CF_ENEMY_HP" in ''|*[!0-9]*) CF_ENEMY_HP=0 ;; esac
+    unset _cf_file
+    return 0
+}
+
+clanfight_em_batalha() {
+    [ -n "${CF_ATK:-}" ] || [ -n "${CF_ATKRND:-}" ] || \
+    [ -n "${CF_DODGE:-}" ] || [ -n "${CF_HEAL:-}" ]
+}
+
+clanfight_link_valido() {
+    case "$1" in
+        /clanfight/attack/?r=*|/clanfight/attackrandom/?r=*|/clanfight/dodge/?r=*|/clanfight/heal/?r=*|/clanfight/grass/?r=*) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
 clanfight_fight() {
-  cd "$TMP" || return 1
-  LA=4
-  HPER=48
-  RPER=15
-  awk -v ush="$(cat FULL)" -v hper="$HPER" 'BEGIN { printf "%.0f", ush * hper / 100 }' > HLHP
+    LA=4
+    HPER=48
+    RPER=15
+    CF_STARTED=0
+    CF_OLD_HP=0
+    CF_LAST_DODGE=$(( $(date +%s) - 30 ))
+    CF_LAST_HEAL=$(( $(date +%s) - 100 ))
+    CF_LAST_ATK=$(( $(date +%s) - LA ))
+    CF_DEADLINE=$(( $(date +%s) + 600 ))
 
-  cf_access() {
-    grep -o -E '(/[a-z]+/[a-z]{0,4}at[a-z]{0,3}k/[^A-Za-z0-9]r[^A-Za-z0-9][0-9]+)' "$TMP/SRC" | sed -n '1p' > ATK 2>/dev/null
-    grep -o -E '(/[a-z]+/at[a-z]{0,3}k[a-z]{3,6}/[^A-Za-z0-9]r[^A-Za-z0-9][0-9]+)' "$TMP/SRC" | sed -n 1p > ATKRND 2>/dev/null
-    grep -o -E '(/clanfight/dodge/[^A-Za-z0-9]r[^A-Za-z0-9][0-9]+)' "$TMP/SRC" | sed -n 1p > DODGE 2>/dev/null
-    grep -o -E '(/clanfight/heal/[^A-Za-z0-9]r[^A-Za-z0-9][0-9]+)' "$TMP/SRC" | sed -n 1p > HEAL 2>/dev/null
-    grep -o -E '(/clanfight/grass/[^A-Za-z0-9]r[^A-Za-z0-9][0-9]+)' "$TMP/SRC" > GRASS 2>/dev/null
-    grep -o -E '([[:upper:]][[:lower:]]{0,20}( [[:upper:]][[:lower:]]{0,17})?)[[:space:]]\(' "$TMP/SRC" | sed -n 's,\ [(],,;s,\ ,_,;2p' > CLAN 2>/dev/null
-    grep -o -E "(hp)[^A-Za-z0-9]{1,4}[0-9]{1,6}" "$TMP/SRC" | sed "s,hp[']\\/[>],,;s,\ ,," > HP 2>/dev/null
-    grep -o -E "(nbsp)[^A-Za-z0-9]{1,2}[0-9]{1,6}" "$TMP/SRC" | sed -n 's,nbsp[;],,;s,\ ,,;1p' > HP2 2>/dev/null
-    awk -v ush="$(cat HP)" -v rper="$RPER" 'BEGIN { printf "%.0f", ush * rper / 100 + ush }' > RHP
-    awk -v ush="$(cat FULL)" -v hper="$HPER" 'BEGIN { printf "%.0f", ush * hper / 100 }' > HLHP
-    if grep -q -o '/dodge/' "$TMP/SRC"; then
-      printf "Em batalha clanfight - HP: %s\n" "`cat HP`"
-    else
-      echo 1 > BREAK_LOOP
-      printf "Battle is over!\n"
-      sleep 2s
-    fi
-  }
+    case "${CF_FULL:-0}" in ''|*[!0-9]*) CF_FULL=0 ;; esac
 
-  cf_access
-  > BREAK_LOOP
-  cat HP > old_HP
-  echo $(($(date +%s) - 20)) > last_dodge
-  echo $(($(date +%s) - 90)) > last_heal
-  echo $(($(date +%s) - LA)) > last_atk
+    while [ "$(date +%s)" -lt "$CF_DEADLINE" ]; do
+        [ -s "$TMP/SRC" ] || fetch_page "/clanfight/" "$TMP/SRC" || return 1
 
-  # LIMITE DE TEMPO: BREAK_LOOP so e gravado quando a luta termina.
-  # Se o estado nunca resolver (pagina muda, servidor devolve algo
-  # inesperado), o laco ficava requisitando para sempre e a conta
-  # travava naquela batalha. Teto de 10 minutos.
-  FIGHT_BREAK=$(($(date +%s) + 600))
-  until [ -s "BREAK_LOOP" ] || [ "$(date +%s)" -gt "$FIGHT_BREAK" ]; do
-    cf_access
-    if ! grep -q -o 'txt smpl grey' "$TMP/SRC" && \
-       [ "$(($(date +%s) - $(cat last_dodge)))" -gt 20 ] && \
-       [ "$(($(date +%s) - $(cat last_dodge)))" -lt 300 ] && \
-       awk -v ush="$(cat HP)" -v oldhp="$(cat old_HP)" 'BEGIN { exit !(ush < oldhp) }'; then
-      (
-        run_curl_exec "${URL}$(cat DODGE)" > "$TMP/SRC"
-      ) </dev/null > /dev/null 2>&1 &
-      time_exit 17
-      cf_access
-      cat HP > old_HP
-      date +%s > last_dodge
+        if command -v is_logged_in >/dev/null 2>&1; then
+            _cf_page=`cat "$TMP/SRC" 2>/dev/null`
+            if ! is_logged_in "$_cf_page"; then
+                printf "ClanFight: sessao perdida\n"
+                unset _cf_page
+                return 1
+            fi
+            unset _cf_page
+        fi
 
-    elif awk -v ush="$(cat HP)" -v hlhp="$(cat HLHP)" 'BEGIN { exit !(ush < hlhp) }' && \
-         [ "$(($(date +%s) - $(cat last_heal)))" -gt 90 ] && \
-         [ "$(($(date +%s) - $(cat last_heal)))" -lt 300 ]; then
-      (
-        run_curl_exec "${URL}$(cat HEAL)" > "$TMP/SRC"
-      ) </dev/null > /dev/null 2>&1 &
-      time_exit 17
-      sleep 0.3s
-      (
-        run_curl_exec "${URL}$(cat GRASS)" > "$TMP/SRC"
-      ) </dev/null > /dev/null 2>&1 &
-      time_exit 17
-      cf_access
-      cat HP > FULL
-      cat HP > old_HP
-      date +%s > last_heal
+        clanfight_parse "$TMP/SRC" || return 1
 
-    elif awk -v latk="$(($(date +%s) - $(cat last_atk)))" -v atktime="$LA" 'BEGIN { exit !(latk != atktime) }' && \
-         ! grep -q -o 'txt smpl grey' "$TMP/SRC" && \
-         awk -v rhp="$(cat RHP)" -v enh="$(cat HP2)" 'BEGIN { exit !(rhp < enh) }' || \
-         awk -v latk="$(($(date +%s) - $(cat last_atk)))" -v atktime="$LA" 'BEGIN { exit !(latk != atktime) }' && \
-         ! grep -q -o 'txt smpl grey' "$TMP/SRC" && \
-         grep -q -o "$(cat CLAN)" "$TMP/callies.txt"; then
-      (
-        run_curl_exec "${URL}$(cat ATKRND)" > "$TMP/SRC"
-      ) </dev/null > /dev/null 2>&1 &
-      time_exit 17
-      cf_access
-      date +%s > last_atk
-      sleep 0.3s
+        if ! clanfight_em_batalha; then
+            if [ "$CF_STARTED" -eq 1 ]; then
+                fetch_page "/clanfight/" "$TMP/SRC" || return 1
+                clanfight_parse "$TMP/SRC" || return 1
+                if ! clanfight_em_batalha; then
+                    command -v combat_state_write >/dev/null 2>&1 && combat_state_write clanfight finished "" "$CF_HP"
+                    printf "ClanFight: batalha encerrada\n"
+                    return 0
+                fi
+            else
+                printf "ClanFight: batalha ainda nao disponivel\n"
+                return 3
+            fi
+        fi
 
-    elif awk -v latk="$(($(date +%s) - $(cat last_atk)))" -v atktime="$LA" 'BEGIN { exit !(latk > atktime) }'; then
-      (
-        run_curl_exec "${URL}$(cat ATK)" > "$TMP/SRC"
-      ) </dev/null > /dev/null 2>&1 &
-      time_exit 17
-      cf_access
-      date +%s > last_atk
-    else
-      (
-        run_curl_exec "${URL}/clanfight" > "$TMP/SRC"
-      ) </dev/null > /dev/null 2>&1 &
-      time_exit 17
-      cf_access
-      sleep 1s
-    fi
-  done
+        CF_STARTED=1
+        _cf_now=`date +%s`
+        _cf_action=""
+        _cf_label="waiting"
 
-  unset cf_access _random
-  func_unset
-  printf "ClanFight ok\n"
-  sleep 10s
-  [ -t 1 ] && clear
+        if [ "$CF_FULL" -gt 0 ] && [ "$CF_HP" -gt 0 ]; then
+            _cf_heal_limit=$(( CF_FULL * HPER / 100 ))
+        else
+            _cf_heal_limit=0
+        fi
+
+        if [ "$_cf_heal_limit" -gt 0 ] && [ "$CF_HP" -lt "$_cf_heal_limit" ] && \
+           [ $((_cf_now - CF_LAST_HEAL)) -ge 90 ] && [ -n "$CF_HEAL" ]; then
+            _cf_action="$CF_HEAL"
+            _cf_label="heal"
+        elif [ "$CF_OLD_HP" -gt 0 ] && [ "$CF_HP" -lt "$CF_OLD_HP" ] && \
+             [ $((_cf_now - CF_LAST_DODGE)) -ge 20 ] && [ -n "$CF_DODGE" ]; then
+            _cf_action="$CF_DODGE"
+            _cf_label="dodge"
+        elif [ $((_cf_now - CF_LAST_ATK)) -ge "$LA" ]; then
+            _cf_random=n
+            if [ -n "$CF_ATKRND" ]; then
+                if [ "$CF_HP" -gt 0 ] && [ "$CF_ENEMY_HP" -gt $(( CF_HP + (CF_HP * RPER / 100) )) ]; then
+                    _cf_random=y
+                elif [ -n "$CF_CLAN" ] && [ -s "$TMP/callies.txt" ] && grep -q -F "$CF_CLAN" "$TMP/callies.txt" 2>/dev/null; then
+                    _cf_random=y
+                fi
+            fi
+            if [ "$_cf_random" = "y" ]; then
+                _cf_action="$CF_ATKRND"
+                _cf_label="attackrandom"
+            elif [ -n "$CF_ATK" ]; then
+                _cf_action="$CF_ATK"
+                _cf_label="attack"
+            fi
+            unset _cf_random
+        fi
+
+        CF_OLD_HP="$CF_HP"
+
+        if [ -n "$_cf_action" ]; then
+            if ! clanfight_link_valido "$_cf_action"; then
+                printf "ClanFight: link invalido bloqueado: %s\n" "$_cf_action"
+                return 1
+            fi
+            command -v combat_state_write >/dev/null 2>&1 && combat_state_write clanfight fighting "$_cf_label" "$CF_HP"
+            if ! fetch_page "$_cf_action" "$TMP/SRC"; then
+                printf "ClanFight: falha em %s\n" "$_cf_label"
+                return 1
+            fi
+            case "$_cf_label" in
+                heal) CF_LAST_HEAL=$_cf_now ;;
+                dodge) CF_LAST_DODGE=$_cf_now ;;
+                attack|attackrandom) CF_LAST_ATK=$_cf_now ;;
+            esac
+
+            if [ "$_cf_label" = "heal" ]; then
+                clanfight_parse "$TMP/SRC" >/dev/null 2>&1 || :
+                if [ -n "${CF_GRASS:-}" ] && clanfight_link_valido "$CF_GRASS"; then
+                    fetch_page "$CF_GRASS" "$TMP/SRC" || return 1
+                fi
+            fi
+        else
+            command -v combat_state_write >/dev/null 2>&1 && combat_state_write clanfight fighting waiting "$CF_HP"
+            fetch_page "/clanfight/" "$TMP/SRC" || return 1
+        fi
+
+        unset _cf_action _cf_label _cf_heal_limit _cf_now
+        sleep 1
+    done
+
+    command -v combat_state_write >/dev/null 2>&1 && combat_state_write clanfight timeout "" "${CF_HP:-0}"
+    printf "ClanFight: timeout sem prova de fim; nao marcado como concluido\n"
+    return 4
 }
 
 clanfight_start() {
-  cd "$TMP" || return 1
-  case `date +%H:%M` in
-  10:5[5-9]|18:5[5-9])
-    (
-      run_curl_exec "$URL/train" | grep -o -E '\(([0-9]+)\)' | sed 's/[()]//g' > "$TMP/FULL"
-    ) </dev/null > /dev/null 2>&1 &
-    time_exit 17
-    (
-      run_curl_exec "$URL/clanfight/?close=reward" > "$TMP/SRC"
-    ) </dev/null > /dev/null 2>&1 &
-    time_exit 17
-    (
-      run_curl_exec "$URL/clanfight/enterFight" > "$TMP/SRC"
-    ) </dev/null > /dev/null 2>&1 &
-    time_exit 17
-    printf "The clan tournament will be started...\n"
-    while (case `date +%M:%S` in (59:[3-5][0-9]) exit 1;; esac); do
-      sleep 3
+    case `date +%H:%M` in
+        10:5[5-9]|18:5[5-9]) ;;
+        *) return 3 ;;
+    esac
+
+    printf "ClanFight: preparando Torneio do Cla\n"
+
+    fetch_page "/train" "$TMP/CLANFIGHT_TRAIN" || return 1
+    CF_FULL=`grep -o -E '\(([0-9]+)\)' "$TMP/CLANFIGHT_TRAIN" | sed 's/[()]//g' | sed -n '1p'`
+    case "$CF_FULL" in ''|*[!0-9]*) CF_FULL=0 ;; esac
+
+    fetch_page "/clanfight/?close=reward" "$TMP/SRC" >/dev/null 2>&1 || :
+    fetch_page "/clanfight/enterFight" "$TMP/SRC" || return 1
+
+    while :; do
+        case `date +%M:%S` in 59:[3-5][0-9]) break ;; esac
+        clanfight_parse "$TMP/SRC" >/dev/null 2>&1 || :
+        clanfight_em_batalha && break
+        sleep 3
     done
-    (
-      run_curl_exec "$URL/clanfight/enterFight" > "$TMP/SRC"
-    ) </dev/null > /dev/null 2>&1 &
-    time_exit 17
-    grep -o -E '(/[a-z]+(/[a-z]+/[^A-Za-z0-9]r[^A-Za-z0-9][0-9]+|/))' "$TMP/SRC" | sed -n '1p' > "$TMP/ACCESS" 2>/dev/null
-    printf " Entering...\n"
-    printf " Waiting...\n"
-    BREAK=$(($(date +%s) + 60))
-    until grep -q -o 'clanfight/dodge/' "$TMP/ACCESS" || [ "$(date +%s)" -gt "$BREAK" ]; do
-      printf " ...\n%s\n" "`cat "$TMP/ACCESS"`"
-      (
-        run_curl_exec "${URL}/clanfight/" > "$TMP/SRC"
-      ) </dev/null > /dev/null 2>&1 &
-      time_exit 17
-      grep -o -E '(/clanfight(/[a-z]+/[^A-Za-z0-9]r[^A-Za-z0-9][0-9]+|/))' "$TMP/SRC" | sed -n '1p' > "$TMP/ACCESS" 2>/dev/null
-      sleep 3
+
+    fetch_page "/clanfight/enterFight" "$TMP/SRC" || return 1
+
+    _cf_wait_end=$(( $(date +%s) + 90 ))
+    while [ "$(date +%s)" -lt "$_cf_wait_end" ]; do
+        clanfight_parse "$TMP/SRC" >/dev/null 2>&1 || :
+        if clanfight_em_batalha; then
+            unset _cf_wait_end
+            clanfight_fight
+            return $?
+        fi
+        fetch_page "/clanfight/" "$TMP/SRC" || return 1
+        sleep 3
     done
-    clanfight_fight
-    ;;
-  esac
+
+    unset _cf_wait_end
+    printf "ClanFight: nao foi possivel confirmar inicio da batalha\n"
+    return 4
 }
