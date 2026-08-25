@@ -25,7 +25,7 @@ cq_ids() {
 cq_pagina() {
     [ -n "$CLD" ] || clan_id
     [ -n "$CLD" ] || return 1
-    fetch_page "/clan/${CLD}/quest/" "$TMP/CQUEST"
+    fetch_page "/clan/${CLD}/quest/" "$TMP/CQUEST" || return 1
     [ -s "$TMP/CQUEST" ]
 }
 
@@ -38,9 +38,10 @@ cq_tomar() {
     for _id in `cq_ids "$_tipo"`; do
         _cl=`grep -o -E "/clan/${CLD}/quest/take/${_id}/[?]r=[0-9]+" "$TMP/CQUEST" | sed -n 1p`
         if [ -n "$_cl" ]; then
-            fetch_page "$_cl"
-            printf "Missao do cla tomada (%s #%s)\n" "$_tipo" "$_id"
-            _tomou=0
+            if fetch_page "$_cl"; then
+                printf "Missao do cla: tomada (%s #%s)\n" "$_tipo" "$_id"
+                _tomou=0
+            fi
             break
         fi
     done
@@ -55,18 +56,43 @@ cq_concluir() {
     for _id in 1 2 3 4 5 6 7 8; do
         _cl=`grep -o -E "/clan/${CLD}/quest/end/${_id}/?[?]r=[0-9]+" "$TMP/CQUEST" | sed -n 1p`
         if [ -n "$_cl" ]; then
-            fetch_page "$_cl"
-            printf "Missao do cla concluida (#%s)\n" "$_id"
-            _n=$((_n + 1))
+            if fetch_page "$_cl"; then
+                printf "Missao do cla #%s: coleta enviada\n" "$_id"
+                _n=$((_n + 1))
+                cq_pagina >/dev/null 2>&1 || break
+            fi
         fi
     done
     unset _id _cl
     [ "$_n" -gt 0 ]
 }
 
-# Ajuda companheiros SEM GASTAR OURO.
-# Qualquer link identificado como pago e ignorado; nao existe excecao de
-# "uma vez por ciclo". Esta regra e absoluta no agente de prioridade.
+# Retorna 0 apenas se o contexto do link NAO apresentar indicio de custo em
+# ouro. E fail-closed: se nao for possivel localizar o link no HTML, nega.
+cq_help_sem_ouro() {
+    _href="$1"
+    _ctx=`awk -v needle="$_href" '
+        {
+            p=index($0, needle)
+            if (p > 0) {
+                s=p-160; if (s < 1) s=1
+                print substr($0, s, length(needle)+320)
+                exit
+            }
+        }
+    ' "$TMP/CQUEST" 2>/dev/null`
+
+    [ -n "$_ctx" ] || { unset _href _ctx; return 1; }
+    if printf '%s' "$_ctx" | grep -qiE 'gold\.png|gold|ouro|pagar|comprar|pay|buy'; then
+        unset _href _ctx
+        return 1
+    fi
+    unset _href _ctx
+    return 0
+}
+
+# Ajuda companheiros SEM GASTAR OURO. O link legado /help nunca e seguido por
+# checkQuest(); toda ajuda passa por esta funcao e pelo contexto do HTML.
 cq_ajudar() {
     [ "${FUNC_clan_help:-y}" = "y" ] || return 1
     cq_pagina || return 1
@@ -76,44 +102,25 @@ cq_ajudar() {
         _cl=`grep -o -E "/clan/${CLD}/quest/help/${_id}/?[?]r=[0-9]+[^\"' <]*" "$TMP/CQUEST" | sed -n 1p`
         [ -n "$_cl" ] || continue
 
-        # Nunca seguir links pagos.
-        if printf '%s' "$_cl" | grep -qiE 'gold|pay|buy|confirm'; then
-            printf "Ajuda paga ignorada (#%s)\n" "$_id"
+        if ! cq_help_sem_ouro "$_cl"; then
+            printf "Ajuda do cla ignorada por seguranca/custo (#%s)\n" "$_id"
             continue
         fi
 
-        fetch_page "$_cl"
-        printf "Ajuda gratuita em missao do cla (#%s)\n" "$_id"
-        _n=$((_n + 1))
+        if fetch_page "$_cl"; then
+            printf "Ajuda do cla sem indicador de ouro: enviada (#%s)\n" "$_id"
+            _n=$((_n + 1))
+            cq_pagina >/dev/null 2>&1 || break
+        fi
     done
     unset _id _cl
     [ "$_n" -gt 0 ]
 }
 
-# Mantido por compatibilidade, mas o scheduler de prioridade NAO chama esta
-# funcao automaticamente. Qualquer uso de ouro para concluir missao exige um
-# fluxo explicitamente habilitado fora do agente atual.
+# Compatibilidade: conclusao forcada com ouro permanece bloqueada por default
+# e tambem e forcada para n em function.sh/priority.sh.
 cq_forcar_ouro() {
     [ "${FUNC_quest_force_gold:-n}" = "y" ] || return 1
-    _min=${FUNC_quest_gold_min:-1200}
-    case "$_min" in ''|*[!0-9]*) _min=1200 ;; esac
-
-    cq_pagina || return 1
-    _ouro=`grep -o -E "gold\.png' alt='g'/> ?[0-9][0-9.,']{0,14}[KMBkmb]?" "$TMP/CQUEST" | sed -E "s@.*/> ?@@" | head -n1`
-    _ouro=`valor_num "$_ouro"`
-    case "$_ouro" in ''|*[!0-9]*) return 1 ;; esac
-    [ "$_ouro" -gt "$_min" ] || return 1
-
-    for _id in 1 2 3 4 5 6 7 8; do
-        _cl=`grep -o -E "/clan/${CLD}/quest/(finish|complete|endGold|forGold)/${_id}/?[?]r=[0-9]+" "$TMP/CQUEST" | sed -n 1p`
-        if [ -n "$_cl" ]; then
-            fetch_page "$_cl"
-            printf "Missao do cla concluida com ouro (#%s, ouro %s)\n" "$_id" "$_ouro"
-            unset _id _cl _ouro _min
-            return 0
-        fi
-    done
-    unset _id _cl _ouro _min
     return 1
 }
 
