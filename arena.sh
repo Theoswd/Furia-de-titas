@@ -47,17 +47,24 @@ arena_duel() {
     checkQuest 4 apply
 
     fetch_page "/arena/"
+    # Diagnostico: guarda a ultima pagina da arena, para inspecionar quando
+    # a conta "vai na arena" mas nao ataca. Fica em ~/.twm/BR_<conta>/.
+    cp "$TMP/SRC" "$TMP/arena_debug.html" 2>/dev/null
 
     BREAK=$(($(date +%s) + 60))
     count=0
 
-    until grep -q -o 'lab/wizard' "$TMP/SRC" || [ "$(date +%s)" -gt "$BREAK" ]; do
-        ACCESS=`grep -o -E '(/arena/attack/1/[?]r[=][0-9]+)' "$TMP/SRC" | sed -n '1p'`
-        # Sem link de ataque a arena acabou: sai em vez de repetir
-        # fetch_page com URL vazia (que baixa a home) por 60 segundos.
+    # CORRECAO: o laco era "until grep 'lab/wizard' ...". Em alguns estados a
+    # pagina da arena ja traz o link do Laboratorio do Mago (lab/wizard), e
+    # entao o laco terminava ANTES de qualquer ataque — a conta aparecia
+    # "na arena" no painel, mas a energia nao caia e nenhum "Attack" saia.
+    # Agora quem manda e a PRESENCA do link de ataque real (com nonce): ataca
+    # enquanto houver, dentro do teto de 60s. Slot generico ([0-9]+) em vez
+    # de fixo em /1/, para cobrir qualquer posicao de adversario.
+    while [ "$(date +%s)" -lt "$BREAK" ]; do
+        ACCESS=`grep -o -E '/arena/attack/[0-9]+/[?]r[=][0-9]+' "$TMP/SRC" | sed -n '1p'`
         if [ -z "$ACCESS" ]; then
-            printf "  Arena sem ataques disponiveis
-"
+            printf "  Arena: sem ataque disponivel agora (ver arena_debug.html)\n"
             break
         fi
         fetch_page "$ACCESS"
