@@ -1,5 +1,5 @@
 #!/bin/sh
-# test_agent.sh - validacao estatica + testes offline V2.1.1.
+# test_agent.sh - validacao estatica + testes offline V2.1.2.
 # NAO faz login, NAO acessa o jogo e NAO executa atividades reais.
 
 set -u
@@ -12,7 +12,7 @@ ok()   { PASS=$((PASS + 1)); printf '[OK]   %s\n' "$*"; }
 fail() { FAIL=$((FAIL + 1)); printf '[FAIL] %s\n' "$*"; }
 warn() { WARN=$((WARN + 1)); printf '[WARN] %s\n' "$*"; }
 
-printf '=== Furia de Titas - auditoria segura V2.1.1 ===\n'
+printf '=== Furia de Titas - auditoria segura V2.1.2 ===\n'
 
 case "$(uname -s 2>/dev/null)" in
     Linux)
@@ -22,7 +22,7 @@ case "$(uname -s 2>/dev/null)" in
     *) warn "plataforma nao validada: $(uname -s 2>/dev/null)" ;;
 esac
 
-for f in play.sh worker.sh twm.sh run.sh priority.sh function.sh trade.sh blessing.sh clanquest.sh clanid.sh crono.sh info.sh panel.sh panel_live.sh status.sh state.sh action_runner.sh resource_guard.sh test_agent_runtime.sh agent_manifest.json; do
+for f in play.sh worker.sh twm.sh run.sh priority.sh function.sh trade.sh blessing.sh clanquest.sh clanid.sh clanfight.sh crono.sh info.sh panel.sh panel_live.sh status.sh state.sh action_runner.sh resource_guard.sh test_agent_runtime.sh agent_manifest.json; do
     if [ -f "$ROOT/$f" ]; then ok "$f presente"; else fail "$f ausente"; fi
 done
 
@@ -95,6 +95,46 @@ if grep -q 'priority_state cronograma /fights/timetable/ returned' "$ROOT/priori
 if grep -q 'ARENA_ATTACKS=0' "$ROOT/arena.sh" && grep -q '0|3) arena_marcar' "$ROOT/priority.sh" && grep -q '0|3) arena_marcar' "$ROOT/crono.sh"; then ok 'Arena so marca cooldown em retorno valido'; else fail 'Arena pode marcar cooldown apos falha'; fi
 
 if grep -q '/clandungeon/executar' "$ROOT/clanid.sh" && grep -q '"$_n" -lt 10' "$ROOT/clanid.sh" && grep -q 'if clanDungeon; then' "$ROOT/crono.sh"; then ok 'Masmorra: executar, limite 10 e marcador condicionado'; else fail 'fluxo da Masmorra incompleto'; fi
+
+# ClanFight: sem URL vazia, fim normal separado de timeout e estado LIVE.
+if grep -q '^clanfight_link_valido()' "$ROOT/clanfight.sh" && \
+   grep -q 'timeout sem prova de fim' "$ROOT/clanfight.sh" && \
+   grep -q 'return 4' "$ROOT/clanfight.sh" && \
+   grep -q 'combat_state_write clanfight fighting' "$ROOT/clanfight.sh" && \
+   ! grep -q 'ClanFight ok' "$ROOT/clanfight.sh"; then
+    ok 'ClanFight valida links, distingue timeout e publica estado real'
+else
+    fail 'ClanFight ainda possui falso sucesso ou acao insegura'
+fi
+
+# O guard interno nao pode consultar missao do cla a cada ataque.
+_pg_block=`awk '/^priority_guard\(\)/,/^}/' "$ROOT/priority.sh"`
+if ! printf '%s\n' "$_pg_block" | grep -q 'priority_clan_pending' && \
+   printf '%s\n' "$_pg_block" | grep -q 'priority_event_window'; then
+    ok 'guard interno nao interrompe atividade por consulta repetida ao cla'
+else
+    fail 'guard interno ainda pode bloquear a propria missao/atividade'
+fi
+unset _pg_block
+
+if grep -q '^priority_before_secondary()' "$ROOT/priority.sh" && \
+   grep -q 'priority_task_due missions 300' "$ROOT/priority.sh" && \
+   grep -q 'priority_task_due routine 600' "$ROOT/priority.sh" && \
+   grep -q 'priority_task_due coliseum 300' "$ROOT/priority.sh"; then
+    ok 'atividades fora do cronograma possuem cadencia e checagem de cla antes de executar'
+else
+    fail 'scheduler secundario ainda pode deixar atividades paradas'
+fi
+
+# Missoes gerais precisam aparecer antes do Coliseu no arquivo, para a janela
+# noturna nao monopolizar a conta durante horas.
+_mline=`grep -n 'priority_task_due missions 300' "$ROOT/priority.sh" | sed -n '1s/:.*//p'`
+_cline=`grep -n 'priority_task_due coliseum 300' "$ROOT/priority.sh" | sed -n '1s/:.*//p'`
+case "$_mline:$_cline" in
+    *[!0-9:]*|:*) fail 'nao foi possivel validar ordem Missoes/Coliseu' ;;
+    *) if [ "$_mline" -lt "$_cline" ]; then ok 'Missoes gerais sao verificadas antes do Coliseu'; else fail 'Coliseu ainda antecede Missoes gerais'; fi ;;
+esac
+unset _mline _cline
 
 if grep -q 'evento vazio ignorado' "$ROOT/check.sh" && grep -q "sed -n '1p'" "$ROOT/check.sh"; then ok 'apply_event rejeita evento vazio e usa um link'; else fail 'apply_event inseguro'; fi
 
