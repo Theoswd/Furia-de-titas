@@ -27,9 +27,9 @@ priority_poll() {
     sleep "$_p"
 }
 
-# Fallback horario. O cronograma remoto e consultado para diagnostico/cache,
-# mas nao fingimos que o parser remoto esta validado enquanto nao conhecemos
-# um formato estavel da pagina /fights/timetable/.
+# Fallback horario. O cronograma remoto e consultado/cacheado, mas o parser
+# remoto ainda esta marcado como pendente de validacao no manifest. Nao
+# fingimos que o HTML remoto e autoritativo antes de validar seu formato.
 priority_event_window() {
     case "$(date +%H:%M)" in
         10:5[5-9]|18:5[5-9]|13:5[5-9]|20:5[5-9]|09:5[5-9]|15:5[5-9]|21:5[5-9]|12:2[5-9]|16:2[5-9]|22:2[5-9]|10:2[8-9]|14:5[8-9]|10:1[0-4]|16:1[0-4]|09:2[5-9]|21:2[5-9]) return 0 ;;
@@ -103,6 +103,20 @@ priority_run_event() {
         return 3
     fi
 
+    if command -v event_retry_allowed >/dev/null 2>&1 && ! event_retry_allowed "$_slot"; then
+        _tries=`event_retry_count "$_slot" 2>/dev/null`
+        case "$_tries" in ''|*[!0-9]*) _tries=0 ;; esac
+        if [ "$_tries" -ge 3 ]; then
+            command -v event_slot_mark >/dev/null 2>&1 && event_slot_mark "$_slot"
+            priority_state cronograma /fights/timetable/ failed "limite de 3 tentativas atingido: $_slot"
+            unset _ev _slot _tries
+            return 1
+        fi
+        priority_state cronograma /fights/timetable/ waiting "retry em cooldown: tentativa $_tries/3"
+        unset _ev _slot _tries
+        return 4
+    fi
+
     command -v event_lock_start >/dev/null 2>&1 && event_lock_start "$_ev"
     command -v combat_state_write >/dev/null 2>&1 && combat_state_write "$_ev" waiting "" ""
 
@@ -136,11 +150,9 @@ priority_run_event() {
 
     case "$_rc" in
         0)
-            # O modulo retornou sem erro. Nao chamamos isto de "finished"
-            # porque os modulos legados ainda nao provam semanticamente o fim.
             command -v event_lock_finish >/dev/null 2>&1 && event_lock_finish "$_ev" returned
             command -v event_slot_mark >/dev/null 2>&1 && event_slot_mark "$_slot"
-            priority_state cronograma /fights/timetable/ returned "modulo retornou sem erro"
+            priority_state cronograma /fights/timetable/ returned "modulo retornou sem erro; fim semantico ainda nao provado"
             ;;
         3)
             command -v event_lock_finish >/dev/null 2>&1 && event_lock_finish "$_ev" skipped
@@ -149,7 +161,16 @@ priority_run_event() {
             ;;
         *)
             command -v event_lock_finish >/dev/null 2>&1 && event_lock_finish "$_ev" failed
-            priority_state cronograma /fights/timetable/ failed "rc=$_rc"
+            command -v event_retry_mark >/dev/null 2>&1 && event_retry_mark "$_slot"
+            _tries=`event_retry_count "$_slot" 2>/dev/null`
+            case "$_tries" in ''|*[!0-9]*) _tries=1 ;; esac
+            if [ "$_tries" -ge 3 ]; then
+                command -v event_slot_mark >/dev/null 2>&1 && event_slot_mark "$_slot"
+                priority_state cronograma /fights/timetable/ failed "rc=$_rc; retries esgotados"
+            else
+                priority_state cronograma /fights/timetable/ failed "rc=$_rc; tentativa $_tries/3"
+            fi
+            unset _tries
             ;;
     esac
 
@@ -255,9 +276,7 @@ priority_secondary() {
         priority_state arena /arena/ running
         arena_duel
         _arc=$?
-        case "$_arc" in
-            0|3) arena_marcar ;;
-        esac
+        case "$_arc" in 0|3) arena_marcar ;; esac
         [ "$_arc" -eq 2 ] && { unset _arc; return 0; }
         unset _arc
         return 0
@@ -294,8 +313,7 @@ priority_secondary() {
     priority_state economia /trade/ running
     func_trade
 
-    # Tesouraria e estatua ficam fail-closed nesta fase: as implementacoes
-    # antigas nao obedeciam a politica economica definida.
+    # Tesouraria e estatua ficam fail-closed nesta fase.
     return 0
 }
 
