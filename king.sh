@@ -19,6 +19,7 @@ king_fight() {
     HLHP=`awk -v ush="$(cat FULL)" -v hper="$HPER" 'BEGIN { printf "%.0f", ush * hper / 100 }'`
     if grep -q -o '/dodge/' "$TMP/SRC"; then
       printf "Em batalha - HP: %s\n" "`cat HP`"
+      battle_panel_write "$TMP/SRC"
     else
       (
         run_curl_exec "${URL}/king" > "$TMP/SRC"

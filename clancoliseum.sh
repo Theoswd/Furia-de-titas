@@ -20,6 +20,7 @@ clancoliseum_fight() {
 
     if grep -q -o '/dodge/' "$src_ram"; then
       printf "Em batalha clancoliseum - HP: %s\n" "`cat USH`"
+      battle_panel_write "$src_ram"
     else
       echo 1 > BREAK_LOOP
       printf "Battle over!\n"

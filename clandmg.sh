@@ -26,6 +26,7 @@ clandmgfight_fight() {
     awk -v ush="$(cat FULL)" -v hper="$HPER" 'BEGIN { printf "%.0f", ush * hper / 100 }' > HLHP
     if grep -q -o '/dodge/' "$TMP/SRC"; then
       printf "Em batalha clandmg - HP: %s\n" "`cat HP`"
+      battle_panel_write "$TMP/SRC"
     else
       echo 1 > BREAK_LOOP
       printf "Battle is over!\n"

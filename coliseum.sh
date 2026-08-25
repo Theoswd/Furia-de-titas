@@ -83,6 +83,7 @@ coliseum_fight() {
 
             if grep -q -o '/dodge/' "$src_ram"; then
                 printf "Em batalha - HP: %s\n" "$USH"
+                battle_panel_write "$src_ram"
             else
                 if grep -q -o '?end_fight=true' "$src_ram"; then
                     if awk -v ltime="$(($(date +%s) - first_time))" 'BEGIN { exit !(ltime < 300) }'; then

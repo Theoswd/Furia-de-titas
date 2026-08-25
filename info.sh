@@ -473,3 +473,41 @@ valor_num() {
     awk -v d="$_dg" -v m="$_mu" 'BEGIN{ printf "%.0f", d*m }'
     unset _v _mu _dg
 }
+
+# ====================================================================
+# PAINEL DE BATALHA AO VIVO
+# ====================================================================
+# Reconstroi o log de batalha (dano recebido/causado, habilidades usadas,
+# abates) a partir do HTML CRU da pagina de luta que o modulo de combate
+# acabou de baixar. NAO usa w3m: so tr/sed/grep, que existem no toybox do
+# Android (E22) e no WSL. Roda dentro do worker, durante a batalha, onde o
+# custo e irrelevante perto da requisicao curl.
+#
+# Escreve em $TMP/battle_panel (ultimas 8 acoes) e carimba a hora em
+# $TMP/battle_panel_ts, para o painel do status.sh mostrar so o que e
+# recente e apagar sozinho quando a luta acaba.
+#
+# Tokens neutros no arquivo — (0)=time vermelho, (1)=time azul, [X]=abate —
+# convertidos em emoji pelo painel so quando TWM_EMOJI=1, para nao poluir
+# terminais sem fonte de emoji.
+#
+# $1 = arquivo com o HTML da batalha (varia por modulo: SRC, col_src, etc.)
+battle_panel_write() {
+    [ -r "$1" ] || return 0
+    [ -n "$TMP" ] || return 0
+    tr '\n' ' ' < "$1" 2>/dev/null \
+      | sed -e 's/<br[^>]*>/\n/g' \
+      | sed -e 's#<img[^>]*race/0\.png[^>]*>#(0) #g' \
+            -e 's#<img[^>]*race/1\.png[^>]*>#(1) #g' \
+            -e 's#<img[^>]*rip\.png[^>]*>#[X] #g' \
+            -e 's#<img[^>]*>##g' \
+            -e 's#<span class="bold">\([0-9]*\)</span>#\1#g' \
+            -e 's#<span class="quality[^"]*">\([^<]*\)</span>#[\1]#g' \
+            -e 's#<[^>]*>##g' \
+            -e 's#&nbsp;# #g; s#&amp;#\&#g' \
+      | sed -e 's/[[:space:]]\{1,\}/ /g; s/^ //; s/ $//' \
+            -e 's/ critico/ (crit)/g; s/ crítico/ (crit)/g' \
+      | grep -E 'acertar|assassinou|usou' \
+      | tail -n 8 > "$TMP/battle_panel" 2>/dev/null
+    date +%s > "$TMP/battle_panel_ts" 2>/dev/null
+}

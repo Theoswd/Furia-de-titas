@@ -18,6 +18,7 @@ altars_fight() {
     awk -v ush="$(cat FULL)" -v hper="$(cat HPER)" 'BEGIN { printf "%.0f", ush * hper / 100 }' > HLHP
     if grep -q -o '/dodge/' "$TMP/src.html"; then
       printf "Em batalha - HP: %s\n" "`cat HP`"
+      battle_panel_write "$TMP/src.html"
     else
       echo 1 > BREAK_LOOP
       printf "Battle over!\n"

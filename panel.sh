@@ -320,6 +320,81 @@ combate_de() {
     unset _d _hp _old _dif
 }
 
+# COMBATE AO VIVO — log completo de todas as contas em batalha.
+#
+# Os modulos de combate escrevem $TMP/battle_panel (via battle_panel_write,
+# no info.sh) enquanto lutam, e carimbam battle_panel_ts. Aqui so lemos: se
+# o carimbo for recente (<=90s) mostramos o log; passou a luta, some sozinho.
+# Somente leitura — nunca toca em processo, igual ao resto do painel.
+painel_batalha() {
+    _bw="$1"; case "$_bw" in ''|*[!0-9]*) _bw=80 ;; esac
+    _bnow=$(date +%s)
+    _bhead=0
+    while IFS='|' read -r _bsrv _buser _bx <&4; do
+        limpa_campo "$_bsrv";  _bsrv="$_CF"
+        limpa_campo "$_buser"; _buser="$_CF"
+        case "$_bsrv" in ''|\#*|*[!0-9]*) continue ;; esac
+        [ -z "$_buser" ] && continue
+        _bd="$HOME/.twm/BR_${_buser}"
+        [ -s "$_bd/battle_panel" ] || continue
+        ler_arq "$_bd/battle_panel_ts"; _bts="$_LIDO"
+        case "$_bts" in ''|*[!0-9]*) _bts=0 ;; esac
+        [ "$((_bnow - _bts))" -le 90 ] || continue
+
+        if [ "$_bhead" = 0 ]; then
+            painel_regua "$_bw"
+            printf "  %b%sCOMBATE AO VIVO%b\n" "$C_CYAN$C_BOLD" "$I_ACT" "$C_RESET"
+            _bhead=1
+        fi
+        printf "  %b%s%b\n" "$C_WHITE" "$_buser" "$C_RESET"
+        while IFS= read -r _bln; do
+            [ -n "$_bln" ] || continue
+            # Emoji opcional (mesmo criterio do resto do painel).
+            if [ "${TWM_EMOJI:-0}" = "1" ]; then
+                _bln=$(printf '%s' "$_bln" | sed 's/(0)/🔴/g; s/(1)/🔵/g; s/\[X\]/💀/g')
+            fi
+            # Dano recebido em vermelho; causado/abate em verde; resto neutro.
+            case "$_bln" in
+                *"acertar Você"*|*"acertar Voce"*)                 _bc="$C_RED" ;;
+                "Você acertar"*|"Voce acertar"*|*assassinou*)      _bc="$C_GREEN" ;;
+                *usou*)                                            _bc="$C_DIM" ;;
+                *)                                                 _bc="$C_GRAY" ;;
+            esac
+            printf "    %b%.*s%b\n" "$_bc" "$((_bw - 4))" "$_bln" "$C_RESET"
+        done < "$_bd/battle_panel"
+    done 4< "$ACCOUNTS_FILE"
+    unset _bw _bnow _bhead _bsrv _buser _bx _bd _bts _bln _bc
+}
+
+# CHAT — uma caixa com o chat GERAL em cima e o do CLA embaixo. Le dois
+# arquivos compartilhados que um worker atualiza a cada 3 min (atualiza_chat,
+# no info.sh). Somente leitura; se os arquivos ainda nao existem, nao desenha.
+painel_chat() {
+    _cw="$1"; case "$_cw" in ''|*[!0-9]*) _cw=80 ;; esac
+    _cg="$HOME/.twm/chat_geral"
+    _cc="$HOME/.twm/chat_clan"
+    [ -s "$_cg" ] || [ -s "$_cc" ] || return 0
+
+    painel_regua "$_cw"
+    printf "  %b%sCHAT GERAL%b\n" "$C_CYAN$C_BOLD" "$I_TIT" "$C_RESET"
+    if [ -s "$_cg" ]; then
+        while IFS= read -r _cl; do
+            printf "  %b%.*s%b\n" "$C_GRAY" "$((_cw - 2))" "$_cl" "$C_RESET"
+        done < "$_cg"
+    else
+        printf "  %b(sem mensagens ainda)%b\n" "$C_DIM" "$C_RESET"
+    fi
+    printf "  %b%sCHAT DO CLA%b\n" "$C_MAG$C_BOLD" "$I_TIT" "$C_RESET"
+    if [ -s "$_cc" ]; then
+        while IFS= read -r _cl; do
+            printf "  %b%.*s%b\n" "$C_GRAY" "$((_cw - 2))" "$_cl" "$C_RESET"
+        done < "$_cc"
+    else
+        printf "  %b(sem mensagens ainda)%b\n" "$C_DIM" "$C_RESET"
+    fi
+    unset _cw _cg _cc _cl
+}
+
 painel_loop() {
 while true; do
     [ -t 1 ] && [ "${PANEL_ONCE:-0}" != "1" ] && clear
@@ -495,6 +570,9 @@ while true; do
             painel_regua "$LARG"
         fi
 
+        # Log de batalha ao vivo (todas as contas em luta), abaixo do resumo.
+        painel_batalha "$LARG"
+
         # O contador e o proximo evento so cabem na MESMA linha a partir de
         # 100 colunas. Abaixo disso vao em duas — a versao anterior somava
         # 100 caracteres fixos e quebrava em qualquer tela menor.
@@ -543,6 +621,8 @@ while true; do
             fi
             printf "  %b%.*s%b\n" "$C_RED" "$((LARG - 2))" "$_msg" "$C_RESET"
         fi
+        # Chat geral (em cima) e do cla (embaixo), na base do painel.
+        painel_chat "$LARG"
         painel_regua "$LARG"
     fi
 

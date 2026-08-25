@@ -7,6 +7,7 @@ undying_fight() {
 
     if grep -q -o 'out_gate' "$TMP/SRC"; then
       printf "Em batalha undying\n"
+      battle_panel_write "$TMP/SRC"
     else
       echo 1 > BREAK_LOOP
       printf "Battle over!\n"
