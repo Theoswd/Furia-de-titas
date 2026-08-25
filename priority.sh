@@ -1,12 +1,10 @@
 # priority.sh - Scheduler orientado por estado + prioridade + horario
 # Regra: cronograma de batalha > missao do cla > atividades secundarias.
 
-# Carrega os modulos V2 somente quando este scheduler entra em runtime.
 [ -f "$TWMDIR/state.sh" ] && . "$TWMDIR/state.sh"
 [ -f "$TWMDIR/action_runner.sh" ] && . "$TWMDIR/action_runner.sh"
 [ -f "$TWMDIR/resource_guard.sh" ] && . "$TWMDIR/resource_guard.sh"
 
-# BLOQUEIO ABSOLUTO DA BENCAO.
 use_blessing() { return 0; }
 
 priority_state() {
@@ -47,12 +45,15 @@ priority_event_name() {
     esac
 }
 
-# Guard usado pelas atividades sequenciais. Uma atividade secundaria deve
-# devolver o controle assim que surgir evento/lock ou missao de cla pendente.
 priority_guard() {
     priority_event_window && return 1
     command -v event_lock_active >/dev/null 2>&1 && event_lock_active && return 1
-    priority_clan_pending && return 1
+
+    # Quando estamos executando a propria missao do cla, a missao pendente nao
+    # pode interromper a atividade que a completa. Evento continua superior.
+    if [ "${PRIORITY_CLAN_ACTIVE:-n}" != "y" ]; then
+        priority_clan_pending && return 1
+    fi
     return 0
 }
 
@@ -94,15 +95,22 @@ priority_clan_type() {
 }
 
 priority_execute_clan_type() {
+    PRIORITY_CLAN_ACTIVE=y
+    export PRIORITY_CLAN_ACTIVE
+
     case "$1" in
-        liga) priority_state missao_cla_liga "/clan/${CLD}/quest/" running; league_play 2>/dev/null ;;
-        arena) priority_state missao_cla_arena "/clan/${CLD}/quest/" running; arena_duel ;;
-        caverna) priority_state missao_cla_caverna "/clan/${CLD}/quest/" running; cave_routine ;;
-        carreira) priority_state missao_cla_carreira "/clan/${CLD}/quest/" running; career_func ;;
-        elixir) priority_state missao_cla_elixir "/clan/${CLD}/quest/" running; use_elixir ;;
-        loja) priority_state missao_cla_loja "/clan/${CLD}/quest/" running; func_trade ;;
-        *) return 1 ;;
+        liga) priority_state missao_cla_liga "/clan/${CLD}/quest/" running; league_play 2>/dev/null; _rc=$? ;;
+        arena) priority_state missao_cla_arena "/clan/${CLD}/quest/" running; arena_duel; _rc=$? ;;
+        caverna) priority_state missao_cla_caverna "/clan/${CLD}/quest/" running; cave_routine; _rc=$? ;;
+        carreira) priority_state missao_cla_carreira "/clan/${CLD}/quest/" running; career_func; _rc=$? ;;
+        elixir) priority_state missao_cla_elixir "/clan/${CLD}/quest/" running; use_elixir; _rc=$? ;;
+        loja) priority_state missao_cla_loja "/clan/${CLD}/quest/" running; func_trade; _rc=$? ;;
+        *) _rc=1 ;;
     esac
+
+    PRIORITY_CLAN_ACTIVE=n
+    export PRIORITY_CLAN_ACTIVE
+    return "$_rc"
 }
 
 priority_run_clan() {
@@ -115,15 +123,17 @@ priority_run_clan() {
     _type=$(priority_clan_type)
     if [ -n "$_type" ]; then
         priority_execute_clan_type "$_type"
+        _rc=$?
         unset _type
-        return $?
+        return "$_rc"
     fi
 
     for _type in liga arena caverna carreira elixir loja; do
         if cq_tomar "$_type" >/dev/null 2>&1; then
             priority_execute_clan_type "$_type"
+            _rc=$?
             unset _type
-            return $?
+            return "$_rc"
         fi
     done
     unset _type
@@ -208,14 +218,11 @@ twm_play() {
     [ -n "$CLD" ] || clan_id 2>/dev/null
     load_config 2>/dev/null
 
-    # Camada de seguranca runtime. Mesmo que config antigo tenha y, o agente
-    # de prioridade nunca permite estes gastos automaticos.
     FUNC_use_blessing=n
-    export FUNC_use_blessing
     FUNC_cave_boost=n
-    export FUNC_cave_boost
     FUNC_quest_force_gold=n
-    export FUNC_quest_force_gold
+    PRIORITY_CLAN_ACTIVE=n
+    export FUNC_use_blessing FUNC_cave_boost FUNC_quest_force_gold PRIORITY_CLAN_ACTIVE
 
     while true; do
         if command -v event_lock_active >/dev/null 2>&1 && event_lock_active; then
