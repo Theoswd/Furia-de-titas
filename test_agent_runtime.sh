@@ -5,7 +5,7 @@
 set -u
 ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P) || exit 1
 BASE_TMP=${TMPDIR:-/tmp}
-WORK="$BASE_TMP/furia-v21-test-$$"
+WORK="$BASE_TMP/furia-v212-test-$$"
 mkdir -p "$WORK" || exit 1
 trap 'rm -rf "$WORK"' 0 HUP INT TERM
 
@@ -14,7 +14,7 @@ FAIL=0
 ok() { PASS=$((PASS + 1)); printf '[OK]   %s\n' "$*"; }
 fail() { FAIL=$((FAIL + 1)); printf '[FAIL] %s\n' "$*"; }
 
-printf '=== V2.1 - testes offline de comportamento ===\n'
+printf '=== V2.1.2 - testes offline de comportamento ===\n'
 
 TMP="$WORK/state"
 mkdir -p "$TMP"
@@ -52,7 +52,6 @@ export TMP
 if resource_allow gold 10 blessing >/dev/null 2>&1; then fail 'resource_guard permitiu blessing'; else ok 'resource_guard nega blessing'; fi
 if resource_allow gold 1 cave_gold_boost >/dev/null 2>&1; then fail 'resource_guard permitiu boost de ouro da caverna'; else ok 'resource_guard nega boost de ouro da caverna'; fi
 
-# Bencao: bloqueio precisa ocorrer no ponto HTTP, antes de _rc_run/curl.
 TMP="$WORK/blessing"
 mkdir -p "$TMP"
 export TMP
@@ -70,7 +69,6 @@ else
 fi
 if use_blessing >/dev/null 2>&1; then fail 'use_blessing ainda retorna sucesso'; else ok 'use_blessing permanece desativada'; fi
 
-# Missoes do Cla + Masmorra: tokens variaveis e somente 10 ataques gratuitos.
 TMP="$WORK/clan"
 mkdir -p "$TMP"
 export TMP
@@ -88,26 +86,13 @@ fetch_page() {
     _cf_out="${2:-$TMP/SRC}"
     printf '%s\n' "$_cf_path" >> "$CLAN_CALLS"
     case "$CLAN_MODE:$_cf_path" in
-        quest:/clan/99/quest/)
-            printf '/quest/take/3/?r=12345\n' > "$_cf_out"
-            ;;
-        quest:/quest/take/3/?r=12345)
-            printf 'ok\n' > "$_cf_out"
-            ;;
-        dungeon:/clandungeon/)
-            printf '/clandungeon/executar\n' > "$_cf_out"
-            ;;
-        dungeon:/clandungeon/executar)
-            printf '/clandungeon/attack/?r=1\n' > "$_cf_out"
-            ;;
+        quest:/clan/99/quest/) printf '/quest/take/3/?r=12345\n' > "$_cf_out" ;;
+        quest:/quest/take/3/?r=12345) printf 'ok\n' > "$_cf_out" ;;
+        dungeon:/clandungeon/) printf '/clandungeon/executar\n' > "$_cf_out" ;;
+        dungeon:/clandungeon/executar) printf '/clandungeon/attack/?r=1\n' > "$_cf_out" ;;
         dungeon:/clandungeon/attack/?r=*)
             DUN_ATTACKS=$((DUN_ATTACKS + 1))
-            if [ "$DUN_ATTACKS" -lt 10 ]; then
-                printf '/clandungeon/attack/?r=%s\n' "$((DUN_ATTACKS + 1))" > "$_cf_out"
-            else
-                : > "$_cf_out"
-            fi
-            ;;
+            if [ "$DUN_ATTACKS" -lt 10 ]; then printf '/clandungeon/attack/?r=%s\n' "$((DUN_ATTACKS + 1))" > "$_cf_out"; else : > "$_cf_out"; fi ;;
         *) : > "$_cf_out" ;;
     esac
     unset _cf_path _cf_out
@@ -117,24 +102,14 @@ fetch_page() {
 
 : > "$CLAN_CALLS"
 CLAN_MODE=quest
-if checkQuest 3 apply >/dev/null 2>&1 && grep -q '^/quest/take/3/?r=12345$' "$CLAN_CALLS"; then
-    ok 'checkQuest aceita token r com tamanho variavel'
-else
-    fail 'checkQuest ainda depende de token r com tamanho fixo'
-fi
+if checkQuest 3 apply >/dev/null 2>&1 && grep -q '^/quest/take/3/?r=12345$' "$CLAN_CALLS"; then ok 'checkQuest aceita token r com tamanho variavel'; else fail 'checkQuest ainda depende de token r com tamanho fixo'; fi
 
 : > "$CLAN_CALLS"
 CLAN_MODE=dungeon
 DUN_ATTACKS=0
 if clanDungeon >/dev/null 2>&1 && [ "$DUN_ATTACKS" -eq 10 ]; then
-    if grep -q '^/clandungeon/executar$' "$CLAN_CALLS" && ! grep -qiE 'buy|pay|gold|purchase' "$CLAN_CALLS"; then
-        ok 'Masmorra entra por executar e limita 10 ataques gratuitos'
-    else
-        fail 'Masmorra usou fluxo inesperado/pago'
-    fi
-else
-    fail "Masmorra enviou ${DUN_ATTACKS:-0} ataques; esperado 10"
-fi
+    if grep -q '^/clandungeon/executar$' "$CLAN_CALLS" && ! grep -qiE 'buy|pay|gold|purchase' "$CLAN_CALLS"; then ok 'Masmorra entra por executar e limita 10 ataques gratuitos'; else fail 'Masmorra usou fluxo inesperado/pago'; fi
+else fail "Masmorra enviou ${DUN_ATTACKS:-0} ataques; esperado 10"; fi
 
 TMP="$WORK/check"
 mkdir -p "$TMP"
@@ -154,11 +129,7 @@ fetch_page() {
         /inv/chest/) printf "/inv/chest/use/10/1/?r=1\n" > "$TMP/SRC"; ELIXIR_STEP=0 ;;
         /inv/chest/use/*)
             ELIXIR_STEP=$((ELIXIR_STEP + 1))
-            case "$ELIXIR_STEP" in
-                1) printf "/inv/chest/use/11/1/?r=2\n" > "$TMP/SRC" ;;
-                2) printf "/inv/chest/use/12/1/?r=3\n" > "$TMP/SRC" ;;
-                *) : > "$TMP/SRC" ;;
-            esac ;;
+            case "$ELIXIR_STEP" in 1) printf "/inv/chest/use/11/1/?r=2\n" > "$TMP/SRC" ;; 2) printf "/inv/chest/use/12/1/?r=3\n" > "$TMP/SRC" ;; *) : > "$TMP/SRC" ;; esac ;;
         *) : > "$TMP/SRC" ;;
     esac
     unset _tf_path
@@ -193,6 +164,41 @@ if activity_run_links "/campaign/" '/campaign/attack/[?]r=[0-9]+' 30 fixture >/d
 else
     if [ "${ACTIVITY_RUN_COUNT:-0}" -le 3 ]; then ok 'action_runner aborta repeticao sem progresso'; else fail 'action_runner demorou demais para abortar repeticao'; fi
 fi
+
+# ClanFight: parser e allowlist de acoes do proprio evento.
+TMP="$WORK/clanfight"
+mkdir -p "$TMP"
+export TMP
+cat > "$TMP/SRC" <<'EOF'
+<a href='/clanfight/attack/?r=111'>Ataque</a>
+<a href='/clanfight/attackrandom/?r=222'>Aleatorio</a>
+<a href='/clanfight/dodge/?r=333'>Esquiva</a>
+<a href='/clanfight/heal/?r=444'>Cura</a>
+hp'>850
+&nbsp;1200
+EOF
+. "$ROOT/clanfight.sh"
+if clanfight_parse "$TMP/SRC" && [ "$CF_ATK" = '/clanfight/attack/?r=111' ] && [ "$CF_DODGE" = '/clanfight/dodge/?r=333' ]; then ok 'ClanFight reconhece acoes validas do evento'; else fail 'ClanFight nao reconheceu fixture de batalha'; fi
+if clanfight_link_valido '/clanfight/heal/?r=444' && ! clanfight_link_valido '/trade/exchange/gold/100?r=1' && ! clanfight_link_valido ''; then ok 'ClanFight bloqueia URL vazia/fora do evento'; else fail 'ClanFight allowlist de URL falhou'; fi
+
+# Scheduler fora do cronograma: o guard interno nao pode consultar cla a cada
+# acao, e os marcadores precisam liberar/segurar tarefas no intervalo correto.
+TMP="$WORK/scheduler"
+mkdir -p "$TMP"
+export TMP
+TWMDIR="$ROOT"
+export TWMDIR
+. "$ROOT/priority.sh"
+CLAN_PROBES=0
+priority_event_window() { return 1; }
+event_lock_active() { return 1; }
+priority_clan_pending() { CLAN_PROBES=$((CLAN_PROBES + 1)); return 1; }
+if priority_guard && [ "$CLAN_PROBES" -eq 0 ]; then ok 'guard interno nao consulta cla durante atividade'; else fail 'guard interno ainda consulta cla/reinterrompe atividade'; fi
+rm -f "$TMP/last_missions"
+if priority_task_due missions 300; then
+    priority_task_mark missions
+    if priority_task_due missions 300; then fail 'marcador de Missoes nao aplicou intervalo'; else ok 'Missoes fora do cronograma possuem intervalo funcional'; fi
+else fail 'Missoes novas nasceram bloqueadas'; fi
 
 printf '\nResultado runtime: %s OK | %s FAIL\n' "$PASS" "$FAIL"
 [ "$FAIL" -gt 0 ] && exit 1
