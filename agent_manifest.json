@@ -1,11 +1,12 @@
 {
   "name": "Furia-de-titas",
   "channel": "test",
-  "version": "2.0.0-v2-core",
+  "version": "2.1.0-stabilization",
   "shell": "posix-sh",
   "platforms": ["wsl", "termux"],
   "branch": "feat/priority-state-scheduler",
   "modules": [
+    "run.sh",
     "priority.sh",
     "state.sh",
     "action_runner.sh",
@@ -14,14 +15,25 @@
     "career.sh",
     "arena.sh",
     "cave.sh",
+    "clanquest.sh",
     "clanid.sh",
+    "check.sh",
     "specialevent.sh",
-    "test_agent.sh"
+    "test_agent.sh",
+    "test_agent_runtime.sh"
   ],
   "safety": {
+    "legacy_scheduler_fallback": false,
     "blessing_auto_gold": false,
     "cave_gold_boost": false,
     "clan_help_paid": false,
-    "quest_force_gold": false
+    "quest_force_gold": false,
+    "clan_treasury_auto": false,
+    "clan_statue_auto_spend": false
+  },
+  "validation": {
+    "static": "test_agent.sh",
+    "offline_behavior": "test_agent_runtime.sh",
+    "remote_timetable_parser": "pending-validation"
   }
 }
