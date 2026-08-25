@@ -104,6 +104,7 @@ show_menu() {
     printf "%b%s%b\n" "$A2" "$_L" "$RESET"
     printf "  %bTWM%b %b· Gerenciador de Contas%b%*s%bBR%b\n" \
            "$A1" "$RESET" "$DIM" "$RESET" 26 '' "$WHITE" "$RESET"
+printf "  %bMod Author: Stephenn Curry%b\n" "$DIM" "$RESET"
     printf "%b%s%b\n" "$A2" "$_L" "$RESET"
     printf "  %bContas cadastradas:%b %b%s%b\n" "$DIM" "$RESET" "$WHITE" "$n" "$RESET"
     # O caminho e impresso sempre: um "0" sem o arquivo ao lado nao permite

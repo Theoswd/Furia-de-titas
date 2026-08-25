@@ -482,6 +482,7 @@ while true; do
         printf "  %b%sTWM Multi-contas%b %b· BR%b%*s%b%s%b\n" \
                "$C_CYAN$C_BOLD" "$I_TIT" "$C_RESET" "$C_DIM" "$C_RESET" \
                "$_pad" '' "$C_WHITE" "$agora" "$C_RESET"
+        printf "  %bMod Author: Stephenn Curry%b\n" "$C_DIM" "$C_RESET"
         painel_regua "$LARG"
         printf "%b" "$LISTA"
         painel_regua "$LARG"
