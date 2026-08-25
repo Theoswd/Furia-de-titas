@@ -68,10 +68,72 @@ elif [ "$HTTP_CALLED" -ne 0 ]; then
 else
     ok 'Bencao bloqueada antes do curl'
 fi
-if use_blessing >/dev/null 2>&1; then
-    fail 'use_blessing ainda retorna sucesso'
+if use_blessing >/dev/null 2>&1; then fail 'use_blessing ainda retorna sucesso'; else ok 'use_blessing permanece desativada'; fi
+
+# Missoes do Cla + Masmorra: tokens variaveis e somente 10 ataques gratuitos.
+TMP="$WORK/clan"
+mkdir -p "$TMP"
+export TMP
+CLD=99
+FUNC_clan_missions=y
+export CLD FUNC_clan_missions
+CLAN_MODE=quest
+DUN_ATTACKS=0
+CLAN_CALLS="$TMP/calls"
+: > "$CLAN_CALLS"
+sleep() { :; }
+is_logged_in() { return 0; }
+fetch_page() {
+    _cf_path="$1"
+    _cf_out="${2:-$TMP/SRC}"
+    printf '%s\n' "$_cf_path" >> "$CLAN_CALLS"
+    case "$CLAN_MODE:$_cf_path" in
+        quest:/clan/99/quest/)
+            printf '/quest/take/3/?r=12345\n' > "$_cf_out"
+            ;;
+        quest:/quest/take/3/?r=12345)
+            printf 'ok\n' > "$_cf_out"
+            ;;
+        dungeon:/clandungeon/)
+            printf '/clandungeon/executar\n' > "$_cf_out"
+            ;;
+        dungeon:/clandungeon/executar)
+            printf '/clandungeon/attack/?r=1\n' > "$_cf_out"
+            ;;
+        dungeon:/clandungeon/attack/?r=*)
+            DUN_ATTACKS=$((DUN_ATTACKS + 1))
+            if [ "$DUN_ATTACKS" -lt 10 ]; then
+                printf '/clandungeon/attack/?r=%s\n' "$((DUN_ATTACKS + 1))" > "$_cf_out"
+            else
+                : > "$_cf_out"
+            fi
+            ;;
+        *) : > "$_cf_out" ;;
+    esac
+    unset _cf_path _cf_out
+    return 0
+}
+. "$ROOT/clanid.sh"
+
+: > "$CLAN_CALLS"
+CLAN_MODE=quest
+if checkQuest 3 apply >/dev/null 2>&1 && grep -q '^/quest/take/3/?r=12345$' "$CLAN_CALLS"; then
+    ok 'checkQuest aceita token r com tamanho variavel'
 else
-    ok 'use_blessing permanece desativada'
+    fail 'checkQuest ainda depende de token r com tamanho fixo'
+fi
+
+: > "$CLAN_CALLS"
+CLAN_MODE=dungeon
+DUN_ATTACKS=0
+if clanDungeon >/dev/null 2>&1 && [ "$DUN_ATTACKS" -eq 10 ]; then
+    if grep -q '^/clandungeon/executar$' "$CLAN_CALLS" && ! grep -qiE 'buy|pay|gold|purchase' "$CLAN_CALLS"; then
+        ok 'Masmorra entra por executar e limita 10 ataques gratuitos'
+    else
+        fail 'Masmorra usou fluxo inesperado/pago'
+    fi
+else
+    fail "Masmorra enviou ${DUN_ATTACKS:-0} ataques; esperado 10"
 fi
 
 TMP="$WORK/check"
