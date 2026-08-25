@@ -13,7 +13,7 @@ restart_script() {
 # definidos. Se priority.sh ou qualquer dependencia V2 faltar, o agente para
 # em vez de cair silenciosamente no fluxo legado.
 twm_play_priority_loader() {
-    for _v2 in priority.sh state.sh action_runner.sh resource_guard.sh; do
+    for _v2 in priority.sh state.sh action_runner.sh resource_guard.sh blessing.sh; do
         if [ ! -f "$TWMDIR/$_v2" ]; then
             printf "ERRO V2: modulo obrigatorio ausente: %s\n" "$_v2"
             unset _v2
@@ -24,6 +24,14 @@ twm_play_priority_loader() {
 
     if ! . "$TWMDIR/priority.sh"; then
         printf "ERRO V2: falha ao carregar priority.sh\n"
+        return 1
+    fi
+
+    # Bencao e carregada por ultimo de proposito. Ela sobrescreve qualquer
+    # funcao antiga use_blessing/run_curl e impede /effshop/blessing no ponto
+    # comum de requisicao, inclusive chamadas diretas de modulos legados.
+    if ! . "$TWMDIR/blessing.sh"; then
+        printf "ERRO V2: falha ao carregar blessing.sh\n"
         return 1
     fi
 
