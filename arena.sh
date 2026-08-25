@@ -70,6 +70,10 @@ arena_duel() {
         fetch_page "$ACCESS"
         count=$((count + 1))
         printf "  Attack %s\n" "$count"
+        # Painel ao vivo: reaproveita o COMBATE AO VIVO (battle_panel) para
+        # mostrar o golpe atual da arena no status.sh.
+        printf 'Arena - golpe %s\n' "$count" > "$TMP/battle_panel" 2>/dev/null
+        date +%s > "$TMP/battle_panel_ts" 2>/dev/null
         sleep 0.6s
     done
 
@@ -79,6 +83,9 @@ arena_duel() {
 
     checkQuest 3 end
     checkQuest 4 end
+
+    # Arena terminou: limpa o painel de combate ao vivo.
+    rm -f "$TMP/battle_panel" "$TMP/battle_panel_ts" 2>/dev/null
 
     printf "Sell all items ok\n"
     printf "Arena ok\n"

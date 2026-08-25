@@ -320,6 +320,76 @@ combate_de() {
     unset _d _hp _old _dif
 }
 
+# COR POR NOME DE JOGADOR, ALEATORIA POR SESSAO.
+#
+# Cada abertura do painel sorteia uma semente (PANEL_SEED). O mesmo nome tem
+# sempre a mesma cor enquanto o painel esta aberto (facil de seguir quem e
+# quem), e a paleta muda quando o painel reabre. Serve para diferenciar o
+# NOME do jogador do texto que ele enviou (chat) e para distinguir os
+# participantes no log de batalha.
+PANEL_SEED="${PANEL_SEED:-$(( ($$ + $(date +%s)) % 100003 ))}"
+
+# BEGIN comum dos dois colorizadores: paleta e hash do nome -> indice de cor.
+# (Uma cor por nome; index() rende um hash simples e portatil em qualquer awk.)
+_PANEL_NAMEAWK='
+function nmhash(s,   i, h) {
+    h = seed % 100003
+    for (i = 1; i <= length(s); i++)
+        h = (h * 33 + index(REF, substr(s, i, 1))) % 100003
+    return h
+}
+BEGIN {
+    REF = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 "
+    np = split("1;36 1;32 1;33 1;35 1;34 1;37 0;36 0;32 0;35 0;33", pal, " ")
+}
+'
+
+# Colore a caixa de chat: nome (antes do ": ") com a cor da sessao, mensagem
+# em texto normal. Linhas de sistema (sem ": ") saem em cinza. 1 awk por bloco.
+_chat_colorize() {
+    awk -v seed="${PANEL_SEED:-0}" -v w="$2" "$_PANEL_NAMEAWK"'
+    {
+        line = $0
+        p = index(line, ": ")
+        if (p > 0) { nm = substr(line, 1, p-1); ms = substr(line, p+2) }
+        else       { nm = "";                  ms = line }
+        full = (nm == "" ? ms : nm ": " ms)
+        if (length(full) > w-2) full = substr(full, 1, w-2)
+        if (nm != "" && length(nm)+2 < length(full)) {
+            ms2 = substr(full, length(nm)+3)
+            printf "  \033[%sm%s\033[0m: %s\n", pal[(nmhash(nm)%np)+1], nm, ms2
+        } else {
+            printf "  \033[0;37m%s\033[0m\n", full
+        }
+    }' "$1"
+}
+
+# Colore o log de batalha: colore em cada linha as sequencias de palavras que
+# comecam com maiuscula (nomes de jogadores, inclusive "Voce"), com a cor da
+# sessao; verbos, numeros e marcadores ficam neutros. Faz tambem a troca dos
+# tokens (0)/(1)/[X] por emoji quando TWM_EMOJI=1. 1 awk por conta em luta.
+_battle_colorize() {
+    awk -v seed="${PANEL_SEED:-0}" -v w="$2" -v emoji="$3" "$_PANEL_NAMEAWK"'
+    function isname(t) { return (t ~ /^[A-Z]/) }
+    {
+        line = $0
+        if (length(line) > w-4) line = substr(line, 1, w-4)
+        if (emoji == "1") { gsub(/\(0\)/, "\360\237\224\264", line); gsub(/\(1\)/, "\360\237\224\265", line); gsub(/\[X\]/, "\360\237\222\200", line) }
+        n = split(line, t, " ")
+        out = ""; ph = ""
+        for (i = 1; i <= n; i++) {
+            if (isname(t[i])) { ph = (ph == "" ? t[i] : ph " " t[i]) }
+            else {
+                if (ph != "") { out = out sprintf("\033[%sm%s\033[0m ", pal[(nmhash(ph)%np)+1], ph); ph = "" }
+                out = out t[i] " "
+            }
+        }
+        if (ph != "") out = out sprintf("\033[%sm%s\033[0m", pal[(nmhash(ph)%np)+1], ph)
+        sub(/ +$/, "", out)
+        printf "    %s\n", out
+    }' "$1"
+}
+
 # COMBATE AO VIVO — log completo de todas as contas em batalha.
 #
 # Os modulos de combate escrevem $TMP/battle_panel (via battle_panel_write,
@@ -347,21 +417,8 @@ painel_batalha() {
             _bhead=1
         fi
         printf "  %b%s%b\n" "$C_WHITE" "$_buser" "$C_RESET"
-        while IFS= read -r _bln; do
-            [ -n "$_bln" ] || continue
-            # Emoji opcional (mesmo criterio do resto do painel).
-            if [ "${TWM_EMOJI:-0}" = "1" ]; then
-                _bln=$(printf '%s' "$_bln" | sed 's/(0)/🔴/g; s/(1)/🔵/g; s/\[X\]/💀/g')
-            fi
-            # Dano recebido em vermelho; causado/abate em verde; resto neutro.
-            case "$_bln" in
-                *"acertar Você"*|*"acertar Voce"*)                 _bc="$C_RED" ;;
-                "Você acertar"*|"Voce acertar"*|*assassinou*)      _bc="$C_GREEN" ;;
-                *usou*)                                            _bc="$C_DIM" ;;
-                *)                                                 _bc="$C_GRAY" ;;
-            esac
-            printf "    %b%.*s%b\n" "$_bc" "$((_bw - 4))" "$_bln" "$C_RESET"
-        done < "$_bd/battle_panel"
+        # Nomes dos jogadores coloridos (cor da sessao); emoji conforme TWM_EMOJI.
+        _battle_colorize "$_bd/battle_panel" "$_bw" "${TWM_EMOJI:-0}"
     done 4< "$ACCOUNTS_FILE"
     unset _bw _bnow _bhead _bsrv _buser _bx _bd _bts _bln _bc
 }
@@ -378,21 +435,17 @@ painel_chat() {
     painel_regua "$_cw"
     printf "  %b%sCHAT GERAL%b\n" "$C_CYAN$C_BOLD" "$I_TIT" "$C_RESET"
     if [ -s "$_cg" ]; then
-        while IFS= read -r _cl; do
-            printf "  %b%.*s%b\n" "$C_GRAY" "$((_cw - 2))" "$_cl" "$C_RESET"
-        done < "$_cg"
+        _chat_colorize "$_cg" "$_cw"
     else
         printf "  %b(sem mensagens ainda)%b\n" "$C_DIM" "$C_RESET"
     fi
     printf "  %b%sCHAT DO CLA%b\n" "$C_MAG$C_BOLD" "$I_TIT" "$C_RESET"
     if [ -s "$_cc" ]; then
-        while IFS= read -r _cl; do
-            printf "  %b%.*s%b\n" "$C_GRAY" "$((_cw - 2))" "$_cl" "$C_RESET"
-        done < "$_cc"
+        _chat_colorize "$_cc" "$_cw"
     else
         printf "  %b(sem mensagens ainda)%b\n" "$C_DIM" "$C_RESET"
     fi
-    unset _cw _cg _cc _cl
+    unset _cw _cg _cc
 }
 
 painel_loop() {
