@@ -523,3 +523,73 @@ battle_panel_write() {
     ' "$1" > "$TMP/battle_panel" 2>/dev/null
     date +%s > "$TMP/battle_panel_ts" 2>/dev/null
 }
+
+# ====================================================================
+# CHAT DO JOGO (geral + cla) PARA O PAINEL
+# ====================================================================
+# Formata o HTML cru de /chat/titans ou /chat/clan em linhas "Nome: msg"
+# (ou so a msg do sistema, no cla). So awk, sem w3m. Le do stdin.
+#
+# Estrutura confirmada contra o HTML real:
+#   <div> <img .../> <a href='/user/N/'>NOME</a> ...(&#187;)...
+#         <span class='white'|'dgreen'>MENSAGEM</span> </div>
+# Recorta a regiao de mensagens entre "Atualizar</a>" e "block_zero medium"
+# para nao pegar cabecalho, rodape nem scripts.
+_chat_fmt() {
+    awk '
+        { buf = buf $0 " " }
+        END {
+            s = index(buf, "Atualizar</a>"); if (s > 0) buf = substr(buf, s + 13)
+            e = index(buf, "block_zero medium"); if (e > 0) buf = substr(buf, 1, e - 1)
+            n = split(buf, d, "<div>")
+            c = 0
+            for (i = 1; i <= n; i++) {
+                m = d[i]
+                if (m !~ /class=.(white|dgreen|dred)/) continue
+                gsub(/<img[^>]*>/, "", m)
+                gsub(/<[^>]*>/, "", m)
+                sub(/<.*/, "", m)
+                gsub(/\(&#187;\)/, "", m)
+                gsub(/&nbsp;/, " ", m); gsub(/&#[0-9]+;/, "", m)
+                gsub(/  +/, " ", m); sub(/^ +/, "", m); sub(/ +$/, "", m)
+                sub(/'"'"' :/, ":", m); sub(/ :/, ":", m)
+                if (m == "" || m ~ /:$/) continue
+                c++; line[c] = m
+            }
+            start = c - 7; if (start < 1) start = 1
+            for (i = start; i <= c; i++) print line[i]
+        }
+    '
+}
+
+# Atualiza os dois arquivos de chat que o painel le. Compartilhado por
+# todas as contas: gate de 3 min por timestamp em ~/.twm/last_chat (uma
+# conta busca por janela; no pior caso duas coincidem, o que e inofensivo
+# e nunca trava, ao contrario de uma trava de diretorio presa). Custo: so
+# quando a janela abre, 2 requisicoes + 2 awk — leve para o E22.
+atualiza_chat() {
+    _cdir="$HOME/.twm"
+    _cts="$_cdir/last_chat"
+    _m=${FUNC_chat_min:-3}
+    case "$_m" in ''|*[!0-9]*) _m=3 ;; esac
+    _u=`cat "$_cts" 2>/dev/null`
+    case "$_u" in ''|*[!0-9]*) _u=0 ;; esac
+    [ $(( $(date +%s) - _u )) -ge $((_m * 60)) ] || return 0
+    date +%s > "$_cts" 2>/dev/null
+
+    # run_curl grava a pagina acessada em $TMP/pagina; preserva a aba atual
+    # para o painel nao passar a mostrar "Mensagens" o tempo todo.
+    _cta=`cat "${TMP}/pagina" 2>/dev/null`
+
+    TWM_MAXTIME=17
+    _pg=`run_curl "${URL}/chat/titans/changeRoom/" 2>/dev/null`
+    [ -n "$_pg" ] && printf '%s' "$_pg" | _chat_fmt > "$_cdir/chat_geral.tmp" 2>/dev/null \
+        && mv "$_cdir/chat_geral.tmp" "$_cdir/chat_geral" 2>/dev/null
+    _pg=`run_curl "${URL}/chat/clan/changeRoom/" 2>/dev/null`
+    [ -n "$_pg" ] && printf '%s' "$_pg" | _chat_fmt > "$_cdir/chat_clan.tmp" 2>/dev/null \
+        && mv "$_cdir/chat_clan.tmp" "$_cdir/chat_clan" 2>/dev/null
+    unset TWM_MAXTIME
+
+    [ -n "$_cta" ] && printf %s "$_cta" > "${TMP}/pagina" 2>/dev/null
+    unset _cdir _cts _m _u _pg _cta
+}

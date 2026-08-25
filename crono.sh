@@ -176,6 +176,10 @@ tarefas_livres() {
         atualiza_stats 2>/dev/null
     fi
 
+    # --- Chat geral + cla, a cada 3 min (compartilhado por todas as contas;
+    # o proprio atualiza_chat controla o intervalo e evita duplicidade).
+    atualiza_chat 2>/dev/null
+
     # --- Checklist das missoes do cla
     if [ -n "$CLD" ] && cq_liberado; then
         printf "Checklist do cla\n"
