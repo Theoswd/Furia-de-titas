@@ -23,35 +23,49 @@ runtime_state_write() {
 
 event_lock_start() {
     _se="$1"
+    _now=$(date +%s)
     {
         printf 'event=%s\n' "$_se"
         printf 'status=running\n'
         printf 'pid=%s\n' "$$"
-        printf 'started=%s\n' "$(date +%s)"
-        printf 'updated=%s\n' "$(date +%s)"
+        printf 'started=%s\n' "$_now"
+        printf 'updated=%s\n' "$_now"
     } | _state_atomic_write "$TMP/event_lock"
-    unset _se
+    unset _se _now
 }
 
 event_lock_active() {
     [ -s "$TMP/event_lock" ] || return 1
-    _ls=""; _lp=""
+    _ls=""; _lp=""; _started=0
     while IFS='=' read -r _lk _lv; do
         case "$_lk" in
-            status) _ls="$_lv" ;;
-            pid)    _lp="$_lv" ;;
+            status)  _ls="$_lv" ;;
+            pid)     _lp="$_lv" ;;
+            started) _started="$_lv" ;;
         esac
     done < "$TMP/event_lock"
-    [ "$_ls" = "running" ] || { unset _ls _lp _lk _lv; return 1; }
-    case "$_lp" in
-        ''|*[!0-9]*) rm -f "$TMP/event_lock" 2>/dev/null; unset _ls _lp _lk _lv; return 1 ;;
-    esac
+
+    [ "$_ls" = "running" ] || { rm -f "$TMP/event_lock" 2>/dev/null; unset _ls _lp _started _lk _lv; return 1; }
+    case "$_lp" in ''|*[!0-9]*) rm -f "$TMP/event_lock" 2>/dev/null; unset _ls _lp _started _lk _lv; return 1 ;; esac
+    case "$_started" in ''|*[!0-9]*) _started=0 ;; esac
+
+    # TTL de seguranca: nenhum lock de evento sobrevive indefinidamente.
+    _ttl=${EVENT_LOCK_TTL:-1800}
+    case "$_ttl" in ''|*[!0-9]*) _ttl=1800 ;; esac
+    _age=$(( $(date +%s) - _started ))
+    if [ "$_started" -gt 0 ] && [ "$_age" -gt "$_ttl" ]; then
+        rm -f "$TMP/event_lock" 2>/dev/null
+        unset _ls _lp _started _ttl _age _lk _lv
+        return 1
+    fi
+
     if kill -0 "$_lp" 2>/dev/null; then
-        unset _ls _lp _lk _lv
+        unset _ls _lp _started _ttl _age _lk _lv
         return 0
     fi
+
     rm -f "$TMP/event_lock" 2>/dev/null
-    unset _ls _lp _lk _lv
+    unset _ls _lp _started _ttl _age _lk _lv
     return 1
 }
 
@@ -65,6 +79,22 @@ event_lock_finish() {
     } | _state_atomic_write "$TMP/last_event"
     rm -f "$TMP/event_lock" 2>/dev/null
     unset _se _sr
+}
+
+# Impede repetir o mesmo evento varias vezes dentro da mesma janela.
+event_slot_seen() {
+    _slot="$1"
+    [ -n "$_slot" ] || return 1
+    _last=""
+    [ -r "$TMP/last_event_slot" ] && read -r _last < "$TMP/last_event_slot" || :
+    [ "$_last" = "$_slot" ]
+}
+
+event_slot_mark() {
+    _slot="$1"
+    [ -n "$_slot" ] || return 1
+    printf '%s\n' "$_slot" > "$TMP/last_event_slot"
+    unset _slot
 }
 
 combat_state_write() {
