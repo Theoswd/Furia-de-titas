@@ -182,6 +182,10 @@ tarefas_livres() {
         cq_concluir    2>/dev/null
         cq_ajudar      2>/dev/null
         cq_forcar_ouro 2>/dev/null
+        # Missoes 7 e 8 tem atividade propria: alquimia e mercador do
+        # Coliseu. Sem missao ativa, cq_tomar falha e nada e produzido.
+        cq_elixir      2>/dev/null
+        cq_mercador    2>/dev/null
         cq_marcar
     fi
 
@@ -255,6 +259,10 @@ start() {
         cq_concluir    2>/dev/null
         cq_ajudar      2>/dev/null
         cq_forcar_ouro 2>/dev/null
+        # Missoes 7 e 8 tem atividade propria: alquimia e mercador do
+        # Coliseu. Sem missao ativa, cq_tomar falha e nada e produzido.
+        cq_elixir      2>/dev/null
+        cq_mercador    2>/dev/null
     fi
 
     # Atividades. Cada uma verifica antes se ha missao do cla que ela
@@ -293,10 +301,6 @@ start() {
         masmorra_marcar
     fi
 
-    # Missao 8 do cla ("Obtenha 3 pedras ou ervas") e cumprida na loja.
-    # O mapa em cq_ids ja previa a chave "loja", mas nenhuma atividade a
-    # invocava: a missao nunca era tomada e o progresso nao contava.
-    cq_antes loja 2>/dev/null
     func_trade
 
     # Cabana do Sabio: missoes, colecoes e reliquias
