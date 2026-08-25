@@ -21,7 +21,7 @@ func_trade() {
     _dias=${FUNC_trade_dias:-365}
     case "$_dias" in ''|*[!0-9]*) _dias=365 ;; esac
 
-    fetch_page "/trade/exchange"
+    fetch_page "/trade/exchange" || return 1
     _pr=`grep -o -E "silver\.png' alt='s'/> ?[0-9][0-9.,']{0,14}[KMBkmb]?" "$TMP/SRC" | sed -E "s@.*/> ?@@" | head -n1`
     _prata=`valor_num "$_pr"`
     case "$_prata" in ''|*[!0-9]*) _prata=0 ;; esac
@@ -31,52 +31,50 @@ func_trade() {
     elif [ "$_prata" -ge $((1800   * _dias)) ]; then _lote=1
     else
         printf "Trade: prata insuficiente para trocar com seguranca (%s)\n" "$_pr"
-        printf "Trade ok\n"
         unset _hoje _ult _dias _pr _prata _lote
-        return 0
+        return 3
     fi
 
     _cl=`grep -o -E "/trade/exchange/gold/${_lote}[?]r=[0-9]+" "$TMP/SRC" | sed -n 1p`
     if [ -z "$_cl" ]; then
         printf "Trade: lote de %s indisponivel agora\n" "$_lote"
-        printf "Trade ok\n"
         unset _hoje _ult _dias _pr _prata _lote _cl
-        return 0
+        return 3
     fi
 
-    fetch_page "$_cl"
+    if ! fetch_page "$_cl"; then
+        unset _hoje _ult _dias _pr _prata _lote _cl
+        return 1
+    fi
+
+    if command -v is_logged_in >/dev/null 2>&1; then
+        _trade_page=`cat "$TMP/SRC" 2>/dev/null`
+        if ! is_logged_in "$_trade_page"; then
+            printf "Trade: sessao perdida; troca nao contabilizada\n"
+            unset _hoje _ult _dias _pr _prata _lote _cl _trade_page
+            return 1
+        fi
+        unset _trade_page
+    fi
+
+    # O marcador indica que a ACAO foi enviada uma vez hoje. A confirmacao
+    # economica saldo-antes/saldo-depois ainda sera implementada separadamente.
     printf '%s' "$_hoje" > "$TMP/last_trade" 2>/dev/null
-    printf "Trade: prata %s — trocou por %s de ouro (1x hoje)\n" "$_pr" "$_lote"
-    printf "Trade ok\n"
+    printf "Trade: pedido de troca por %s ouro enviado (1x hoje)\n" "$_lote"
     unset _hoje _ult _dias _pr _prata _lote _cl
+    return 0
 }
 
-# BÊNÇÃO DESATIVADA POR COMPLETO.
-# Mantemos o nome da funcao para compatibilidade com codigo antigo, mas ela
-# nunca consulta /effshop, nunca segue /effshop/blessing e nunca gasta ouro.
+# BENCAO DESATIVADA POR COMPLETO.
 use_blessing() {
     return 0
 }
 
+# Tesouraria do cla temporariamente desativada.
+# A implementacao antiga enviava prata=1000 duas vezes e ouro=0, sem seguir
+# a politica definida para ouro diario, prata em dias alternados e deduplicacao.
+# Fail-closed e preferivel a registrar uma doacao incorreta como sucesso.
 clan_money() {
-    clan_id
-    if [ -n "$CLD" ]; then
-        printf "Clan money ...\n"
-
-        fetch_page "/arena/quit"
-        awk_code=`sed "s/href='/\n/g" "$TMP/SRC" | grep "attack/1" | head -n 1 | awk -F\/ '{ print $5 }' | tr -cd '[:digit:]'`
-        echo "$awk_code" > "$TMP/CODE"
-
-        printf "/clan/%s/money/?r=%s&silver=1000&gold=0&confirm=true&type=limit\n" "$CLD" "`cat "$TMP/CODE"`"
-        fetch_page "/clan/${CLD}/money/?r=$(cat "$TMP/CODE")&silver=1000&gold=0&confirm=true&type=limit"
-
-        fetch_page "/arena/quit"
-        awk_code=`sed "s/href='/\n/g" "$TMP/SRC" | grep "attack/1" | head -n 1 | awk -F\/ '{ print $5 }' | tr -cd '[:digit:]'`
-        echo "$awk_code" > "$TMP/CODE"
-
-        printf "/clan/%s/money/?r=%s&silver=1000&gold=0&confirm=true&type=limit\n" "$CLD" "`cat "$TMP/CODE"`"
-        fetch_page "/clan/${CLD}/money/?r=$(cat "$TMP/CODE")&silver=1000&gold=0&confirm=true&type=limit"
-
-        printf "Clan money ok\n"
-    fi
+    printf "Tesouraria do cla: automacao desativada ate a politica V2.1 ser validada\n"
+    return 1
 }
