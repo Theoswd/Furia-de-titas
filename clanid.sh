@@ -27,9 +27,11 @@ checkQuest() {
 
     # IMPORTANTE: o fluxo legado nunca mais segue /help. Toda ajuda fica
     # exclusivamente em cq_ajudar(), onde ha politica de custo separada.
+    # O token r nao e tratado como tendo tamanho fixo: o jogo pode mudar a
+    # quantidade de digitos sem quebrar a tomada/coleta da missao.
     case "$action" in
-        apply) click=`grep -o -E "/quest/take/$quest_id/\?r=[0-9]{8}" "$TMP/SRC" | sed -n '1p'` ;;
-        end)   click=`grep -o -E "/quest/(deleteHelp|end)/$quest_id/\?r=[0-9]{8}" "$TMP/SRC" | sed -n '1p'` ;;
+        apply) click=`grep -o -E "/quest/take/$quest_id/\?r=[0-9]+" "$TMP/SRC" | sed -n '1p'` ;;
+        end)   click=`grep -o -E "/quest/(deleteHelp|end)/$quest_id/\?r=[0-9]+" "$TMP/SRC" | sed -n '1p'` ;;
         *) return 1 ;;
     esac
 
