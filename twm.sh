@@ -60,12 +60,14 @@ fi
 
 cd "$TWMDIR" || exit 1
 for _lib in \
+    state.sh resource_guard.sh \
     requeriments.sh loginlogoff.sh \
     flagfight.sh clanid.sh crono.sh arena.sh coliseum.sh \
     campaign.sh run.sh altars.sh clandmg.sh clanfight.sh \
     clancoliseum.sh king.sh undying.sh trade.sh career.sh \
     cave.sh allies.sh svproxy.sh check.sh league.sh clanquest.sh \
-    specialevent.sh function.sh update_check.sh
+    specialevent.sh function.sh update_check.sh \
+    blessing.sh
 do
     [ -f "$TWMDIR/$_lib" ] && . "$TWMDIR/$_lib"
 done

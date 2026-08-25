@@ -24,7 +24,7 @@ cq_ids() {
         caverna)  echo "5" ;;
         carreira) echo "6" ;;
         elixir)   echo "7" ;;
-        loja)     echo "8" ;;
+        mercador) echo "8" ;;
         *)        echo "" ;;
     esac
 }
@@ -104,6 +104,11 @@ cq_ajudar() {
 # Missao parada com ouro suficiente: conclui pagando.
 # O limite vem de FUNC_quest_gold_min (padrao 1200).
 cq_forcar_ouro() {
+    # Concluir missao do cla pagando ouro e gasto de OURO, e a politica
+    # nega qualquer gasto de ouro. A funcao continua existindo para nao
+    # quebrar quem a chama, mas a tentativa para aqui e fica no ledger.
+    resource_allow gold "${FUNC_quest_gold_min:-1200}" quest_force_gold || return 1
+
     [ "${FUNC_quest_force_gold:-y}" = "y" ] || return 1
     _min=${FUNC_quest_gold_min:-1200}
     case "$_min" in ''|*[!0-9]*) _min=1200 ;; esac
@@ -136,4 +141,74 @@ cq_antes() {
     [ -n "$CLD" ] || return 1
     cq_concluir > /dev/null 2>&1
     cq_tomar "$1"
+}
+
+# Sorteio portatil de 1..N. Nao usa shuf (ausente em ash/toybox enxutos)
+# nem $RANDOM (nao existe em dash). Semeia com o PID para que contas
+# diferentes no mesmo segundo nao escolham sempre a mesma opcao.
+cq_sorteia() {
+    _sn="$1"
+    _sc=`cat "$TMP/rnd_seq" 2>/dev/null`
+    case "$_sc" in ''|*[!0-9]*) _sc=0 ;; esac
+    _sc=$((_sc + 1))
+    printf '%s' "$_sc" > "$TMP/rnd_seq" 2>/dev/null
+    awk -v n="$_sn" -v s="$$" -v c="$_sc" \
+        'BEGIN{ srand(s * 7919 + c * 104729 + systime()); printf "%d", int(rand()*n)+1 }'
+    unset _sn _sc
+}
+
+# Missao 7 do cla: produzir elixir no laboratorio (secao 17 do prompt).
+# So produz o necessario para a missao: toma a missao, faz a pocao e
+# encerra. Sem missao ativa nao produz nada.
+cq_elixir() {
+    [ -n "$CLD" ] || return 1
+    cq_tomar elixir || return 1
+
+    fetch_page "/lab/alchemy/" || return 1
+    _i=`cq_sorteia 4`
+    fetch_page "/lab/alchemy/${_i}/" || return 1
+
+    _cl=`grep -o -E "/lab/alchemy/${_i}/makePotion[?]r=[0-9]+" "$TMP/SRC" | sed -n 1p`
+    [ -n "$_cl" ] || { unset _i _cl; return 1; }
+
+    case "$_i" in
+        1) printf "Elixir de forca\n" ;;
+        2) printf "Elixir de vida\n" ;;
+        3) printf "Elixir de agilidade\n" ;;
+        4) printf "Elixir de protecao\n" ;;
+    esac
+
+    fetch_page "$_cl"
+    _cl=`grep -o -E "/lab/alchemy/${_i}/makePotion[?]r=[0-9]+" "$TMP/SRC" | sed -n 1p`
+    [ -n "$_cl" ] && fetch_page "$_cl"
+
+    cq_concluir 2>/dev/null
+    unset _i _cl
+    return 0
+}
+
+# Missao 8 do cla: obter pedras ou ervas com o mercador do Coliseu
+# (secao 18). A missao chama "Velho Lojista", mas a loja dela NAO e a
+# troca de prata: e /coliseum/merchant/.
+cq_mercador() {
+    [ -n "$CLD" ] || return 1
+    cq_tomar mercador || return 1
+
+    fetch_page "/coliseum/merchant/" || return 1
+    _i=`cq_sorteia 2`
+    _cl=`grep -o -E "/coliseum/merchant/${_i}/startMaking[?]r=[0-9]+&ref=lab" "$TMP/SRC" | sed -n 1p`
+    [ -n "$_cl" ] || { unset _i _cl; return 1; }
+
+    case "$_i" in
+        1) printf "Produzindo pedras\n" ;;
+        2) printf "Produzindo ervas\n" ;;
+    esac
+
+    fetch_page "$_cl"
+    _cl=`grep -o -E "/coliseum/merchant/${_i}/startMaking[?]r=[0-9]+&ref=lab" "$TMP/SRC" | sed -n 1p`
+    [ -n "$_cl" ] && fetch_page "$_cl"
+
+    cq_concluir 2>/dev/null
+    unset _i _cl
+    return 0
 }

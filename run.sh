@@ -55,8 +55,19 @@ twm_play() {
             start
             ;;
 
-        # --- Coliseu comum: 00:30 as 04:30
-        (00:3[0-9]|00:[45][0-9]|0[123]:[0-5][0-9]|04:[0-2][0-9]|04:30)
+        # --- Coliseu comum: 00:30 as 04:30, pulsado de 10 em 10 minutos
+        #
+        # Antes esta janela casava TODO minuto. A coliseum_fight faz tres
+        # requisicoes de preparacao (/train, /settings/graphics/0,
+        # /coliseum) antes de lutar, entao eram ~720 requisicoes por conta
+        # por noite so de preparo. Com 10 contas, ~7.200; com 20, ~14.400.
+        #
+        # A TitansWarPro pulsa nos minutos terminados em 5 e roda sem
+        # problema. Mesma ideia aqui, dentro da janela 00:30-04:30: 24
+        # entradas por noite em vez de 241. Os minutos que sobram caem no
+        # ramo (*), que ja chama tarefas_livres, entao a checagem das
+        # missoes do cla e da arena continua na mesma frequencia.
+        (00:[345]5|0[123]:[0-5]5|04:[012]5)
             coliseum_fight
               # PAUSA PARA CHECAR MISSOES. O Coliseu comum nao esta entre os
               # cinco eventos de prioridade, entao entre as lutas o bot
@@ -77,7 +88,12 @@ twm_play() {
             ;;
 
         # --- Rotina comum
-        (00:00|01:00|02:00|03:00|04:3[1-9]|05:00|05:30|06:00|06:30|07:00|07:30|08:00|08:30|09:00|11:00|11:30|12:00|13:00|13:30|14:00|14:30|15:00|15:30|17:00|17:30|18:00|18:30|19:00|19:30|20:00|20:30|22:00|23:00|23:30)
+        #
+        # Madrugada alinhada com a TitansWarPro: rotina completa a cada
+        # :00 e :30. Antes so havia :00 das 00 as 03, porque a janela do
+        # Coliseu casava todo minuto e nao sobrava espaco. Com o Coliseu
+        # pulsado nos minutos terminados em 5, :00 e :30 ficam livres.
+        (00:00|00:30|01:00|01:30|02:00|02:30|03:00|03:30|04:00|04:30|05:00|05:30|06:00|06:30|07:00|07:30|08:00|08:30|09:00|11:00|11:30|12:00|13:00|13:30|14:00|14:30|15:00|15:30|17:00|17:30|18:00|18:30|19:00|19:30|20:00|20:30|22:00|23:00|23:30)
             start
             ;;
 

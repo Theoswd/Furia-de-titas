@@ -117,9 +117,14 @@ request_update() {
                 key="FUNC_cave_boost"
                 ;;
                 d|D)
-    printf "Use blessing? (y or n): "
-    key="FUNC_use_blessing"
-    ;;
+                    # A Bencao esta bloqueada por politica (nao se gasta
+                    # ouro). A opcao continua no menu para nao mudar as
+                    # letras das outras, mas avisa em vez de enganar.
+                    printf "Bencao: bloqueada por politica, o bot nao gasta ouro.\n"
+                    printf "Para reativar e preciso editar blessing.sh e resource_guard.sh.\n"
+                    EXIT_CONFIG=""
+                    continue
+                    ;;
             *)
                 printf "Exiting configuration update mode.\n"
                 EXIT_CONFIG="y"
@@ -170,7 +175,7 @@ FUNC_auto_events=y
 FUNC_clan_missions=y
 FUNC_clan_quests=y
 FUNC_clan_help=y
-FUNC_quest_force_gold=y
+FUNC_quest_force_gold=n
 FUNC_quest_gold_min=1200
 FUNC_arena_min=30
 FUNC_cq_min=15
@@ -178,7 +183,7 @@ FUNC_masmorra=y
 FUNC_estatua_horas=6
 FUNC_stats_min=3
 FUNC_clan_statue=y
-FUNC_cave_boost=y
+FUNC_cave_boost=n
 SCRIPT_PAUSED=n
 ALLIES=
 EOF
