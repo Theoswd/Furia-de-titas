@@ -1,17 +1,12 @@
 #!/bin/sh
 # panel_live.sh - camada LIVE do painel.
-#
-# Regra: a coluna de atividade NAO usa scheduler, priority_state ou apelidos
-# internos do bot. A unica fonte e $TMP/pagina, gravado por info.sh a cada
-# requisicao real feita pela conta. O rotulo e apenas a area correspondente
-# ao caminho atual do jogo, no mesmo sentido usado pelas paginas /online/.
+# A fonte principal de localizacao continua sendo $TMP/pagina, gravada por
+# requisicoes reais. combat_state apenas acrescenta detalhe da acao de luta.
 
 pagina_nome_online() {
     _po="$1"
     [ -n "$_po" ] || _po="/"
 
-    # A ordem importa: /clandungeon, /clanfight etc. precisam ser tratados
-    # antes do prefixo generico /clan.
     case "$_po" in
         "/"|"/?out_gate_confirm=true"|"/?out_gate_confirm=true"*) _PO_NOME="Página Principal" ;;
         "/?sign_in=1"*)     _PO_NOME="Entrando" ;;
@@ -59,8 +54,6 @@ aba_de() {
 
     pagina_nome_online "$_p"
 
-    # Mostra somente a localizacao atual. O caminho bruto continua disponivel
-    # em ~/.twm/BR_<conta>/pagina para diagnostico, mas nao polui o painel.
     if [ "$_p" = "/" ] || [ "$_p" = "/?out_gate_confirm=true" ]; then
         printf '○ %s' "$_PO_NOME"
     else
@@ -69,25 +62,41 @@ aba_de() {
     unset _d _p _PO_NOME
 }
 
-# Relatorio de combate somente enquanto a conta ESTA numa pagina de batalha.
-# HP/old_HP podem permanecer no disco depois da luta; por isso nunca usamos a
-# mera existencia desses arquivos como prova de combate ativo.
+combat_state_detail() {
+    _cs_file="$1/combat_state"
+    [ -s "$_cs_file" ] || return 0
+    _cs_status=""; _cs_action=""; _cs_hp=""; _cs_updated=0
+    while IFS='=' read -r _cs_k _cs_v; do
+        case "$_cs_k" in
+            status)  _cs_status="$_cs_v" ;;
+            action)  _cs_action="$_cs_v" ;;
+            hp)      _cs_hp="$_cs_v" ;;
+            updated) _cs_updated="$_cs_v" ;;
+        esac
+    done < "$_cs_file"
+    case "$_cs_updated" in ''|*[!0-9]*) _cs_updated=0 ;; esac
+
+    # Estado velho nao aparece como LIVE depois que o worker mudou de pagina.
+    _cs_age=$(( $(date +%s) - _cs_updated ))
+    [ "$_cs_age" -le 120 ] || { unset _cs_file _cs_status _cs_action _cs_hp _cs_updated _cs_k _cs_v _cs_age; return 0; }
+
+    _cs_txt=""
+    [ -n "$_cs_action" ] && _cs_txt="$_cs_action"
+    case "$_cs_hp" in ''|*[!0-9]*) ;; *) _cs_txt="${_cs_txt:+$_cs_txt | }HP $_cs_hp" ;; esac
+    [ -n "$_cs_txt" ] && printf '%s' "$_cs_txt"
+    unset _cs_file _cs_status _cs_action _cs_hp _cs_updated _cs_k _cs_v _cs_age _cs_txt
+}
+
 combate_de() {
     _d="$1"
     ler_arq "$_d/pagina"; _p="$_LIDO"
 
     case "$_p" in
         /coliseum*)
-            # No Coliseu o relatorio transitorio e a prova adicional de que a
-            # luta atual ainda esta ativa. coliseum.sh o apaga ao terminar.
             [ -s "$_d/col_report" ] || { unset _d _p; return 0; }
             ;;
-        /clanfight*|/clancoliseum*|/clandmgfight*|/flagfight*|/altars*|/undying*|/king*|/collfight*)
-            ;;
-        *)
-            unset _d _p
-            return 0
-            ;;
+        /clanfight*|/clancoliseum*|/clandmgfight*|/flagfight*|/altars*|/undying*|/king*|/collfight*) ;;
+        *) unset _d _p; return 0 ;;
     esac
 
     ler_arq "$_d/HP"; _hp="$_LIDO"
@@ -114,8 +123,6 @@ combate_de() {
     fi
 
     if [ -s "$_d/col_report" ]; then
-        # Pega a ultima linha usando apenas builtins do shell. Evita criar um
-        # processo tail por conta a cada redesenho, importante no Android.
         _acao=""
         while IFS= read -r _linha; do
             [ -n "$_linha" ] && _acao="$_linha"
@@ -123,6 +130,9 @@ combate_de() {
         [ -n "$_acao" ] && _texto="${_texto:+$_texto  |  }LIVE: $_acao"
     fi
 
+    _v2=`combat_state_detail "$_d"`
+    [ -n "$_v2" ] && _texto="${_texto:+$_texto  |  }$_v2"
+
     printf '%s' "$_texto"
-    unset _d _p _hp _old _dif _texto _acao _linha
+    unset _d _p _hp _old _dif _texto _acao _linha _v2
 }
