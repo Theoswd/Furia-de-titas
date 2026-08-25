@@ -1,0 +1,225 @@
+--- a/panel.sh
++++ b/panel.sh
+@@ -4,12 +4,41 @@
+ C_RED='\033[1;31m';  C_MAG='\033[1;35m';   C_WHITE='\033[1;37m'
+ C_GOLD='\033[0;33m'; C_GRAY='\033[0;37m';  C_BLUE='\033[1;34m'
+ 
+-# Emoji ou ASCII.
++# Cor unica para o nome de cada conta durante esta sessao do painel.
++# WSL/Windows Terminal e Termux normalmente suportam 256 cores. Em terminais
++# mais simples cai automaticamente para a paleta ANSI basica.
++_NAME_COLOR_SEED=$(( ($$ + $(date +%s)) % 20 ))
++case "${TERM:-}" in
++    *256color*|xterm*|screen*|tmux*) _NAME_COLOR_256=1 ;;
++    *)                               _NAME_COLOR_256=0 ;;
++esac
++nome_cor_idx() {
++    _ci=$(( ($1 - 1 + _NAME_COLOR_SEED) % 20 ))
++    if [ "$_NAME_COLOR_256" = 1 ]; then
++        case "$_ci" in
++            0)  _NC='\033[38;5;39m'  ;; 1)  _NC='\033[38;5;45m'  ;;
++            2)  _NC='\033[38;5;51m'  ;; 3)  _NC='\033[38;5;81m'  ;;
++            4)  _NC='\033[38;5;75m'  ;; 5)  _NC='\033[38;5;69m'  ;;
++            6)  _NC='\033[38;5;99m'  ;; 7)  _NC='\033[38;5;135m' ;;
++            8)  _NC='\033[38;5;171m' ;; 9)  _NC='\033[38;5;207m' ;;
++            10) _NC='\033[38;5;203m' ;; 11) _NC='\033[38;5;209m' ;;
++            12) _NC='\033[38;5;214m' ;; 13) _NC='\033[38;5;220m' ;;
++            14) _NC='\033[38;5;190m' ;; 15) _NC='\033[38;5;154m' ;;
++            16) _NC='\033[38;5;118m' ;; 17) _NC='\033[38;5;48m'  ;;
++            18) _NC='\033[38;5;49m'  ;; *)  _NC='\033[38;5;87m'  ;;
++        esac
++    else
++        case $((_ci % 6)) in
++            0) _NC="$C_CYAN" ;; 1) _NC="$C_GREEN" ;; 2) _NC="$C_YELLOW" ;;
++            3) _NC="$C_MAG"  ;; 4) _NC="$C_BLUE"  ;; *) _NC="$C_WHITE" ;;
++        esac
++    fi
++}
++
++# Icones.
+ #
+-# Muitos terminais (Windows Terminal sem fonte de emoji, consoles antigos)
+-# desenham quadrados no lugar dos simbolos. Por isso o padrao e ASCII com
+-# cor, que funciona em qualquer lugar. Para ligar os emoji:
+-#     TWM_EMOJI=1 ./play.sh
++# TWM_EMOJI=1 ativa emoji completos. O padrao usa simbolos Unicode de largura
++# mais previsivel no WSL e Termux. Para terminal antigo: TWM_ASCII=1.
+ if [ "${TWM_EMOJI:-0}" = "1" ]; then
+     I_HP="❤️ "; I_EN="⚡ "; I_LV="⭐ "; I_GO="🪙 "; I_SI="🥈 "
+     I_TIT="🎮 "; I_ACT="📋 "; I_EVT="⏰ "; I_ARROW="▸"
+@@ -24,7 +53,7 @@
+     A_TROCA="💱  Troca Prata/Ouro";     A_SABIO="🧙  Cabana do Sábio"
+     A_EVENTO="🎉  Evento Especial";     A_DESCANSO="💤  Descansando"
+     A_NONE="—"
+-else
++elif [ "${TWM_ASCII:-0}" = "1" ]; then
+     I_HP="HP"; I_EN="Eng"; I_LV="LV"; I_GO="Ouro"; I_SI="PR"
+     I_TIT=""; I_ACT=""; I_EVT=""; I_ARROW="->"
+     S_ON="[on]"; S_WAIT="[..]"; S_ERR="[off]"; S_OFF="[--]"; S_UNK="[??]"; S_PAUSE="[||]"
+@@ -38,6 +67,20 @@
+     A_TROCA="Troca Prata/Ouro";     A_SABIO="Cabana do Sábio"
+     A_EVENTO="Evento Especial";     A_DESCANSO="Descansando"
+     A_NONE="-"
++else
++    I_HP="♥"; I_EN="⚡"; I_LV="★"; I_GO="◆"; I_SI="◇"
++    I_TIT="◆ "; I_ACT="» "; I_EVT="◷ "; I_ARROW="›"
++    S_ON="●"; S_WAIT="◐"; S_ERR="✖"; S_OFF="○"; S_UNK="?"; S_PAUSE="Ⅱ"
++    A_CLANFIGHT="Torneio do Clã";   A_ALTARES="Altares dos Deuses"
++    A_VALE="Vale dos Imortais";     A_REI="Rei dos Imortais"
++    A_CLANCOL="Coliseu do Clã";     A_MASMORRA="Masmorra do Clã"
++    A_CLANQUEST="Missões do Clã";   A_BANDEIRAS="Batalha de Bandeiras"
++    A_COLISEU="Coliseu";            A_ARENA="Arena"
++    A_CARREIRA="Carreira";          A_CAVERNA="Caverna"
++    A_CAMPANHA="Campanha";          A_LIGA="Liga dos Favoritos"
++    A_TROCA="Troca Prata/Ouro";     A_SABIO="Cabana do Sábio"
++    A_EVENTO="Evento Especial";     A_DESCANSO="Descansando"
++    A_NONE="—"
+ fi
+ 
+ # Largura do terminal.
+@@ -1,4 +1,6 @@
+         idx=$((idx + 1))
++        nome_cor_idx "$idx"
++        nome_cor="$_NC"
+ 
+         nome="$user"; hp="-"; mp="-"; ene="-"; lvl="-"; ouro="-"; prata="-"
+         if [ -s "$acc_dir/stats" ]; then
+@@ -1,6 +1,6 @@
+             LISTA="${LISTA}$(printf "%b%2s %b%-5s %b%-*.*s %b%s %b%-.*s%b" \
+                 "$C_DIM" "$idx" "$cor" "$sim" \
+-                "$C_WHITE" "$_nw" "$_nw" "$nome" \
++                "$nome_cor" "$_nw" "$_nw" "$nome" \
+                 "$C_DIM" "$I_ARROW" \
+                 "$C_CYAN" "$_aw" "$_aba" "$C_RESET")
+ "
+@@ -1,6 +1,6 @@
+             LISTA="${LISTA}$(printf "%b%2s %b%-5s %b%-18.18s %b%s %-7s %b%s %-6s %b%s %-4s %b%s %-8s %b%s %s%b" \
+                 "$C_DIM" "$idx" "$cor" "$sim" \
+-                "$C_WHITE" "$nome" \
++                "$nome_cor" "$nome" \
+                 "$C_RED" "$I_HP" "$hp" \
+                 "$C_YELLOW" "$I_EN" "$ene" \
+                 "$C_MAG" "$I_LV" "$lvl" \
+@@ -9,10 +9,10 @@
+ "
+             if [ -n "$_cbt" ]; then
+                 ATIV="${ATIV}$(printf "    %b%-18.18s %b%s %b%-22.22s %b%s%b" \
+-                    "$C_WHITE" "$nome" "$C_DIM" "$I_ARROW" "$C_CYAN" "$_aba" "$_cor_c" "$_cbt" "$C_RESET")
++                    "$nome_cor" "$nome" "$C_DIM" "$I_ARROW" "$C_CYAN" "$_aba" "$_cor_c" "$_cbt" "$C_RESET")
+ "
+             else
+                 ATIV="${ATIV}$(printf "    %b%-18.18s %b%s %b%s%b" \
+-                    "$C_WHITE" "$nome" "$C_DIM" "$I_ARROW" "$C_CYAN" "$_aba" "$C_RESET")
++                    "$nome_cor" "$nome" "$C_DIM" "$I_ARROW" "$C_CYAN" "$_aba" "$C_RESET")
+ "
+             fi
+@@ -1,5 +1,7 @@
+         printf "  %b%sTWM Multi-contas%b %b· BR%b%*s%b%s%b\n" \
+                "$C_CYAN$C_BOLD" "$I_TIT" "$C_RESET" "$C_DIM" "$C_RESET" \
+                "$_pad" '' "$C_WHITE" "$agora" "$C_RESET"
++        printf "  %bMod Author:%b %bStephenn Curry%b\n" \
++               "$C_DIM" "$C_RESET" "$C_WHITE" "$C_RESET"
+         painel_regua "$LARG"
+         printf "%b" "$LISTA"
+--- a/setup.sh
++++ b/setup.sh
+@@ -1,5 +1,7 @@
+     printf "%b%s%b\n" "$A2" "$_L" "$RESET"
+     printf "  %bTWM%b %b· Gerenciador de Contas%b%*s%bBR%b\n" \
+            "$A1" "$RESET" "$DIM" "$RESET" 26 '' "$WHITE" "$RESET"
++    printf "  %bMod Author:%b %bStephenn Curry%b\n" \
++           "$DIM" "$RESET" "$WHITE" "$RESET"
+     printf "%b%s%b\n" "$A2" "$_L" "$RESET"
+     printf "  %bContas cadastradas:%b %b%s%b\n" "$DIM" "$RESET" "$WHITE" "$n" "$RESET"
+--- a/clanid.sh
++++ b/clanid.sh
+@@ -1,9 +1,23 @@
+-    # SOMENTE GOLPES GRATUITOS. Limite adicional de 10 ataques por chamada,
+-    # mesmo que o HTML venha inconsistente. Nunca segue links de compra.
++    # SOMENTE GOLPES GRATUITOS. A pagina inicial pode exibir primeiro
++    # /clandungeon/executar; nesse caso entramos nela e so depois procuramos
++    # /clandungeon/attack/?r=N. Nunca segue links de compra/pagamento.
+     _br=$(($(date +%s) + 180))
+     _n=0
+     while [ "$(date +%s)" -lt "$_br" ] && [ "$_n" -lt 10 ]; do
+         _cl=`grep -o -E '/clandungeon/attack/[?]r=[0-9]+' "$TMP/DUNGEON" | sed -n 1p`
++
++        if [ -z "$_cl" ]; then
++            _exec=`grep -o -E '/clandungeon/executar(/[?]r=[0-9]+)?' "$TMP/DUNGEON" | sed -n 1p`
++            if [ -n "$_exec" ]; then
++                printf "Masmorra: entrando na execucao\n"
++                if ! fetch_page "$_exec" "$TMP/DUNGEON"; then
++                    printf "Masmorra: falha ao abrir /clandungeon/executar\n"
++                    break
++                fi
++                _cl=`grep -o -E '/clandungeon/attack/[?]r=[0-9]+' "$TMP/DUNGEON" | sed -n 1p`
++            fi
++        fi
++
+         [ -n "$_cl" ] || break
+ 
+         if ! fetch_page "$_cl" "$TMP/DUNGEON"; then
+@@ -13,15 +27,22 @@
+ 
+         _n=$((_n + 1))
+         printf "Masmorra: ataque gratuito %s/10\n" "$_n"
++
++        # Algumas respostas de ataque nao repetem os links de continuidade.
++        # Rele a pagina principal para redescobrir executar/attack pelo estado
++        # real do jogo, sem assumir que a resposta anterior contem tudo.
++        if ! grep -q -E '/clandungeon/(attack|executar)' "$TMP/DUNGEON" 2>/dev/null; then
++            fetch_page "/clandungeon/" "$TMP/DUNGEON" || break
++        fi
+         sleep 1
+     done
+ 
+     if [ "$_n" -gt 0 ]; then
+         printf "Masmorra do cla ok (%s ataque(s) gratuito(s))\n" "$_n"
+-        unset _golpes _br _cl
++        unset _golpes _br _cl _exec
+         return 0
+     fi
+ 
+     printf "Masmorra: nenhum ataque gratuito executado agora\n"
+-    unset _golpes _br _n _cl
++    unset _golpes _br _n _cl _exec
+     return 1
+--- a/test_agent.sh
++++ b/test_agent.sh
+@@ -1,3 +1,3 @@
+-for f in play.sh worker.sh twm.sh run.sh priority.sh trade.sh clanquest.sh clanid.sh panel_live.sh coliseum.sh status.sh; do
++for f in play.sh worker.sh twm.sh run.sh priority.sh trade.sh clanquest.sh clanid.sh panel.sh panel_live.sh coliseum.sh status.sh setup.sh; do
+     if [ -f "$ROOT/$f" ]; then
+         if sh -n "$ROOT/$f" 2>/dev/null; then
+@@ -1,9 +1,10 @@
+ if grep -q 'SOMENTE GOLPES GRATUITOS' "$ROOT/clanid.sh" 2>/dev/null && \
++   grep -q '/clandungeon/executar' "$ROOT/clanid.sh" 2>/dev/null && \
+    grep -q '/clandungeon/attack/' "$ROOT/clanid.sh" 2>/dev/null && \
+    grep -q '"$_n" -lt 10' "$ROOT/clanid.sh" 2>/dev/null; then
+-    ok 'masmorra limitada a ate 10 golpes gratuitos'
++    ok 'masmorra detecta executar e limita a ate 10 golpes gratuitos'
+ else
+-    fail 'limite gratuito da masmorra nao confirmado'
++    fail 'fluxo executar/ataque gratuito da masmorra nao confirmado'
+ fi
+ 
+ if grep -q 'if clanDungeon; then' "$ROOT/priority.sh" 2>/dev/null && \
+@@ -7,4 +7,18 @@
+     fail 'painel LIVE nao esta isolado do estado interno do scheduler'
+ fi
+ 
++if grep -q 'nome_cor_idx' "$ROOT/panel.sh" 2>/dev/null && \
++   grep -q 'Mod Author:' "$ROOT/panel.sh" 2>/dev/null && \
++   grep -q 'I_HP="♥"' "$ROOT/panel.sh" 2>/dev/null; then
++    ok 'painel com cores por conta, icones UTF-8 e assinatura do autor'
++else
++    fail 'tema visual novo do painel nao encontrado'
++fi
++
++if grep -q 'Mod Author:' "$ROOT/setup.sh" 2>/dev/null; then
++    ok 'assinatura do autor presente no setup'
++else
++    fail 'assinatura do autor ausente no setup'
++fi
++
+ # /clan/* deve aparecer como Cla; /clandungeon/* como Masmorra; descanso /.
