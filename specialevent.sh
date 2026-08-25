@@ -15,7 +15,10 @@ specialEvent() {
         questrnd)
             fetch_page "$event_link"
             printf "Event Adventure\n"
-            click=`grep -o -E "/questrnd/take/\?r=[0-9]{8}" "$TMP/SRC" | sed -n '1p'`
+            # CORRECAO (validacao fantasma): era [0-9]{8}, que truncava o
+            # token real de 10 digitos e devolvia um link invalido — o fetch
+            # falhava mas o "Claiming reward" saia mesmo assim. Agora [0-9]+.
+            click=`grep -o -E "/questrnd/take/[?]r=[0-9]+" "$TMP/SRC" | sed -n '1p'`
             if [ -n "$click" ]; then
                 fetch_page "$click"
                 printf "Claiming reward\n"

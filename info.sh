@@ -492,22 +492,34 @@ valor_num() {
 # terminais sem fonte de emoji.
 #
 # $1 = arquivo com o HTML da batalha (varia por modulo: SRC, col_src, etc.)
+#
+# CUSTO DE PROCESSOS (Android 12+ / "signal 9"): feito num UNICO awk, nao
+# num pipe de tr+sed+grep+tail (7 processos). Durante o Rei com 6 contas em
+# luta, cada acao geraria dezenas de processos transitorios e podia estourar
+# o teto de ~32 do sistema. Aqui sao 2 processos (awk + date), e o awk usado
+# (split com regex, gsub) roda igual em gawk, mawk, busybox e toybox.
 battle_panel_write() {
     [ -r "$1" ] || return 0
     [ -n "$TMP" ] || return 0
-    tr '\n' ' ' < "$1" 2>/dev/null \
-      | sed -e 's/<br[^>]*>/\n/g' \
-      | sed -e 's#<img[^>]*race/0\.png[^>]*>#(0) #g' \
-            -e 's#<img[^>]*race/1\.png[^>]*>#(1) #g' \
-            -e 's#<img[^>]*rip\.png[^>]*>#[X] #g' \
-            -e 's#<img[^>]*>##g' \
-            -e 's#<span class="bold">\([0-9]*\)</span>#\1#g' \
-            -e 's#<span class="quality[^"]*">\([^<]*\)</span>#[\1]#g' \
-            -e 's#<[^>]*>##g' \
-            -e 's#&nbsp;# #g; s#&amp;#\&#g' \
-      | sed -e 's/[[:space:]]\{1,\}/ /g; s/^ //; s/ $//' \
-            -e 's/ critico/ (crit)/g; s/ crítico/ (crit)/g' \
-      | grep -E 'acertar|assassinou|usou' \
-      | tail -n 8 > "$TMP/battle_panel" 2>/dev/null
+    awk '
+        { buf = buf $0 " " }
+        END {
+            n = split(buf, seg, /<br[^>]*>/)
+            c = 0
+            for (i = 1; i <= n; i++) {
+                s = seg[i]
+                gsub(/<img[^>]*race\/0\.png[^>]*>/, "(0) ", s)
+                gsub(/<img[^>]*race\/1\.png[^>]*>/, "(1) ", s)
+                gsub(/<img[^>]*rip\.png[^>]*>/,      "[X] ", s)
+                gsub(/<[^>]*>/, "", s)
+                gsub(/&nbsp;/, " ", s); gsub(/&amp;/, "\\&", s)
+                gsub(/  +/, " ", s); sub(/^ +/, "", s); sub(/ +$/, "", s)
+                gsub(/ critico/, " (crit)", s); gsub(/ crítico/, " (crit)", s)
+                if (s ~ /acertar|assassinou|usou/) { c++; line[c] = s }
+            }
+            start = c - 7; if (start < 1) start = 1
+            for (i = start; i <= c; i++) print line[i]
+        }
+    ' "$1" > "$TMP/battle_panel" 2>/dev/null
     date +%s > "$TMP/battle_panel_ts" 2>/dev/null
 }

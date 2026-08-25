@@ -37,12 +37,22 @@ checkQuest() {
         return 1
     fi
 
+    # CORRECAO (validacao fantasma): o token "r" tem 10 digitos no jogo
+    # (ex.: r=1736263959), mas o regex exigia exatamente 8 ([0-9]{8}). Isso
+    # nao falhava limpo: casava os 8 PRIMEIROS digitos e devolvia um link
+    # TRUNCADO (r=17362639). Como o link nao ficava vazio, o checkQuest dava
+    # fetch nessa URL invalida, o servidor ignorava, e mesmo assim retornava
+    # 0 (sucesso fantasma) — reportava a missao tomada sem ter tomado.
+    # Alem disso o fetch usava "$click" sem o prefixo /clan/<CLD>, ou seja o
+    # caminho tambem estava errado. Agora: [0-9]+ (token completo) e o
+    # caminho correto. So "take"/"end" (nunca "help", que pode custar ouro),
+    # em linha com a politica central de gasto e com o cq_tomar/cq_concluir.
     case "$action" in
         apply)
-            click=`grep -o -E "/quest/(take|help)/$quest_id/\?r=[0-9]{8}" "$TMP/SRC" | sed -n '1p'`
+            click=`grep -o -E "/quest/take/$quest_id/[?]r=[0-9]+" "$TMP/SRC" | sed -n '1p'`
             ;;
         end)
-            click=`grep -o -E "/quest/(deleteHelp|end)/$quest_id/\?r=[0-9]{8}" "$TMP/SRC" | sed -n '1p'`
+            click=`grep -o -E "/quest/end/$quest_id/[?]r=[0-9]+" "$TMP/SRC" | sed -n '1p'`
             ;;
         *)
             return 1
@@ -50,7 +60,7 @@ checkQuest() {
     esac
 
     if [ -n "$click" ]; then
-        fetch_page "$click"
+        fetch_page "/clan/${CLD}${click}"
         return 0
     fi
 
