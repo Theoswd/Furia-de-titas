@@ -49,7 +49,6 @@ event_lock_active() {
     case "$_lp" in ''|*[!0-9]*) rm -f "$TMP/event_lock" 2>/dev/null; unset _ls _lp _started _lk _lv; return 1 ;; esac
     case "$_started" in ''|*[!0-9]*) _started=0 ;; esac
 
-    # TTL de seguranca: nenhum lock de evento sobrevive indefinidamente.
     _ttl=${EVENT_LOCK_TTL:-1800}
     case "$_ttl" in ''|*[!0-9]*) _ttl=1800 ;; esac
     _age=$(( $(date +%s) - _started ))
@@ -81,7 +80,6 @@ event_lock_finish() {
     unset _se _sr
 }
 
-# Impede repetir o mesmo evento varias vezes dentro da mesma janela.
 event_slot_seen() {
     _slot="$1"
     [ -n "$_slot" ] || return 1
@@ -94,7 +92,58 @@ event_slot_mark() {
     _slot="$1"
     [ -n "$_slot" ] || return 1
     printf '%s\n' "$_slot" > "$TMP/last_event_slot"
+    rm -f "$TMP/event_retry" 2>/dev/null
     unset _slot
+}
+
+# Falhas de entrada nao podem gerar rajada a cada poll. No maximo 3 tentativas
+# por slot, com intervalo minimo de 60s entre elas.
+event_retry_allowed() {
+    _slot="$1"
+    _now=`date +%s`
+    _rs=""; _rt=0; _rc=0
+    if [ -r "$TMP/event_retry" ]; then
+        IFS='|' read -r _rs _rt _rc < "$TMP/event_retry" || :
+    fi
+    case "$_rt" in ''|*[!0-9]*) _rt=0 ;; esac
+    case "$_rc" in ''|*[!0-9]*) _rc=0 ;; esac
+
+    if [ "$_rs" != "$_slot" ]; then
+        unset _slot _now _rs _rt _rc
+        return 0
+    fi
+    [ "$_rc" -lt 3 ] || { unset _slot _now _rs _rt _rc; return 1; }
+    [ $((_now - _rt)) -ge 60 ]
+    _ret=$?
+    unset _slot _now _rs _rt _rc
+    return "$_ret"
+}
+
+event_retry_mark() {
+    _slot="$1"
+    _now=`date +%s`
+    _rs=""; _rt=0; _rc=0
+    if [ -r "$TMP/event_retry" ]; then
+        IFS='|' read -r _rs _rt _rc < "$TMP/event_retry" || :
+    fi
+    case "$_rc" in ''|*[!0-9]*) _rc=0 ;; esac
+    [ "$_rs" = "$_slot" ] || _rc=0
+    _rc=$((_rc + 1))
+    printf '%s|%s|%s\n' "$_slot" "$_now" "$_rc" > "$TMP/event_retry"
+    EVENT_RETRY_COUNT=$_rc
+    export EVENT_RETRY_COUNT
+    unset _slot _now _rs _rt _rc
+}
+
+event_retry_count() {
+    _slot="$1"
+    _rs=""; _rt=0; _rc=0
+    if [ -r "$TMP/event_retry" ]; then
+        IFS='|' read -r _rs _rt _rc < "$TMP/event_retry" || :
+    fi
+    case "$_rc" in ''|*[!0-9]*) _rc=0 ;; esac
+    if [ "$_rs" = "$_slot" ]; then printf '%s' "$_rc"; else printf '0'; fi
+    unset _slot _rs _rt _rc
 }
 
 combat_state_write() {
