@@ -152,8 +152,8 @@ config_defaults() {
     cat <<'EOF'
 FUNC_check_rewards=y
 FUNC_use_elixir=y
-FUNC_use_blessing=y
-FUNC_blessing_gold_min=100
+FUNC_use_blessing=n
+FUNC_blessing_gold_min=0
 FUNC_trade=y
 FUNC_trade_dias=365
 FUNC_coliseum=y
