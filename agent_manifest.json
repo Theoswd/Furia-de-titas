@@ -1,7 +1,7 @@
 {
   "name": "Furia-de-titas",
   "channel": "test",
-  "version": "2.1.1-blessing-hard-block",
+  "version": "2.1.2-missions-clanfight",
   "shell": "posix-sh",
   "platforms": ["wsl", "termux"],
   "branch": "feat/priority-state-scheduler",
@@ -18,6 +18,7 @@
     "cave.sh",
     "clanquest.sh",
     "clanid.sh",
+    "clanfight.sh",
     "check.sh",
     "specialevent.sh",
     "test_agent.sh",
@@ -31,7 +32,15 @@
     "clan_help_paid": false,
     "quest_force_gold": false,
     "clan_treasury_auto": false,
-    "clan_statue_auto_spend": false
+    "clan_statue_auto_spend": false,
+    "clanfight_empty_url_blocked": true,
+    "clanfight_timeout_is_failure": true
+  },
+  "scheduler": {
+    "clan_check_seconds": 30,
+    "general_missions_seconds": 300,
+    "routine_seconds": 600,
+    "night_coliseum_attempt_seconds": 300
   },
   "validation": {
     "static": "test_agent.sh",
