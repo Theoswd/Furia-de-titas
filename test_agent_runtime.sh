@@ -7,7 +7,7 @@ ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd -P) || exit 1
 BASE_TMP=${TMPDIR:-/tmp}
 WORK="$BASE_TMP/furia-v21-test-$$"
 mkdir -p "$WORK" || exit 1
-trap 'rm -rf "$WORK"' EXIT HUP INT TERM
+trap 'rm -rf "$WORK"' 0 HUP INT TERM
 
 PASS=0
 FAIL=0
@@ -17,7 +17,7 @@ fail() { FAIL=$((FAIL + 1)); printf '[FAIL] %s\n' "$*"; }
 printf '=== V2.1 - testes offline de comportamento ===\n'
 
 # ------------------------------------------------------------
-# state.sh: slot deduplicado e lock velho expira.
+# state.sh: slot, TTL e backoff de retry.
 # ------------------------------------------------------------
 TMP="$WORK/state"
 mkdir -p "$TMP"
@@ -51,6 +51,29 @@ else
     ok 'event_lock antigo expira por TTL'
 fi
 unset EVENT_LOCK_TTL
+
+rm -f "$TMP/event_retry"
+if event_retry_allowed "slot-b"; then
+    ok 'primeira tentativa de evento e permitida'
+else
+    fail 'primeira tentativa de evento foi bloqueada'
+fi
+
+event_retry_mark "slot-b"
+if event_retry_allowed "slot-b"; then
+    fail 'retry imediato de evento nao entrou em cooldown'
+else
+    ok 'retry imediato de evento entra em cooldown'
+fi
+
+cat > "$TMP/event_retry" <<EOF
+slot-b|1|3
+EOF
+if event_retry_allowed "slot-b"; then
+    fail 'quarta tentativa de evento foi permitida'
+else
+    ok 'evento limita retries a tres tentativas'
+fi
 
 # ------------------------------------------------------------
 # resource_guard: gasto perigoso deve ser negado.
