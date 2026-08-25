@@ -136,8 +136,11 @@ else
     fail 'event_lock nao expira com seguranca'
 fi
 
-if grep -q 'returned "modulo retornou sem erro"' "$ROOT/priority.sh" && \
-   ! grep -q 'priority_state cronograma /fights/timetable/ finished' "$ROOT/priority.sh"; then
+# O scheduler deve registrar apenas "returned" quando o modulo volta rc=0;
+# nunca "finished" enquanto o fim semantico do evento nao for comprovado.
+if grep -q 'priority_state cronograma /fights/timetable/ returned' "$ROOT/priority.sh" && \
+   ! grep -q 'priority_state cronograma /fights/timetable/ finished' "$ROOT/priority.sh" && \
+   ! grep -q 'event_lock_finish "$_ev" finished' "$ROOT/priority.sh"; then
     ok 'scheduler nao chama retorno de modulo de conclusao confirmada'
 else
     fail 'scheduler ainda anuncia evento como concluido sem prova'
