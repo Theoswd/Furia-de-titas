@@ -8,15 +8,17 @@
 use_blessing() { return 0; }
 
 priority_state() {
-    _p_activity="$1"; _p_page="$2"; _p_status="$3"
+    _p_activity="$1"; _p_page="$2"; _p_status="$3"; _p_detail="${4:-}"
     {
         printf 'timestamp=%s\n' "$(date +%s)"
         printf 'activity=%s\n' "$_p_activity"
         printf 'page=%s\n' "$_p_page"
         printf 'status=%s\n' "$_p_status"
+        [ -n "$_p_detail" ] && printf 'detail=%s\n' "$_p_detail"
     } > "$TMP/priority_state" 2>/dev/null
-    command -v runtime_state_write >/dev/null 2>&1 && runtime_state_write "$_p_activity" "$_p_page" "$_p_status" 2>/dev/null
-    unset _p_activity _p_page _p_status
+    command -v runtime_state_write >/dev/null 2>&1 && \
+        runtime_state_write "$_p_activity" "$_p_page" "$_p_status" "$_p_detail" 2>/dev/null
+    unset _p_activity _p_page _p_status _p_detail
 }
 
 priority_poll() {
@@ -25,6 +27,9 @@ priority_poll() {
     sleep "$_p"
 }
 
+# Fallback horario. O cronograma remoto e consultado para diagnostico/cache,
+# mas nao fingimos que o parser remoto esta validado enquanto nao conhecemos
+# um formato estavel da pagina /fights/timetable/.
 priority_event_window() {
     case "$(date +%H:%M)" in
         10:5[5-9]|18:5[5-9]|13:5[5-9]|20:5[5-9]|09:5[5-9]|15:5[5-9]|21:5[5-9]|12:2[5-9]|16:2[5-9]|22:2[5-9]|10:2[8-9]|14:5[8-9]|10:1[0-4]|16:1[0-4]|09:2[5-9]|21:2[5-9]) return 0 ;;
@@ -45,12 +50,43 @@ priority_event_name() {
     esac
 }
 
+priority_event_slot() {
+    _date=`date +%Y%m%d`
+    case "$(date +%H:%M)" in
+        10:5[5-9]) _slot=1055 ;; 18:5[5-9]) _slot=1855 ;;
+        13:5[5-9]) _slot=1355 ;; 20:5[5-9]) _slot=2055 ;;
+        09:5[5-9]) _slot=0955 ;; 15:5[5-9]) _slot=1555 ;; 21:5[5-9]) _slot=2155 ;;
+        12:2[5-9]) _slot=1225 ;; 16:2[5-9]) _slot=1625 ;; 22:2[5-9]) _slot=2225 ;;
+        10:2[8-9]) _slot=1028 ;; 14:5[8-9]) _slot=1458 ;;
+        10:1[0-4]) _slot=1010 ;; 16:1[0-4]) _slot=1610 ;;
+        09:2[5-9]) _slot=0925 ;; 21:2[5-9]) _slot=2125 ;;
+        *) _slot=`date +%H%M` ;;
+    esac
+    _ev=`priority_event_name`
+    printf '%s-%s-%s' "$_date" "$_ev" "$_slot"
+    unset _date _slot _ev
+}
+
+priority_timetable_refresh() {
+    _last=0
+    [ -r "$TMP/last_timetable_fetch" ] && read -r _last < "$TMP/last_timetable_fetch" || :
+    case "$_last" in ''|*[!0-9]*) _last=0 ;; esac
+    _now=`date +%s`
+    [ $((_now - _last)) -ge 60 ] || { unset _last _now; return 0; }
+
+    _old_page=""
+    [ -r "$TMP/pagina" ] && read -r _old_page < "$TMP/pagina" || :
+    if fetch_page "/fights/timetable/" "$TMP/TIMETABLE" 2>/dev/null; then
+        printf '%s\n' "$_now" > "$TMP/last_timetable_fetch"
+    fi
+    [ -n "$_old_page" ] && printf '%s' "$_old_page" > "$TMP/pagina" 2>/dev/null
+    unset _last _now _old_page
+}
+
 priority_guard() {
     priority_event_window && return 1
     command -v event_lock_active >/dev/null 2>&1 && event_lock_active && return 1
 
-    # Quando estamos executando a propria missao do cla, a missao pendente nao
-    # pode interromper a atividade que a completa. Evento continua superior.
     if [ "${PRIORITY_CLAN_ACTIVE:-n}" != "y" ]; then
         priority_clan_pending && return 1
     fi
@@ -59,25 +95,67 @@ priority_guard() {
 
 priority_run_event() {
     _ev=`priority_event_name`
+    _slot=`priority_event_slot`
+
+    if command -v event_slot_seen >/dev/null 2>&1 && event_slot_seen "$_slot"; then
+        priority_state cronograma /fights/timetable/ waiting "janela ja processada: $_slot"
+        unset _ev _slot
+        return 3
+    fi
+
     command -v event_lock_start >/dev/null 2>&1 && event_lock_start "$_ev"
     command -v combat_state_write >/dev/null 2>&1 && combat_state_write "$_ev" waiting "" ""
 
+    _rc=1
     case "$(date +%H:%M)" in
-        10:5[5-9]|18:5[5-9]) priority_state cronograma_clan /fights/timetable/ running; [ -n "$CLD" ] && clanfight_start ;;
-        13:5[5-9]|20:5[5-9]) priority_state cronograma_altar /fights/timetable/ running; [ -n "$CLD" ] && altars_start ;;
-        09:5[5-9]|15:5[5-9]|21:5[5-9]) priority_state cronograma_vale /fights/timetable/ running; undying_start ;;
-        12:2[5-9]|16:2[5-9]|22:2[5-9]) priority_state cronograma_rei /fights/timetable/ running; king_start ;;
-        10:2[8-9]|14:5[8-9]) priority_state cronograma_coliseu_cla /fights/timetable/ running; [ -n "$CLD" ] && clancoliseum_start ;;
-        10:1[0-4]|16:1[0-4]) priority_state cronograma_bandeiras /fights/timetable/ running; flagfight_start ;;
-        09:2[5-9]|21:2[5-9]) priority_state cronograma_evento_especial /fights/timetable/ running; [ "${FUNC_auto_events:-y}" = "y" ] && specialEvent ;;
-        *) command -v event_lock_finish >/dev/null 2>&1 && event_lock_finish "$_ev" skipped; unset _ev; return 1 ;;
+        10:5[5-9]|18:5[5-9])
+            priority_state cronograma_clan /fights/timetable/ running
+            if [ -n "$CLD" ]; then clanfight_start; _rc=$?; else _rc=3; fi ;;
+        13:5[5-9]|20:5[5-9])
+            priority_state cronograma_altar /fights/timetable/ running
+            if [ -n "$CLD" ]; then altars_start; _rc=$?; else _rc=3; fi ;;
+        09:5[5-9]|15:5[5-9]|21:5[5-9])
+            priority_state cronograma_vale /fights/timetable/ running
+            undying_start; _rc=$? ;;
+        12:2[5-9]|16:2[5-9]|22:2[5-9])
+            priority_state cronograma_rei /fights/timetable/ running
+            king_start; _rc=$? ;;
+        10:2[8-9]|14:5[8-9])
+            priority_state cronograma_coliseu_cla /fights/timetable/ running
+            if [ -n "$CLD" ]; then clancoliseum_start; _rc=$?; else _rc=3; fi ;;
+        10:1[0-4]|16:1[0-4])
+            priority_state cronograma_bandeiras /fights/timetable/ running
+            flagfight_start; _rc=$? ;;
+        09:2[5-9]|21:2[5-9])
+            priority_state cronograma_evento_especial /fights/timetable/ running
+            if [ "${FUNC_auto_events:-y}" = "y" ]; then specialEvent; _rc=$?; else _rc=3; fi ;;
+        *) _rc=3 ;;
     esac
 
     command -v combat_state_clear >/dev/null 2>&1 && combat_state_clear
-    command -v event_lock_finish >/dev/null 2>&1 && event_lock_finish "$_ev" finished
-    priority_state cronograma /fights/timetable/ finished
-    unset _ev
-    return 0
+
+    case "$_rc" in
+        0)
+            # O modulo retornou sem erro. Nao chamamos isto de "finished"
+            # porque os modulos legados ainda nao provam semanticamente o fim.
+            command -v event_lock_finish >/dev/null 2>&1 && event_lock_finish "$_ev" returned
+            command -v event_slot_mark >/dev/null 2>&1 && event_slot_mark "$_slot"
+            priority_state cronograma /fights/timetable/ returned "modulo retornou sem erro"
+            ;;
+        3)
+            command -v event_lock_finish >/dev/null 2>&1 && event_lock_finish "$_ev" skipped
+            command -v event_slot_mark >/dev/null 2>&1 && event_slot_mark "$_slot"
+            priority_state cronograma /fights/timetable/ skipped "evento indisponivel/desabilitado"
+            ;;
+        *)
+            command -v event_lock_finish >/dev/null 2>&1 && event_lock_finish "$_ev" failed
+            priority_state cronograma /fights/timetable/ failed "rc=$_rc"
+            ;;
+    esac
+
+    _out=$_rc
+    unset _ev _slot _rc
+    return "$_out"
 }
 
 priority_clan_type() {
@@ -160,8 +238,9 @@ priority_secondary() {
         priority_state masmorra_cla /clandungeon/ running
         if clanDungeon; then
             masmorra_marcar
+            priority_state masmorra_cla /clandungeon/ returned "ataques enviados"
         else
-            priority_state masmorra_cla /clandungeon/ waiting
+            priority_state masmorra_cla /clandungeon/ waiting "nenhum ataque confirmado"
         fi
         return 0
     fi
@@ -175,7 +254,12 @@ priority_secondary() {
     if arena_liberada; then
         priority_state arena /arena/ running
         arena_duel
-        arena_marcar
+        _arc=$?
+        case "$_arc" in
+            0|3) arena_marcar ;;
+        esac
+        [ "$_arc" -eq 2 ] && { unset _arc; return 0; }
+        unset _arc
         return 0
     fi
 
@@ -191,7 +275,10 @@ priority_secondary() {
     priority_state campanha /campaign/ running; campaign_func
     priority_guard || return 0
 
-    priority_state cabana_sabio /sage/ running; check_missions; check_rewards
+    priority_state cabana_sabio /sage/ running
+    pause_missions_weekend 2>/dev/null
+    check_missions
+    check_rewards
     priority_guard || return 0
 
     if [ "${FUNC_auto_events:-y}" = "y" ]; then
@@ -204,12 +291,11 @@ priority_secondary() {
     use_elixir 2>/dev/null
     priority_guard || return 0
 
-    priority_state economia /trade/ running; func_trade
-    if [ -n "$CLD" ]; then
-        priority_state tesouraria_cla "/clan/${CLD}/money/" running
-        clan_money
-    fi
+    priority_state economia /trade/ running
+    func_trade
 
+    # Tesouraria e estatua ficam fail-closed nesta fase: as implementacoes
+    # antigas nao obedeciam a politica economica definida.
     return 0
 }
 
@@ -225,8 +311,10 @@ twm_play() {
     export FUNC_use_blessing FUNC_cave_boost FUNC_quest_force_gold PRIORITY_CLAN_ACTIVE
 
     while true; do
+        priority_timetable_refresh 2>/dev/null
+
         if command -v event_lock_active >/dev/null 2>&1 && event_lock_active; then
-            priority_state cronograma /fights/timetable/ running
+            priority_state cronograma /fights/timetable/ running "event_lock ativo"
         fi
 
         if priority_event_window; then
