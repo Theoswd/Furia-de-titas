@@ -92,11 +92,28 @@ func_sleep() {
         fi
     fi
 
-    if [ "${MIN:-0}" -ge 29 ] && [ "${MIN:-0}" -le 30 ] 2>/dev/null; then
-        i=15
-    else
-        i=60
-    fi
+    # ESPERA CURTA NA APROXIMACAO DAS JANELAS DE EVENTO.
+    #
+    # CORRECAO: com i=60 o worker so reavaliava o relogio uma vez por minuto,
+    # e a volta do laco ainda gasta tempo em requisicoes. Janelas estreitas —
+    # Coliseu do Cla (:28-:29), Bandeiras (:10-:14), Rei (:25-:29), Torneio e
+    # Altares (:55-:59) — podiam ser puladas inteiras: o bot acordava com a
+    # janela ja fechada e o evento passava em branco.
+    #
+    # Perto desses minutos a espera cai para 15s, o que da 4 chances por
+    # minuto de entrar na janela. Fora deles segue 60s, sem custo extra.
+    #
+    # O minuto e lido AQUI, e nao do $MIN: no ramo ocioso do run.sh o
+    # func_sleep e chamado ANTES do func_crono, entao o $MIN esta defasado de
+    # um ciclo (e vazio na primeira volta) — justamente o erro que faria a
+    # espera curta cair no minuto errado.
+    _fs_min=`date +%M | sed 's/^0//'`
+    case "$_fs_min" in ''|*[!0-9]*) _fs_min=0 ;; esac
+    case "$_fs_min" in
+        9|10|11|12|13|24|25|26|27|28|29|30|54|55|56|57) i=15 ;;
+        *)                                              i=60 ;;
+    esac
+    unset _fs_min
     func_cat
 }
 
@@ -252,6 +269,37 @@ tarefas_livres() {
         check_rewards
         ativ_marcar sabio
     fi
+
+    # --- Liga, Troca, Missoes do Cla e Eventos especiais.
+    #
+    # CORRECAO: estas quatro so existiam dentro do start(), que roda apenas
+    # nos minutos exatos da agenda. Quando um evento de prioridade vencia o
+    # case, ou quando o minuto simplesmente nao estava na lista, elas ficavam
+    # de fora — a Liga chegava a passar o dia sem lutar. Agora tambem entram
+    # na varredura ociosa, cada uma no seu intervalo.
+    if ativ_liberada liga 30; then
+        cq_antes liga 2>/dev/null
+        league_play 2>/dev/null
+        ativ_marcar liga
+    fi
+
+    # O func_trade tem portao proprio de uma vez ao dia, entao esta chamada
+    # sai barata nas demais voltas; o intervalo aqui e so para nao reabrir a
+    # pagina da troca a cada minuto.
+    if ativ_liberada troca 60; then
+        func_trade 2>/dev/null
+        ativ_marcar troca
+    fi
+
+    if [ -n "$CLD" ] && [ "${FUNC_clan_missions:-y}" = "y" ] && ativ_liberada clanquest 20; then
+        clanQuests 2>/dev/null
+        ativ_marcar clanquest
+    fi
+
+    if [ "${FUNC_auto_events:-y}" = "y" ] && ativ_liberada evento 30; then
+        specialEvent 2>/dev/null
+        ativ_marcar evento
+    fi
 }
 
 masmorra_na_janela() {
@@ -371,6 +419,7 @@ start() {
 
     cq_antes liga 2>/dev/null
     league_play 2>/dev/null
+    ativ_marcar liga
 
     # Batalhas sempre com elixir e bencao
     cq_antes elixir 2>/dev/null
@@ -390,6 +439,7 @@ start() {
     fi
 
     func_trade
+    ativ_marcar troca
 
     # Cabana do Sabio: missoes, colecoes e reliquias
     check_missions
@@ -398,10 +448,12 @@ start() {
 
     if [ "${FUNC_auto_events:-y}" = "y" ]; then
         specialEvent
+        ativ_marcar evento
     fi
 
     if [ "${FUNC_clan_missions:-y}" = "y" ]; then
         clanQuests
+        ativ_marcar clanquest
     fi
 
     messages_info
