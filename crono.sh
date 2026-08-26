@@ -42,6 +42,7 @@ func_cat() {
     # mostrando a ultima aba visitada (tipicamente Missoes do Cla) o
     # tempo todo, mesmo com o bot ocioso.
     printf %s "/" > "${TMP}/pagina" 2>/dev/null
+    limpar_combate
 
     if [ ! -t 0 ]; then
         printf "Sem batalhas agora, aguardando %ss\n" "$_i"
@@ -124,13 +125,28 @@ stats_liberado() {
 }
 
 atualiza_stats() {
-    # Preserva a aba atual. O run_curl registra toda pagina acessada,
-    # entao esta consulta a /user sobrescreveria a atividade real e o
-    # painel passaria a exibir "Meu Heroi" o tempo todo.
+    # Preserva a aba atual em TODOS os caminhos de saida. O run_curl
+    # registra cada pagina acessada, entao a consulta a /user (e a /train,
+    # para a energia) sobrescreve $TMP/pagina.
+    #
+    # CORRECAO (descanso preso em "Meu Heroi"): a versao anterior so
+    # restaurava a aba no caminho de sucesso. Uma falha de rede ou de sessao
+    # fazia o `return 1` sair deixando "/user" gravado — e o painel exibia
+    # "Meu Heroi" durante o descanso, a cada 3 minutos, ate a proxima escrita.
     _aba_ant=`cat "${TMP}/pagina" 2>/dev/null`
+
+    # CORRECAO (energia congelada): energia e HP maximo so aparecem em /train
+    # e regeneram com o tempo. Sem esta chamada, o painel repetia a energia
+    # da ultima entrada em start() — que tem vaos de mais de uma hora —,
+    # entao ela parecia travada.
+    fetch_train_stats 2>/dev/null
+
     _pg=`run_curl "${URL}/user" 2>/dev/null`
-    [ -n "$_pg" ] || return 1
-    is_logged_in "$_pg" || return 1
+    if [ -z "$_pg" ] || ! is_logged_in "$_pg"; then
+        printf %s "$_aba_ant" > "${TMP}/pagina" 2>/dev/null
+        unset _pg _aba_ant
+        return 1
+    fi
     _a=`extract_username "$_pg"`
     [ -n "$_a" ] && ACC="$_a"
     parse_status "$_pg"
@@ -227,12 +243,29 @@ arena_liberada() {
 }
 arena_marcar() { date +%s > "$TMP/last_arena" 2>/dev/null; }
 
+# Apaga os marcadores de combate ao vivo deixados no disco.
+#
+# Os modulos de batalha (king, altares, torneio, masmorra, bandeiras,
+# coliseu do cla) gravam HP/old_HP/FULL/USH no diretorio da conta durante a
+# luta, e o painel os le para desenhar o "ao vivo das batalhas". Eles NAO
+# eram apagados ao fim da luta, entao o painel continuava mostrando
+# "-142 de dano recebido" com a conta ja parada na pagina inicial —
+# combate fantasma. Apagados aqui (no descanso), o ao vivo passa a refletir
+# apenas batalha de verdade em andamento.
+limpar_combate() {
+    rm -f "$TMP/HP" "$TMP/old_HP" "$TMP/FULL" "$TMP/USH" 2>/dev/null
+}
+
 # Volta para a pagina inicial. As contas devem descansar ali entre os
 # ciclos, e nao numa pagina de combate ou de evento — o jogo mantem o
 # personagem "em batalha" e a navegacao seguinte cai em "Fuja da batalha".
 descansar() {
     fetch_page "/?out_gate_confirm=true" "$TMP/REST" 2>/dev/null
     fetch_page "/" "$TMP/REST" 2>/dev/null
+    # A conta voltou para casa: registra a pagina inicial e encerra o
+    # "ao vivo" da luta que acabou.
+    printf %s "/" > "$TMP/pagina" 2>/dev/null
+    limpar_combate
 }
 
 start() {

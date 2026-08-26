@@ -341,7 +341,13 @@ fetch_train_stats() {
     _t=`run_curl "${URL}/train" 2>/dev/null`
     [ -n "$_t" ] || return 1
     FIXHP=`printf '%s' "$_t" | grep -o -E '\([0-9]{1,9}\)' | head -n1 | tr -d '()'`
-    ACC_ENE=`printf '%s' "$_t" | grep -o -E "Energia:? ?[0-9][0-9.,']{0,14}[KMBkmb]?" | sed -E 's@.*:? ?@@' | head -n1`
+    # CORRECAO (energia sempre vazia): o sed era `s@.*:? ?@@`. Como `:?` e ` ?`
+    # sao ambos opcionais, o `.*` guloso casava a string INTEIRA ("Energia:
+    # 2125") e a substituicao apagava tudo, devolvendo vazio. Sobrava so o
+    # fallback abaixo, que ainda perde o sufixo K/M ("2,1M" virava "2,1").
+    # Agora a remocao e ancorada no proprio rotulo, preservando o numero e o
+    # sufixo.
+    ACC_ENE=`printf '%s' "$_t" | grep -o -E "Energia:? ?[0-9][0-9.,']{0,14}[KMBkmb]?" | head -n1 | sed -E 's@^Energia:?[[:space:]]*@@'`
     [ -z "$ACC_ENE" ] && ACC_ENE=`printf '%s' "$_t" | grep -o -E "Energia:? ?[0-9.,']{1,15}" | grep -o -E "[0-9.,']{1,15}$" | head -n1`
     unset _t
 }

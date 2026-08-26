@@ -19,6 +19,14 @@
 # ============================================================
 if [ -t 1 ]; then HAS_TTY=1; else HAS_TTY=0; fi
 
+# "Chat" (feed de ATIVIDADE EM CONJUNTO: uma linha por conta com a aba
+# atual) DESATIVADO por enquanto — ocupava boa parte da tela e ainda nao tem
+# um layout definitivo. Reative com TWM_CHAT=1 ./status.sh quando houver um
+# desenho pronto. O "ao vivo das batalhas" nao depende disto: ele agora
+# sobrepoe o painel por conta propria sempre que ha luta de verdade.
+TWM_CHAT="${TWM_CHAT:-0}"
+case "$TWM_CHAT" in 1) ;; *) TWM_CHAT=0 ;; esac
+
 # Cores
 C_RESET='\033[0m';   C_DIM='\033[2m';      C_BOLD='\033[1m'
 C_CYAN='\033[1;36m'; C_GREEN='\033[1;32m'; C_YELLOW='\033[1;33m'
@@ -33,7 +41,7 @@ C_GOLD='\033[0;33m'; C_GRAY='\033[0;37m';  C_BLUE='\033[1;34m'
 #     TWM_EMOJI=1 ./play.sh
 if [ "${TWM_EMOJI:-0}" = "1" ]; then
     I_HP="❤️ "; I_EN="⚡ "; I_LV="⭐ "; I_GO="🪙 "; I_SI="🥈 "
-    I_TIT="🎮 "; I_ACT="📋 "; I_EVT="⏰ "; I_ARROW="▸"
+    I_TIT="🎮 "; I_ACT="📋 "; I_EVT="⏰ "; I_ARROW="▸"; I_LIVE="⚔️ "
     S_ON="🟢"; S_WAIT="🟡"; S_ERR="🔴"; S_OFF="⚫"; S_UNK="⚪"; S_PAUSE="⏸️"
     A_CLANFIGHT="🏆  Torneio do Clã";   A_ALTARES="🔥  Altares dos Deuses"
     A_VALE="🌘  Vale dos Imortais";     A_REI="👑  Rei dos Imortais"
@@ -47,7 +55,7 @@ if [ "${TWM_EMOJI:-0}" = "1" ]; then
     A_NONE="—"
 else
     I_HP="HP"; I_EN="Eng"; I_LV="LV"; I_GO="Ouro"; I_SI="PR"
-    I_TIT=""; I_ACT=""; I_EVT=""; I_ARROW="->"
+    I_TIT=""; I_ACT=""; I_EVT=""; I_ARROW="->"; I_LIVE=""
     S_ON="[on]"; S_WAIT="[..]"; S_ERR="[off]"; S_OFF="[--]"; S_UNK="[??]"; S_PAUSE="[||]"
     A_CLANFIGHT="Torneio do Clã";   A_ALTARES="Altares dos Deuses"
     A_VALE="Vale dos Imortais";     A_REI="Rei dos Imortais"
@@ -332,8 +340,8 @@ while true; do
     # estimado — com 72 ele ainda estourava em telas de 72 e 80 colunas.
     if [ "$LARG" -lt 86 ]; then ESTREITO=1; else ESTREITO=0; fi
 
-    n_on=0; n_up=0; n_off=0; idx=0
-    LISTA=""; ATIV=""
+    n_on=0; n_up=0; n_off=0; n_fight=0; idx=0
+    LISTA=""; ATIV=""; BATALHAS=""
 
     while IFS='|' read -r srv user _enc <&3; do
         limpa_campo "$srv";  srv="$_CF"
@@ -409,23 +417,52 @@ while true; do
             *)       _cor_c="$C_GREEN" ;;
         esac
 
+        # AO VIVO DAS BATALHAS — sobrepoe o painel.
+        #
+        # Uma conta so entra aqui quando ha combate DE VERDADE em andamento:
+        # o combate_de so devolve texto enquanto os modulos de batalha
+        # atualizam HP/old_HP, e o descansar()/func_cat apagam esses arquivos
+        # ao fim da luta. Independe do "chat": mesmo com o feed desativado, a
+        # luta aparece.
+        if [ -n "$_cbt" ]; then
+            n_fight=$((n_fight + 1))
+            _bw=$((LARG - 30))
+            [ "$_bw" -lt 6 ] && _bw=6
+            BATALHAS="${BATALHAS}$(printf "  %b%s %b%-14.14s %b%-*.*s %b%s%b" \
+                "$_cor_c" "$I_LIVE" "$C_WHITE" "$nome" \
+                "$C_CYAN" "$_bw" "$_bw" "$_aba" "$_cor_c" "$_cbt" "$C_RESET")
+"
+        fi
+
         if [ "$ESTREITO" = 1 ]; then
             # TELA ESTREITA (celular): duas linhas por conta, com a aba na
             # primeira. As duas secoes se fundem — repetir os seis nomes
             # numa lista separada nao cabe e nao acrescenta nada.
             # Nome com largura util, nao esticado ate a borda: o resto do
             # espaco vai para a aba, que e a informacao que muda.
-            _nw=$((LARG - 32))
-            [ "$_nw" -gt 18 ] && _nw=18
-            [ "$_nw" -lt 8 ]  && _nw=8
-            _aw=$((LARG - _nw - 13))
-            [ "$_aw" -lt 6 ] && _aw=6
-            LISTA="${LISTA}$(printf "%b%2s %b%-5s %b%-*.*s %b%s %b%-.*s%b" \
-                "$C_DIM" "$idx" "$cor" "$sim" \
-                "$C_WHITE" "$_nw" "$_nw" "$nome" \
-                "$C_DIM" "$I_ARROW" \
-                "$C_CYAN" "$_aw" "$_aba" "$C_RESET")
+            if [ "$TWM_CHAT" = 1 ]; then
+                # "Chat" ligado: aba atual junto do nome.
+                _nw=$((LARG - 32))
+                [ "$_nw" -gt 18 ] && _nw=18
+                [ "$_nw" -lt 8 ]  && _nw=8
+                _aw=$((LARG - _nw - 13))
+                [ "$_aw" -lt 6 ] && _aw=6
+                LISTA="${LISTA}$(printf "%b%2s %b%-5s %b%-*.*s %b%s %b%-.*s%b" \
+                    "$C_DIM" "$idx" "$cor" "$sim" \
+                    "$C_WHITE" "$_nw" "$_nw" "$nome" \
+                    "$C_DIM" "$I_ARROW" \
+                    "$C_CYAN" "$_aw" "$_aba" "$C_RESET")
 "
+            else
+                # "Chat" desligado: so numero, simbolo e nome — o nome ganha a
+                # largura que a aba ocupava.
+                _nw=$((LARG - 11))
+                [ "$_nw" -lt 8 ] && _nw=8
+                LISTA="${LISTA}$(printf "%b%2s %b%-5s %b%-.*s%b" \
+                    "$C_DIM" "$idx" "$cor" "$sim" \
+                    "$C_WHITE" "$_nw" "$nome" "$C_RESET")
+"
+            fi
             # Rotulos curtos e truncamento na largura da tela.
             #
             # "HP 98062 Eng 2195 LV 104 Ouro 5,2M PR 1477,8M" tem 45
@@ -444,7 +481,10 @@ while true; do
                     "$_l1" "$hp" "$_l2" "$ene" "$_l3" "$lvl" \
                     "$_l4" "$ouro" "$_l5" "$prata")" "$C_RESET")
 "
-            [ -n "$_cbt" ] && LISTA="${LISTA}$(printf "    %b%s%b" "$_cor_c" "$_cbt" "$C_RESET")
+            # Linha de combate no feed so quando o "chat" esta ligado; com ele
+            # desligado a luta aparece no overlay de batalhas, nao aqui.
+            [ "$TWM_CHAT" = 1 ] && [ -n "$_cbt" ] && \
+                LISTA="${LISTA}$(printf "    %b%s%b" "$_cor_c" "$_cbt" "$C_RESET")
 "
         else
             # CORRECAO: o simbolo ia embutido no %b, sem largura, entao
@@ -460,14 +500,17 @@ while true; do
                 "$C_GOLD" "$I_GO" "$ouro" \
                 "$C_GRAY" "$I_SI" "$prata" "$C_RESET")
 "
-            if [ -n "$_cbt" ]; then
-                ATIV="${ATIV}$(printf "    %b%-18.18s %b%s %b%-22.22s %b%s%b" \
-                    "$C_WHITE" "$nome" "$C_DIM" "$I_ARROW" "$C_CYAN" "$_aba" "$_cor_c" "$_cbt" "$C_RESET")
+            # Feed "ATIVIDADE EM CONJUNTO" (o "chat") so e montado quando ligado.
+            if [ "$TWM_CHAT" = 1 ]; then
+                if [ -n "$_cbt" ]; then
+                    ATIV="${ATIV}$(printf "    %b%-18.18s %b%s %b%-22.22s %b%s%b" \
+                        "$C_WHITE" "$nome" "$C_DIM" "$I_ARROW" "$C_CYAN" "$_aba" "$_cor_c" "$_cbt" "$C_RESET")
 "
-            else
-                ATIV="${ATIV}$(printf "    %b%-18.18s %b%s %b%s%b" \
-                    "$C_WHITE" "$nome" "$C_DIM" "$I_ARROW" "$C_CYAN" "$_aba" "$C_RESET")
+                else
+                    ATIV="${ATIV}$(printf "    %b%-18.18s %b%s %b%s%b" \
+                        "$C_WHITE" "$nome" "$C_DIM" "$I_ARROW" "$C_CYAN" "$_aba" "$C_RESET")
 "
+                fi
             fi
         fi
     done 3< "$ACCOUNTS_FILE"
@@ -487,9 +530,22 @@ while true; do
         printf "%b" "$LISTA"
         painel_regua "$LARG"
 
-        # Numa tela estreita a aba ja vai junto do nome, entao a secao
-        # separada seria so uma repeticao dos mesmos seis nomes.
-        if [ "$ESTREITO" != 1 ]; then
+        # AO VIVO DAS BATALHAS — sobrepoe o painel.
+        #
+        # Aparece logo abaixo das contas, em destaque, sempre que ha luta de
+        # verdade em andamento (n_fight > 0). Some sozinho quando ninguem esta
+        # lutando, sem ocupar espaco. Nao depende do "chat".
+        if [ "$n_fight" -gt 0 ]; then
+            printf "  %b%sAO VIVO — BATALHAS (%s)%b\n" \
+                "$C_RED$C_BOLD" "$I_LIVE" "$n_fight" "$C_RESET"
+            printf "%b" "$BATALHAS"
+            painel_regua "$LARG"
+        fi
+
+        # Feed "ATIVIDADE EM CONJUNTO" (o "chat") DESATIVADO por padrao —
+        # ocupava boa parte da tela. Reative com TWM_CHAT=1. Em tela estreita a
+        # aba ja ia junto do nome, entao a secao separada nunca fez sentido ali.
+        if [ "$TWM_CHAT" = 1 ] && [ "$ESTREITO" != 1 ]; then
             printf "  %b%sATIVIDADE EM CONJUNTO%b\n" "$C_CYAN$C_BOLD" "$I_ACT" "$C_RESET"
             printf "%b" "$ATIV"
             painel_regua "$LARG"
