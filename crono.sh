@@ -224,6 +224,34 @@ tarefas_livres() {
         arena_duel
         arena_marcar
     fi
+
+    # --- Carreira, campanha, caverna e cabana do sabio: executa o que
+    # estiver disponivel sem esperar os minutos :00/:30 do start(). Cada
+    # uma so refaz apos o proprio intervalo (marcador em disco), entao a
+    # varredura e barata. As proprias funcoes ja saem rapido quando nao ha
+    # nada disponivel (sem link = sem acao).
+    if ativ_liberada carreira 15; then
+        cq_antes carreira 2>/dev/null
+        career_func
+        ativ_marcar carreira
+    fi
+
+    if ativ_liberada campanha 15; then
+        campaign_func
+        ativ_marcar campanha
+    fi
+
+    if ativ_liberada caverna 20; then
+        cq_antes caverna 2>/dev/null
+        cave_routine
+        ativ_marcar caverna
+    fi
+
+    if ativ_liberada sabio 20; then
+        check_missions
+        check_rewards
+        ativ_marcar sabio
+    fi
 }
 
 masmorra_na_janela() {
@@ -245,6 +273,27 @@ arena_liberada() {
     [ $((_agora - _ultimo)) -ge $((_m * 60)) ]
 }
 arena_marcar() { date +%s > "$TMP/last_arena" 2>/dev/null; }
+
+# Varredura periodica de atividades no ciclo ocioso.
+#
+# O sweep completo (start) so roda em :00 e :30. Entre esses minutos o bot
+# ficava esperando, mesmo com carreira/campanha/caverna/cabana disponiveis.
+# Agora o tarefas_livres tambem verifica e executa essas atividades, cada
+# uma no seu proprio intervalo (marcador last_<nome> em disco, por conta,
+# como a arena) — assim executa o que estiver disponivel sem esperar o :00/
+# :30 e sem refazer a cada minuto (o que pesaria no Android/E22). O start()
+# tambem marca ao rodar, para as duas vias nao duplicarem.
+ativ_liberada() {
+    _an="$1"; _am="${2:-15}"
+    case "$_am" in ''|*[!0-9]*) _am=15 ;; esac
+    _au=`cat "$TMP/last_$_an" 2>/dev/null`
+    case "$_au" in ''|*[!0-9]*) _au=0 ;; esac
+    if [ $(( $(date +%s) - _au )) -ge $((_am * 60)) ]; then
+        unset _an _am _au; return 0
+    fi
+    unset _an _am _au; return 1
+}
+ativ_marcar() { date +%s > "$TMP/last_$1" 2>/dev/null; }
 
 # Apaga os marcadores de combate ao vivo deixados no disco.
 #
@@ -314,9 +363,11 @@ start() {
 
     cq_antes carreira 2>/dev/null
     career_func
+    ativ_marcar carreira
 
     cq_antes caverna 2>/dev/null
     cave_routine
+    ativ_marcar caverna
 
     cq_antes liga 2>/dev/null
     league_play 2>/dev/null
@@ -327,6 +378,7 @@ start() {
     use_blessing 2>/dev/null
 
     campaign_func
+    ativ_marcar campanha
 
     # Masmorra do cla: mesmo portao de 8h que tarefas_livres usa. Antes
     # so checava a janela, entao reentrava a cada ciclo enquanto a janela
@@ -342,6 +394,7 @@ start() {
     # Cabana do Sabio: missoes, colecoes e reliquias
     check_missions
     check_rewards
+    ativ_marcar sabio
 
     if [ "${FUNC_auto_events:-y}" = "y" ]; then
         specialEvent
