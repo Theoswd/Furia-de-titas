@@ -15,7 +15,7 @@ specialEvent() {
         questrnd)
             fetch_page "$event_link"
             printf "Event Adventure\n"
-            click=`grep -o -E "/questrnd/take/\?r=[0-9]{8}" "$TMP/SRC" | sed -n '1p'`
+            click=`grep -o -E "/questrnd/take/[?]r=[0-9]+" "$TMP/SRC" | sed -n '1p'`
             if [ -n "$click" ]; then
                 fetch_page "$click"
                 printf "Claiming reward\n"

@@ -39,10 +39,10 @@ checkQuest() {
 
     case "$action" in
         apply)
-            click=`grep -o -E "/quest/(take|help)/$quest_id/\?r=[0-9]{8}" "$TMP/SRC" | sed -n '1p'`
+            click=`grep -o -E "/quest/take/$quest_id/[?]r=[0-9]+" "$TMP/SRC" | sed -n '1p'`
             ;;
         end)
-            click=`grep -o -E "/quest/(deleteHelp|end)/$quest_id/\?r=[0-9]{8}" "$TMP/SRC" | sed -n '1p'`
+            click=`grep -o -E "/quest/end/$quest_id/[?]r=[0-9]+" "$TMP/SRC" | sed -n '1p'`
             ;;
         *)
             return 1
@@ -50,7 +50,7 @@ checkQuest() {
     esac
 
     if [ -n "$click" ]; then
-        fetch_page "$click"
+        fetch_page "/clan/${CLD}${click}"
         return 0
     fi
 

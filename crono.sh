@@ -37,12 +37,15 @@ func_cat() {
     _i="${i:-60}"
     case "$_i" in ''|*[!0-9]*) _i=60 ;; esac
 
-    # A conta esta parada entre ciclos: registra a pagina inicial, que
-    # e onde ela de fato descansa. Sem isto o painel continuava
-    # mostrando a ultima aba visitada (tipicamente Missoes do Cla) o
-    # tempo todo, mesmo com o bot ocioso.
-    printf %s "/" > "${TMP}/pagina" 2>/dev/null
-    limpar_combate
+    # DESCANSO REAL NA HOME.
+    #
+    # Antes aqui so gravava pagina="/" (mentira): a SESSAO no jogo continuava
+    # na ultima pagina de verdade — tipicamente /user (stats) ou /clan
+    # (checklist), buscadas pelo tarefas_livres no ciclo ocioso. Por isso a
+    # "atividade" que os outros jogadores viam era sempre Perfil/Cla, enquanto
+    # o painel dizia "Pagina Principal". Agora faz um GET real em "/", entao a
+    # conta descansa de fato na home e o pagina="/" passa a ser verdade.
+    descansar
 
     if [ ! -t 0 ]; then
         printf "Sem batalhas agora, aguardando %ss\n" "$_i"

@@ -51,13 +51,15 @@ arena_duel() {
     BREAK=$(($(date +%s) + 60))
     count=0
 
-    until grep -q -o 'lab/wizard' "$TMP/SRC" || [ "$(date +%s)" -gt "$BREAK" ]; do
-        ACCESS=`grep -o -E '(/arena/attack/1/[?]r[=][0-9]+)' "$TMP/SRC" | sed -n '1p'`
-        # Sem link de ataque a arena acabou: sai em vez de repetir
-        # fetch_page com URL vazia (que baixa a home) por 60 segundos.
+    # CORRECAO: o laco era "until grep 'lab/wizard' ...". Em alguns estados a
+    # pagina da arena ja traz o link do Laboratorio do Mago e o laco terminava
+    # ANTES de atacar — a conta "ia na arena" mas nao golpeava (energia nao
+    # caia). Agora quem manda e a PRESENCA do link de ataque real (com nonce),
+    # slot generico [0-9]+ (nao fixo em /1/), dentro do teto de 60s.
+    while [ "$(date +%s)" -lt "$BREAK" ]; do
+        ACCESS=`grep -o -E '/arena/attack/[0-9]+/[?]r[=][0-9]+' "$TMP/SRC" | sed -n '1p'`
         if [ -z "$ACCESS" ]; then
-            printf "  Arena sem ataques disponiveis
-"
+            printf "  Arena: sem ataque disponivel agora\n"
             break
         fi
         fetch_page "$ACCESS"

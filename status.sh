@@ -49,13 +49,17 @@ while [ "$#" -gt 0 ]; do
         -h|--help)
             printf "uso: ./status.sh [-1] [-n SEGUNDOS]\n"
             printf "  -1        imprime uma vez e sai\n"
-            printf "  -n SEG    intervalo de atualizacao (padrao 20)\n"
+            printf "  -n SEG    intervalo de atualizacao (padrao 5)\n"
             exit 0
             ;;
     esac
     shift
 done
-case "${PANEL_INTERVAL:-20}" in ''|*[!0-9]*) PANEL_INTERVAL=20 ;; esac
+# Padrao 5s (era 20s): o painel so LE arquivos (pagina/stats/combate ja sao
+# gravados a cada requisicao pelos workers), entao atualizar mais rapido
+# deixa o "log de atividade" praticamente em tempo real, seguindo o bot entre
+# as paginas, sem custo para as contas. Ajustavel com -n.
+case "${PANEL_INTERVAL:-5}" in ''|*[!0-9]*) PANEL_INTERVAL=5 ;; esac
 export PANEL_INTERVAL
 
 # ============================================================
