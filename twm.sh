@@ -181,6 +181,9 @@ do_login() {
     cript_file="$TMP/cript_file"
     if [ ! -s "$cript_file" ]; then
         printf "[%s] %s — ERRO: sem credenciais\n" "$TWM_TAG" "$TWM_USER"
+        # Explicito para nao herdar o LOGIN_ERRO da tentativa anterior: sem
+        # credencial nao adianta reencurtar a espera como se fosse rede.
+        LOGIN_ERRO=credencial
         return 1
     fi
 
@@ -215,9 +218,22 @@ do_login() {
     run_curl --data-urlencode "login=${luser}" \
              --data-urlencode "pass=${lpass}" \
              "${URL}/?sign_in=1" > /dev/null
+    # O $? TEM de ser lido AQUI, colado no comando.
+    #
+    # CORRECAO (contas que ficam fora do ar com muitas contas): antes o
+    # "unset luser lpass" vinha entre o POST e a leitura, entao "_rc2=$?"
+    # capturava o status do UNSET — que e sempre 0. A deteccao de falha de
+    # REDE no POST de login nunca disparava.
+    #
+    # O estrago aparece no backoff: uma falha de rede durante o POST (o caso
+    # comum quando ha 15 contas do mesmo IP e o servidor estrangula) caia no
+    # ramo "credencial", como se a senha estivesse errada. Esse ramo escala a
+    # espera — 60s, depois 300s e depois 900s. Uma oscilacao de poucos
+    # segundos jogava a conta para QUINZE MINUTOS parada, repetidamente, e o
+    # painel a mostrava fora do ar quase o tempo todo.
+    _rc2=$?
     unset luser lpass
 
-    _rc2=$?
     PAGE=$(run_curl "${URL}/user" 2>/dev/null)
     _rc3=$?
 
