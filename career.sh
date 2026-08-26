@@ -2,7 +2,10 @@ career_func() {
     printf "Career\n"
     fetch_page "/career/"
 
-    if grep -q -o -E '/career/attack/[?]r[=][0-9]+' "$TMP/SRC"; then
+    # CORRECAO: a guarda so entrava com link de 'attack', mas o laco interno
+    # trata 'attack' E 'take'. Uma pagina so com 'take' (recompensa pronta,
+    # ataques ja esgotados) era descartada e a recompensa nunca recolhida.
+    if grep -q -o -E '/career/(attack|take)/[?]r[=][0-9]+' "$TMP/SRC"; then
         checkQuest 6 apply
 
         fetch_page "/career/"

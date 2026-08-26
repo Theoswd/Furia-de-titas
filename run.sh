@@ -79,6 +79,11 @@ twm_play() {
             # Home no servidor entre os pulsos (o func_cat ja faz isso nos
             # demais ramos).
             descansar
+            # Quando NAO ha luta, o coliseum_fight retorna na hora e este ramo
+            # (sem func_sleep) reentraria em rajada dentro do mesmo minuto.
+            # Uma pausa curta limita isso sem atrasar o pulso de forma sensivel;
+            # quando HA luta, o coliseum_fight ja consome o tempo.
+            sleep 5
             ;;
 
         # --- Batalha de Bandeiras
