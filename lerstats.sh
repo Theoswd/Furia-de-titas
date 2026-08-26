@@ -67,6 +67,14 @@ else
     printf "\n${D}  Todos os numeros entre parenteses (HP maximo sai daqui):${N}\n"
     printf '%s' "$TRAIN" | grep -o -E '\([0-9]{1,9}\)' | head -n 5 | sed 's/^/    /'
 
+    printf "\n${D}  Contexto de cada icone (qual valor acompanha qual icone):${N}\n"
+    printf '%s' "$TRAIN" | grep -o -E "icon/[a-z]+\.png.{0,60}" | head -n 8 | sed 's/^/    /'
+
+
+    printf "\n${D}  Pares 'N / M' ou 'N de M' (energia atual e teto, se existirem):${N}\n"
+    printf '%s' "$TRAIN" | sed 's/<[^>]*>/ /g' | tr -s ' ' \
+        | grep -o -E "[0-9][0-9.,']{0,9} ?(/|de) ?[0-9][0-9.,']{0,9}" | head -n 6 | sed 's/^/    /'
+
     printf "\n${Y}  O que o bot extrai hoje:${N}\n"
     _ene=$(printf '%s' "$TRAIN" | grep -o -E "Energia:? ?[0-9][0-9.,']{0,14}[KMBkmb]?" \
            | head -n1 | sed -E 's@^Energia:?[[:space:]]*@@')
@@ -81,7 +89,15 @@ USERPG=$(baixa "$URL/user")
 if [ -z "$USERPG" ]; then
     printf "  ${R}pagina vazia (sessao caida ou sem rede)${N}\n"
 else
-    printf "${Y}  O que o bot extrai hoje:${N}\n"
+    printf "${D}  Todo trecho com a palavra 'Energia' (texto, sem tags):${N}\n"
+    printf '%s' "$USERPG" | sed 's/<[^>]*>/ /g' | tr -s ' ' \
+        | grep -o -i -E ".{0,45}Energia.{0,45}" | head -n 4 | sed 's/^/    /'
+
+    printf "\n${D}  Contexto de cada icone (qual valor acompanha qual icone):${N}\n"
+    printf '%s' "$USERPG" | grep -o -E "icon/[a-z]+\.png.{0,60}" | head -n 8 | sed 's/^/    /'
+
+
+    printf "\n${Y}  O que o bot extrai hoje:${N}\n"
     printf "    HP    = %s\n" "$(printf '%s' "$USERPG" | grep -o -E "health\.png' alt='hp'/> <span[^>]*>[0-9]{1,9}" | grep -o -E '[0-9]{1,9}$' | head -n1)"
     printf "    MP    = %s\n" "$(printf '%s' "$USERPG" | grep -o -E "mana\.png' alt='mp'/>[^0-9<]{0,4}[0-9]{1,9}" | grep -o -E '[0-9]{1,9}$' | head -n1)"
     printf "    Nivel = %s\n" "$(printf '%s' "$USERPG" | grep -o -E "level\.png' alt='[^']*'/> ?[0-9]{1,4}" | grep -o -E '[0-9]{1,4}$' | head -n1)"
