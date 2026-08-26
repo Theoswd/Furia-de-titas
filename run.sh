@@ -74,11 +74,19 @@ twm_play() {
               # confere o checklist do cla e roda a arena no intervalo dela.
               # Antes, as quatro horas da janela passavam sem nada disso.
             tarefas_livres
+            # Este ramo nao passa pelo func_cat/start(), entao sem isto a
+            # sessao ficava presa na ultima pagina de luta/missao. Descansa na
+            # Home no servidor entre os pulsos (o func_cat ja faz isso nos
+            # demais ramos).
+            descansar
             ;;
 
         # --- Batalha de Bandeiras
         (10:1[0-4]|16:1[0-4])
             flagfight_start
+            # Sai da pagina da batalha e descansa na Home no servidor: este
+            # ramo tambem nao passa pelo func_cat/start().
+            descansar
             ;;
 
         # --- Eventos especiais

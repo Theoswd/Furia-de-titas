@@ -574,6 +574,6 @@ while true; do
     # Uma volta so (status.sh -1): desenha e sai, sem dormir.
     [ "${PANEL_ONCE:-0}" = "1" ] && break
 
-    sleep "${PANEL_INTERVAL:-20}"
+    sleep "${PANEL_INTERVAL:-5}"
 done
 }
