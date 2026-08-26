@@ -162,6 +162,30 @@ atualiza_stats() {
     fetch_train_stats 2>/dev/null
 
     _pg=`run_curl "${URL}/user" 2>/dev/null`
+
+    # SESSAO CAIDA NO OCIO: RECONECTA EM VEZ DE DESISTIR.
+    #
+    # Este era o motivo de a conta "aparecer no painel mas nao no jogo". O
+    # login_logoff — unica funcao que revalida a sessao — so era chamado
+    # dentro do start(), que roda apenas nos minutos da agenda. No ocio, que
+    # e a maior parte do tempo, ninguem checava nada: aqui a sessao morta era
+    # detectada e a funcao apenas devolvia 1, em silencio.
+    #
+    # Com a sessao morta o bot continua pedindo paginas, mas o servidor ve um
+    # visitante anonimo — a conta NAO aparece online para os outros jogadores.
+    # Ela so voltava quando o start() rodava num minuto da agenda e
+    # reconectava, o que dava exatamente o sintoma: a conta so aparecia
+    # durante os eventos do cronograma.
+    #
+    # Com muitas contas isso e bem mais frequente, porque o servidor derruba
+    # sessao com mais facilidade quando ha varias do mesmo IP.
+    if [ -n "$_pg" ] && ! is_logged_in "$_pg"; then
+        printf "Sessao caiu no ocio - reconectando\n"
+        if type login_logoff > /dev/null 2>&1 && login_logoff; then
+            _pg=`run_curl "${URL}/user" 2>/dev/null`
+        fi
+    fi
+
     if [ -z "$_pg" ] || ! is_logged_in "$_pg"; then
         printf %s "$_aba_ant" > "${TMP}/pagina" 2>/dev/null
         unset _pg _aba_ant

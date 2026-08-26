@@ -23,12 +23,27 @@ login_logoff() {
     printf "[%s] %s — sessao expirada, reconectando...\n" "$TWM_TAG" "$TWM_USER"
     rm -f "$TMP_COOKIE"
 
+    cript_file="$TMP/cript_file"
+    [ ! -f "$cript_file" ] && return 1
+
+    # TRAVA GLOBAL DE LOGIN TAMBEM NA RECONEXAO.
+    #
+    # O do_login (twm.sh) ja serializa a autenticacao inicial, mas esta
+    # reconexao nao pegava a trava. Com muitas contas isso importa: quando o
+    # servidor derruba varias sessoes ao mesmo tempo — o caso comum com 15
+    # contas no mesmo IP — todas reconectavam no mesmo instante. O servidor
+    # estrangula essa rajada e responde com a MESMA mensagem de "senha
+    # incorreta", entao contas boas caem no backoff longo e ficam fora do ar
+    # justamente quando mais precisavam voltar.
+    _ll_lock=0
+    if type login_lock > /dev/null 2>&1; then
+        login_lock
+        _ll_lock=1
+    fi
+
     # Mesmo motivo do do_login: a sessao precisa passar pela pagina de
     # login antes do POST, senao o servidor recusa a credencial correta.
     run_curl "${URL}/?sign_in=1" > /dev/null 2>&1
-
-    cript_file="$TMP/cript_file"
-    [ ! -f "$cript_file" ] && return 1
 
     creds=`base64 -d "$cript_file" 2>/dev/null`
     luser=`echo "$creds" | sed 's/login=//;s/&pass=.*//'`
@@ -46,6 +61,11 @@ login_logoff() {
         "${URL}/user" > /dev/null
 
     unset luser lpass
+
+    # A trava cobre so a autenticacao. Liberar aqui garante que ela sai em
+    # qualquer caminho — sucesso, recusa ou erro de rede.
+    [ "$_ll_lock" = "1" ] && login_unlock
+    unset _ll_lock
 
     PAGE=`run_curl "${URL}/user"`
 
