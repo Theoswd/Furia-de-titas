@@ -126,7 +126,7 @@ list_accounts() {
         printf "${RED}Nenhuma conta cadastrada ainda.${RESET}\n"
     else
         n=1
-        while IFS='|' read -r srv user _enc; do
+        while IFS='|' read -r srv user _enc || [ -n "$srv" ]; do
             case "$srv" in ''|\#*) continue ;; esac
             [ -z "$user" ] && continue
             url=$(server_url "$srv")
@@ -224,7 +224,7 @@ remove_account() {
         printf "${RED}Nenhuma conta.${RESET}\n" && sleep 2 && return
 
     n=1
-    while IFS='|' read -r srv user _enc; do
+    while IFS='|' read -r srv user _enc || [ -n "$srv" ]; do
         case "$srv" in ''|\#*) continue ;; esac
         [ -z "$user" ] && continue
         tag=$(server_tag "$srv")
@@ -280,7 +280,7 @@ test_account() {
         printf "${RED}Nenhuma conta.${RESET}\n" && sleep 2 && return
 
     n=1
-    while IFS='|' read -r srv user _enc; do
+    while IFS='|' read -r srv user _enc || [ -n "$srv" ]; do
         case "$srv" in ''|\#*) continue ;; esac
         [ -z "$user" ] && continue
         tag=$(server_tag "$srv")

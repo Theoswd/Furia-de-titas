@@ -335,7 +335,9 @@ while true; do
     n_on=0; n_up=0; n_off=0; n_fight=0; idx=0
     LISTA=""; BATALHAS=""
 
-    while IFS='|' read -r srv user _enc <&3; do
+    # Le tambem a ultima linha quando o arquivo nao termina em quebra de
+    # linha; sem isto a ultima conta nunca aparecia no painel (ver play.sh).
+    while IFS='|' read -r srv user _enc <&3 || [ -n "$srv" ]; do
         limpa_campo "$srv";  srv="$_CF"
         limpa_campo "$user"; user="$_CF"
         case "$srv" in ''|\#*|*[!0-9]*) continue ;; esac
