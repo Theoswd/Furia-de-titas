@@ -199,7 +199,7 @@ coliseum_start() {
                 ) </dev/null > /dev/null 2>&1 &
                 time_exit 20
 
-                ENDQUEST=`grep -o -E '/quest/end/11[?]r[=][A_z0-9]+' "$TMP/SRC"`
+                ENDQUEST=`grep -o -E '/quest/end/11[?]r[=][A-Za-z0-9]+' "$TMP/SRC"`
                 if [ -n "$ENDQUEST" ]; then
                     (
                         run_curl_exec "${URL}${ENDQUEST}" > "$TMP/SRC"
