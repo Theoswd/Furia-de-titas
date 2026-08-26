@@ -70,12 +70,20 @@ arena_duel() {
 
     fetch_page "/inv/bag/"
     SELL=`grep -o -E '(/inv/bag/sellAll/1/[?]r[=][0-9]+)' "$TMP/SRC" | sed -n '1p'`
-    fetch_page "$SELL"
+    # CORRECAO: sem nada a vender o SELL fica vazio e o fetch_page ""
+    # requisitava a HOME — um pedido a toa por passagem na arena que ainda
+    # sobrescrevia $TMP/pagina, fazendo o painel (e a atividade que os outros
+    # jogadores veem) piscar "Pagina Principal" no meio da arena.
+    if [ -n "$SELL" ]; then
+        fetch_page "$SELL"
+        printf "Sell all items ok\n"
+    else
+        printf "Nada a vender na mochila\n"
+    fi
 
     checkQuest 3 end
     checkQuest 4 end
 
-    printf "Sell all items ok\n"
     printf "Arena ok\n"
 }
 

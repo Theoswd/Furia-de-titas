@@ -141,6 +141,15 @@ cave_start() {
         CAVE=`grep -o -E '/cave/(gather|down|speedUp)/[?]r[=][0-9]+' "$TMP/SRC" | sed -n '1p'`
         RESULT=`echo "$CAVE" | cut -d'/' -f3`
 
+        # CORRECAO: a condicao deste laco ("$RUN" contem -cv) e CONSTANTE,
+        # entao sem link de acao ele girava para sempre — e o fetch_page
+        # "$CAVE" com CAVE vazio pedia a HOME a cada volta. O cave_routine ja
+        # tinha esta guarda; o cave_start (modo -cv) ficou sem.
+        if [ -z "$CAVE" ]; then
+            printf "Caverna sem acao disponivel agora\n"
+            break
+        fi
+
         RESOURCES=`grep -o -E 'res/[0-9]+\.png' "$TMP/SRC" | sed 's/res\///;s/.png//'`
         MINERALS_FOUND=`echo "$RESOURCES" | grep -E '^[1-5]$' | wc -l`
         HERBS_FOUND=`echo "$RESOURCES" | grep -E '^(6|7|8|9)$' | wc -l`

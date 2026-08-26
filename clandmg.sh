@@ -131,7 +131,18 @@ clandmgfight_start() {
     ) </dev/null > /dev/null 2>&1 &
     time_exit 17
     printf "The clan duel will be started...\n"
-    while (case `date +%M:%S` in (29:[3-5][0-9]) exit 1;; ([4-5][5-9]:[0-5][0-9]) return;; esac); do
+    # CORRECAO: o ramo de desistencia era "return" DENTRO do subshell da
+    # condicao. O return so encerra o subshell — nao a funcao —, entao a
+    # janela vencida nao abortava nada: o laco apenas terminava e o codigo
+    # seguia inscrevendo e lutando fora de hora. Agora a verificacao e feita
+    # no corpo do laco, onde o return realmente sai do clandmg_start.
+    while (case `date +%M:%S` in (29:[3-5][0-9]) exit 1;; esac); do
+      case `date +%M:%S` in
+        [4-5][5-9]:[0-5][0-9])
+          printf "Masmorra: janela vencida - desistindo\n"
+          return 1
+          ;;
+      esac
       sleep 3
     done
     (
