@@ -30,6 +30,75 @@ info() {
 #
 # Agora: se nao ha terminal, dorme de verdade. Se ha, mantem o modo
 # interativo original.
+# ============================================================
+#  "AGORA": varredura sob demanda, sem esperar o ciclo
+#
+#  No master bastava apertar ENTER: o func_cat lia o stdin com prazo e
+#  qualquer tecla quebrava a espera, entao o laco voltava na hora e a
+#  varredura rodava. Aqui isso nao funciona — os workers sobem com
+#  "< /dev/null" (nohup+setsid), justamente para sobreviverem ao fechamento
+#  do Termux, entao NENHUM ENTER chega neles. O terminal tambem esta ocupado
+#  pelo painel, e com 15 contas nao ha um stdin para cada uma.
+#
+#  O equivalente multi-conta e um arquivo-sinal, como ja e feito com o
+#  PAUSED: quem quer a varredura agora cria o arquivo, e o worker o encontra
+#  durante a espera.
+#
+#     $TMP/RUNNOW    (um por conta, criado pelo ./agora.sh)
+#
+#  O sinal e SEMPRE por conta, nunca global. Um arquivo global so poderia
+#  ser apagado por um dos workers, e os demais continuariam a encontra-lo —
+#  disparando varredura em laco para sempre. O ./agora.sh escreve um arquivo
+#  em cada conta, e cada worker apaga o seu.
+# ============================================================
+
+# Ha pedido de varredura imediata para esta conta?
+runnow_pedido() {
+    [ -f "$TMP/RUNNOW" ]
+}
+
+# Consome o pedido e abre os portoes das atividades.
+#
+# So quebrar a espera nao bastaria: cada atividade tem portao proprio
+# (arena 30 min, carreira 15 min, liga 30 min...), entao a varredura
+# encontraria tudo fechado e nao faria nada — que e justamente o oposto do
+# que se espera ao pedir "agora". Apagando os marcadores, tudo que estiver
+# DISPONIVEL no jogo roda na volta seguinte.
+#
+# Ficam de fora, de proposito, os portoes que espelham regra do jogo e nao
+# preferencia nossa: a masmorra (janela de 8h) e a estatua (bonus de 48h).
+runnow_consumir() {
+    rm -f "$TMP/RUNNOW" 2>/dev/null
+    rm -f "$TMP/last_arena"  "$TMP/last_carreira" "$TMP/last_campanha" \
+          "$TMP/last_caverna" "$TMP/last_sabio"   "$TMP/last_liga" \
+          "$TMP/last_troca"   "$TMP/last_clanquest" "$TMP/last_evento" \
+          "$TMP/last_cq"      "$TMP/last_stats" 2>/dev/null
+    printf "Varredura sob demanda: portoes liberados\n"
+}
+
+# Dorme em fatias, atendendo ao pedido de varredura no meio do caminho.
+#
+# Antes era um "sleep $i" unico: um pedido feito logo apos o inicio da
+# espera so seria visto ate 60s depois. Em fatias de 5s a resposta e quase
+# imediata, e continua sendo UM processo de sleep por vez — o que importa no
+# Android, onde cada processo conta para o limite de 32.
+espera_interrompivel() {
+    _ei_total="$1"
+    case "$_ei_total" in ''|*[!0-9]*) _ei_total=60 ;; esac
+    _ei_gasto=0
+    while [ "$_ei_gasto" -lt "$_ei_total" ]; do
+        if runnow_pedido; then
+            runnow_consumir
+            unset _ei_total _ei_gasto
+            return 0
+        fi
+        sleep 5
+        _ei_gasto=$((_ei_gasto + 5))
+    done
+    unset _ei_total _ei_gasto
+    return 0
+}
+
 func_cat() {
     func_crono
     [ -f "$TMP/msg_file" ] && cat "$TMP/msg_file"
@@ -49,7 +118,7 @@ func_cat() {
 
     if [ ! -t 0 ]; then
         printf "Sem batalhas agora, aguardando %ss\n" "$_i"
-        sleep "$_i"
+        espera_interrompivel "$_i"
         return 0
     fi
 

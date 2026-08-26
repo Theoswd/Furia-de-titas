@@ -158,6 +158,7 @@ cd ~/Furia-de-titas && ./play.sh
 | Iniciar | `cd ~/Furia-de-titas && ./play.sh` |
 | **Ver o painel** (não mexe nas contas) | `cd ~/Furia-de-titas && ./status.sh` |
 | Reiniciar tudo do zero | `cd ~/Furia-de-titas && ./play.sh --restart` |
+| **Rodar as atividades agora** | `cd ~/Furia-de-titas && ./agora.sh` |
 | Pausar / retomar | `cd ~/Furia-de-titas && ./pause.sh` |
 | Ver estado | `cd ~/Furia-de-titas && ./pause.sh status` |
 | Parar tudo | `cd ~/Furia-de-titas && ./stop.sh` |
@@ -168,6 +169,10 @@ cd ~/Furia-de-titas && ./play.sh
 | Ver log de uma conta | `tail -f ~/.twm/BR_NomeConta/twm.log` |
 
 > **Para só olhar as contas, use o `./status.sh`, não o `./play.sh`.** O `status.sh` é somente leitura: desenha o painel e não sobe, não mata e não reinicia worker nenhum — sair com **Ctrl+C** não para nada. O `./play.sh` continua sendo o comando para *iniciar*; rodá-lo de novo agora preserva as contas que já estão rodando, e só sobe as que faltam.
+
+> **`./agora.sh` é o antigo ENTER.** No bot de conta única bastava apertar ENTER para o worker largar a espera e rodar a varredura na hora. Aqui os workers sobem desligados do teclado (`nohup`+`setsid`), justamente para sobreviverem ao fechamento do Termux — nenhum ENTER chega neles, e com muitas contas não há um teclado para cada uma. O `./agora.sh` faz o mesmo por arquivo: os workers atendem em até ~5 s, liberam os portões de arena, carreira, campanha, caverna, cabana do sábio, liga, troca, missões do clã e eventos, e fazem o que estiver disponível no jogo. Use `./agora.sh NomeDaConta` para uma só, e `./agora.sh status` para ver pedidos pendentes.
+>
+> As janelas que são regra do jogo continuam respeitadas: a masmorra (8 h) e a estátua (48 h) não são forçadas.
 
 > **Pausar não desloga.** Os processos continuam vivos e a sessão no jogo permanece válida — ao retomar não há novo login. A pausa entra em vigor **ao fim do ciclo em andamento**, então uma conta no meio de uma batalha pode levar alguns minutos para parar. Para encerrar de vez, use `cd ~/Furia-de-titas && ./stop.sh`.
 
