@@ -111,11 +111,11 @@ EVENTOS="0030|Coliseu
 0925|Evento especial
 0955|Imortais
 1010|Batalha de Bandeiras
-1028|Coliseu do Cla
+1025|Coliseu do Cla
 1055|Batalha de Clas
 1225|Rei dos Imortais
 1355|Altares
-1458|Coliseu do Cla
+1455|Coliseu do Cla
 1555|Imortais
 1610|Batalha de Bandeiras
 1625|Rei dos Imortais

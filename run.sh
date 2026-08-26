@@ -48,7 +48,19 @@ twm_play() {
             ;;
 
         # --- 5. Coliseu do Cla
-        (10:2[8-9]|14:5[8-9])
+        #
+        # CORRECAO (evento perdido): este ramo chamava so em 10:2[8-9] e
+        # 14:5[8-9] — DOIS minutos —, mas o proprio clancoliseum_start aceita
+        # 10:2[5-9]|14:5[5-9], ou seja foi escrito para CINCO minutos de
+        # antecedencia, como os demais eventos. Os tres primeiros minutos da
+        # inscricao eram descartados pelo agendador.
+        #
+        # Isso importa porque a inscricao (/clancoliseum/enterFight) acontece
+        # DENTRO do modulo: perder a janela nao e chegar atrasado, e nao
+        # participar. Com o worker preso numa atividade longa (campanha ate
+        # 90s, coliseu ate 600s) ou dormindo, dois minutos se perdem com
+        # facilidade — e o Coliseu do Cla passava em branco no dia.
+        (10:2[5-9]|14:5[5-9])
             if [ -n "$CLD" ]; then
                 clancoliseum_start
             fi
