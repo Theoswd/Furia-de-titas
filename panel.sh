@@ -324,6 +324,9 @@ painel_loop() {
 while true; do
     [ -t 1 ] && [ "${PANEL_ONCE:-0}" != "1" ] && clear
     agora=$(date +%H:%M:%S)
+    # Epoch uma vez por desenho, nao por conta: serve para medir ha
+    # quanto tempo os numeros de cada conta nao sao atualizados.
+    _agora_ep=$(date +%s)
 
     # Remede a cada volta: o celular pode ser girado com o painel aberto.
     LARG=$(painel_largura)
@@ -378,9 +381,28 @@ while true; do
         idx=$((idx + 1))
 
         nome="$user"; hp="-"; mp="-"; ene="-"; lvl="-"; ouro="-"; prata="-"
+        _velho=""
         if [ -s "$acc_dir/stats" ]; then
             IFS='|' read -r nome hp mp ene lvl ouro prata _ts < "$acc_dir/stats"
             [ -z "$nome" ] && nome="$user"
+
+            # NUMEROS PARADOS: avisa em vez de mentir.
+            #
+            # O painel mostrava o que estivesse no arquivo, sem dizer de
+            # quando era. Se a atualizacao parasse — sessao caida, worker
+            # presa numa batalha longa, erro de leitura —, ele seguia
+            # exibindo HP, energia, ouro e prata antigos como se fossem de
+            # agora, e nao havia como perceber. O carimbo de tempo ja estava
+            # gravado no proprio arquivo; faltava usa-lo.
+            #
+            # O limite e 10 min: a atualizacao normal e a cada 3 min, entao
+            # passar de 10 significa que algo esta errado, nao que a conta
+            # esta so ocupada.
+            case "$_ts" in
+                ''|*[!0-9]*) ;;
+                *) _idade=$(( (_agora_ep - _ts) / 60 ))
+                   [ "$_idade" -gt 10 ] && _velho="$_idade min" ;;
+            esac
         fi
 
         # Atribuicao direta no lugar de "cor=$(estado_cor ...)": a
@@ -463,6 +485,9 @@ while true; do
                     "$_l1" "$hp" "$_l2" "$ene" "$_l3" "$lvl" \
                     "$_l4" "$ouro" "$_l5" "$prata")" "$C_RESET")
 "
+            [ -n "$_velho" ] && LISTA="${LISTA}$(printf "    %bnumeros parados ha %s%b" \
+                "$C_YELLOW" "$_velho" "$C_RESET")
+"
             # O combate ao vivo (dano/morte) aparece no overlay de batalhas,
             # nao aqui — evita uma terceira linha por conta no celular.
         else
@@ -485,9 +510,17 @@ while true; do
             # CONJUNTO" — mesma confirmacao, sem repetir os nomes nem gastar
             # cabecalho e reguas. O combate ao vivo continua no overlay.
             _aw=$((LARG - 8)); [ "$_aw" -lt 6 ] && _aw=6
-            LISTA="${LISTA}$(printf "     %b%s %b%-.*s%b" \
-                "$C_DIM" "$I_ARROW" "$C_CYAN" "$_aw" "$_aba" "$C_RESET")
+            if [ -n "$_velho" ]; then
+                _aw=$((_aw - 24)); [ "$_aw" -lt 6 ] && _aw=6
+                LISTA="${LISTA}$(printf "     %b%s %b%-*.*s  %bnumeros parados ha %s%b" \
+                    "$C_DIM" "$I_ARROW" "$C_CYAN" "$_aw" "$_aw" "$_aba" \
+                    "$C_YELLOW" "$_velho" "$C_RESET")
 "
+            else
+                LISTA="${LISTA}$(printf "     %b%s %b%-.*s%b" \
+                    "$C_DIM" "$I_ARROW" "$C_CYAN" "$_aw" "$_aba" "$C_RESET")
+"
+            fi
         fi
     done 3< "$ACCOUNTS_FILE"
 
