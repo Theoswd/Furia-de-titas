@@ -378,10 +378,28 @@ player_stats() {
 
 # Le a agenda oficial do jogo em /fights/ e grava em ~/.twm/agenda.
 #
-# A pagina traz contagem regressiva por evento ("Para iniciar: 10:12:03"),
-# confirmado comparando duas leituras espacadas: em 90 segundos o valor
-# caiu 1:31. Convertendo para horario absoluto, a agenda do jogo bate com
-# a do run.sh, que dispara de 2 a 5 minutos antes para preparar a entrada.
+# CORRECAO (a agenda oficial nunca era lida): este parser procurava
+# "Para iniciar: HH:MM:SS" e convertia a contagem regressiva para horario
+# absoluto. Esse texto NAO existe na pagina. O /fights/ real ("Cronograma de
+# batalhas") lista, sob cada evento, o HORARIO ABSOLUTO seguido de uma
+# descricao livre:
+#
+#   Vale dos Imortais
+#   10:00 BRT - Tempo para o inicio 1 hora
+#   16:00 BRT - Tempo para o inicio 7 horas
+#   Coliseu do cla
+#   10:30 BRT - Nova temporada comeca em 7 de Setembro
+#
+# Como nada casava, o arquivo saia vazio e o painel caia sempre na lista
+# fixa. A lista fixa esta correta, entao o defeito era silencioso — mas a
+# agenda do jogo nunca era de fato consultada, e uma mudanca de horario
+# passaria despercebida.
+#
+# Agora le o horario absoluto direto. Alem de ser o que a pagina mostra,
+# dispensa toda a aritmetica de contagem regressiva (e o `date -d` do GNU,
+# que o toybox do Android nao tem). A descricao apos o "-" e ignorada de
+# proposito: varia com o estado do evento ("Tempo para o inicio", "Nova
+# temporada comeca em...") e nao interessa para a agenda.
 #
 # Escreve uma linha por evento: HHMM|Nome
 # Uma requisicao por ciclo de start(), e o painel apenas le o arquivo.
@@ -402,46 +420,37 @@ atualiza_agenda() {
     _rawf="${_ag}.$$.raw"
     : > "$_tmpf"
 
+    # Nome do evento OU um horario absoluto "HH:MM BRT". O nome do fuso e
+    # aceito de forma generica (BRT/BRST/qualquer sigla) para o parser nao
+    # quebrar no horario de verao.
     printf '%s' "$_pg" \
         | sed 's/<br[^>]*>/\n/g; s/<\/div>/\n/g; s/<[^>]*>//g' \
-        | grep -oE "(Vale dos Imortais|Coliseu do clã|Torneio dos Clãs|Rei dos Imortais|Altares dos Deuses|Batalha de Bandeiras)|Para iniciar: [0-9]{1,2}:[0-9]{2}:[0-9]{2}" \
+        | grep -oE "(Vale dos Imortais|Coliseu do clã|Torneio dos Clãs|Rei dos Imortais|Altares dos Deuses|Batalha de Bandeiras)|[0-9]{1,2}:[0-9]{2} [A-Z]{2,5}" \
         > "$_rawf" 2>/dev/null
 
-    # CORRECAO 2 (portabilidade — este e o motivo de a agenda nunca
-    # aparecer no Termux): a conversao da contagem regressiva para horario
-    # absoluto era feita com `date -d "@epoch"`, que e EXTENSAO DO GNU
-    # coreutils. O toybox/busybox do Android nao aceita -d: a substituicao
-    # devolvia vazio e o arquivo saia com linhas "|Nome". Como o painel so
-    # testa se o arquivo tem conteudo, ele trocava a agenda fixa (correta)
-    # por essa lista sem horario. A conta agora e aritmetica pura, com o
-    # date usado apenas para ler a hora atual — o que funciona em qualquer
-    # implementacao.
+    # Um evento tem VARIOS horarios (o Vale tem tres), entao o nome vale ate
+    # aparecer o proximo nome — nao e limpo a cada horario, como fazia a
+    # versao de pares nome+contador. Horario sem nome antes e descartado.
     #
-    # CORRECAO 3 (pareamento): o "paste - -" assumia que todo nome vem
-    # seguido do seu contador. Um evento em andamento aparece SEM contador
-    # e desalinhava todos os horarios seguintes — cada evento herdava o
-    # horario do proximo. O laco abaixo so fecha um par quando o contador
-    # vem logo depois do nome, e descarta nome solto.
-    _nh=`date +%H | sed 's/^0//'`; [ -z "$_nh" ] && _nh=0
-    _nm=`date +%M | sed 's/^0//'`; [ -z "$_nm" ] && _nm=0
-    _ns=`date +%S | sed 's/^0//'`; [ -z "$_ns" ] && _ns=0
-    _base=$(( _nh * 3600 + _nm * 60 + _ns ))
-
-    _nome=""
     # Le de ARQUIVO, nao de pipe: num pipe o laco roda em subshell e o
     # "$_nome" guardado de uma volta para a outra se perderia.
+    _nome=""
     while IFS= read -r _ln; do
         case "$_ln" in
-            "Para iniciar: "*)
+            [0-9]*:[0-9]*)
                 [ -n "$_nome" ] || continue
-                _falta=${_ln#Para iniciar: }
-                _h=`printf %s "$_falta" | cut -d: -f1 | sed 's/^0//'`; [ -z "$_h" ] && _h=0
-                _m=`printf %s "$_falta" | cut -d: -f2 | sed 's/^0//'`; [ -z "$_m" ] && _m=0
-                _s=`printf %s "$_falta" | cut -d: -f3 | sed 's/^0//'`; [ -z "$_s" ] && _s=0
-                _abs=$(( (_base + _h * 3600 + _m * 60 + _s) % 86400 ))
-                printf '%02d%02d|%s\n' \
-                    $(( _abs / 3600 )) $(( _abs % 3600 / 60 )) "$_nome" >> "$_tmpf"
-                _nome=""
+                _h=${_ln%%:*}
+                _m=${_ln#*:}; _m=${_m%% *}
+                case "$_h$_m" in *[!0-9]*) continue ;; esac
+                # Zeros a esquerda removidos na mao: "$((10#$_h))" e um
+                # bashism — o dash recusa com "arithmetic expression" e o
+                # toybox do Android tambem, o que zeraria a agenda inteira no
+                # aparelho (mesma armadilha do `date -d` que ja quebrou este
+                # parser antes). Sem isto, "08" ainda seria lido como octal
+                # por varias implementacoes de printf.
+                while :; do case "$_h" in 0?*) _h=${_h#0} ;; *) break ;; esac; done
+                while :; do case "$_m" in 0?*) _m=${_m#0} ;; *) break ;; esac; done
+                printf '%02d%02d|%s\n' "$_h" "$_m" "$_nome" >> "$_tmpf"
                 ;;
             *)
                 _nome="$_ln"
@@ -461,7 +470,7 @@ atualiza_agenda() {
     else
         rm -f "$_tmpf"
     fi
-    unset _ag _pg _tmpf _rawf _nome _nh _nm _ns _base
+    unset _ag _pg _tmpf _rawf _nome _ln _h _m
 }
 
 # Converte "408,7M" / "12K" / "1.234" em numero inteiro.
