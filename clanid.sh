@@ -69,7 +69,14 @@ clanDungeon() {
     [ -n "$CLD" ] || return 1
 
     printf "Masmorra do cla\n"
-    fetch_page "/clandungeon/" "$TMP/DUNGEON"
+    # ALINHADO AO ORIGINAL: o primeiro acesso vai com "?close".
+    #
+    # A pagina pode abrir com um painel de recompensa da rodada anterior, e
+    # enquanto ele esta na frente o link de ataque nao aparece — a masmorra
+    # ficava "sem ataque disponivel" tendo golpes de sobra. O "?close"
+    # dispensa esse painel, do mesmo jeito que o "?close=reward" faz no
+    # coliseu do cla, nos altares e nas bandeiras.
+    fetch_page "/clandungeon/?close" "$TMP/DUNGEON"
     [ -s "$TMP/DUNGEON" ] || return 1
 
     # Golpes gratuitos restantes. O numero vem separado por tags no

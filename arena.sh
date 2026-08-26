@@ -57,7 +57,14 @@ arena_duel() {
     # caia). Agora quem manda e a PRESENCA do link de ataque real (com nonce),
     # slot generico [0-9]+ (nao fixo em /1/), dentro do teto de 60s.
     while [ "$(date +%s)" -lt "$BREAK" ]; do
-        ACCESS=`grep -o -E '/arena/attack/[0-9]+/[?]r[=][0-9]+' "$TMP/SRC" | sed -n '1p'`
+        # ALINHADO AO ORIGINAL: o alvo e o slot 1 (/arena/attack/1/), que e o
+        # que o original ataca sempre. O generico [0-9]+ fica so de reserva,
+        # para a pagina que por algum motivo nao ofereca o slot 1 — assim o
+        # comportamento e identico ao do original no caso normal, sem parar de
+        # golpear no caso incomum.
+        ACCESS=`grep -o -E '/arena/attack/1/[?]r[=][0-9]+' "$TMP/SRC" | sed -n '1p'`
+        [ -n "$ACCESS" ] || \
+            ACCESS=`grep -o -E '/arena/attack/[0-9]+/[?]r[=][0-9]+' "$TMP/SRC" | sed -n '1p'`
         if [ -z "$ACCESS" ]; then
             printf "  Arena: sem ataque disponivel agora\n"
             break

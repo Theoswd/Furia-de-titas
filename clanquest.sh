@@ -204,9 +204,20 @@ cq_mercador() {
         2) printf "Produzindo ervas\n" ;;
     esac
 
-    fetch_page "$_cl"
-    _cl=`grep -o -E "/coliseum/merchant/${_i}/startMaking[?]r=[0-9]+&ref=lab" "$TMP/SRC" | sed -n 1p`
-    [ -n "$_cl" ] && fetch_page "$_cl"
+    # ALINHADO AO ORIGINAL: TRES producoes, nao duas.
+    #
+    # A missao do mercador pede tres itens; a nossa versao clicava duas vezes
+    # e a missao nunca fechava. Cada volta rebusca o link, porque o nonce ?r=
+    # muda a cada producao.
+    _n=1
+    while [ "$_n" -le 3 ]; do
+        [ -n "$_cl" ] || break
+        fetch_page "$_cl"
+        _n=$((_n + 1))
+        [ "$_n" -le 3 ] || break
+        _cl=`grep -o -E "/coliseum/merchant/${_i}/startMaking[?]r=[0-9]+&ref=lab" "$TMP/SRC" | sed -n 1p`
+    done
+    unset _n
 
     cq_concluir 2>/dev/null
     unset _i _cl

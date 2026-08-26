@@ -2,10 +2,13 @@ career_func() {
     printf "Career\n"
     fetch_page "/career/"
 
-    # CORRECAO: a guarda so entrava com link de 'attack', mas o laco interno
-    # trata 'attack' E 'take'. Uma pagina so com 'take' (recompensa pronta,
-    # ataques ja esgotados) era descartada e a recompensa nunca recolhida.
-    if grep -q -o -E '/career/(attack|take)/[?]r[=][0-9]+' "$TMP/SRC"; then
+    # Guarda igual a do original: exige link de ATAQUE para entrar.
+    #
+    # Eu havia ampliado para (attack|take), mas a guarda estreita e
+    # deliberada: sem ataque disponivel nao ha o que fazer na carreira, e
+    # entrar assim mesmo faria o checkQuest 6 TOMAR a missao do cla sem poder
+    # cumpri-la — ocupando um slot de missao a toa.
+    if grep -q -o -E '/career/attack/[?]r[=][0-9]+' "$TMP/SRC"; then
         checkQuest 6 apply
 
         fetch_page "/career/"
