@@ -1,0 +1,106 @@
+#!/bin/sh
+# lerstats.sh - Mostra o que o bot LE da conta, e de onde
+#
+# Serve para comparar com o que o jogo mostra no navegador. Quando um numero
+# do painel nao bate com o jogo, o problema esta quase sempre no seletor: a
+# pagina mudou de formato e a expressao passa a casar outro numero. Este
+# script exibe o TRECHO CRU da pagina ao redor de cada valor, para que a
+# diferenca fique visivel sem adivinhacao.
+#
+# Usa o cookie que a conta ja tem em ~/.twm/BR_<conta>/cookie.txt, entao nao
+# faz login novo e NAO precisa de senha.
+#
+# Uso:  ./lerstats.sh            lista as contas
+#       ./lerstats.sh Grimlock   mostra os dados dessa conta
+
+umask 077
+
+_dir=$(dirname "$0")
+TWMDIR=$(cd "$_dir" && pwd)
+TWMHOME="$HOME/.twm"
+URL="https://furiadetitas.net"
+
+G='\033[1;32m'; R='\033[0;31m'; Y='\033[1;33m'; C='\033[1;36m'; D='\033[2m'; N='\033[0m'
+
+[ -d "$TWMHOME" ] || { printf "${R}Bot nunca executado neste aparelho.${N}\n"; exit 1; }
+
+if [ -z "$1" ]; then
+    printf "${C}Contas disponiveis:${N}\n"
+    for _d in "$TWMHOME"/BR_*/; do
+        [ -d "$_d" ] && printf "  %s\n" "$(basename "${_d%/}" | sed 's/^BR_//')"
+    done
+    printf "\n${D}Uso: ./lerstats.sh NomeDaConta${N}\n"
+    exit 0
+fi
+
+ACC_DIR=""
+for _d in "$TWMHOME"/BR_*/; do
+    [ -d "$_d" ] || continue
+    case "$(basename "${_d%/}")" in *"$1"*) ACC_DIR="${_d%/}"; break ;; esac
+done
+[ -n "$ACC_DIR" ] || { printf "${R}Conta nao encontrada: %s${N}\n" "$1"; exit 1; }
+
+CK="$ACC_DIR/cookie.txt"
+[ -s "$CK" ] || { printf "${R}Sem sessao salva. Rode ./play.sh antes.${N}\n"; exit 1; }
+
+UA="Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36"
+[ -s "$TWMDIR/userAgent.txt" ] && UA=$(head -n1 "$TWMDIR/userAgent.txt")
+
+baixa() {
+    curl -sS -L --compressed --max-redirs 5 --connect-timeout 15 --max-time 30 \
+         -A "$UA" -c "$CK" -b "$CK" "$1" 2>/dev/null
+}
+
+printf "${C}Conta:${N} %s\n\n" "$(basename "$ACC_DIR")"
+
+# ---------- /train : energia e HP maximo ----------
+printf "${C}== pagina /train ==${N}\n"
+TRAIN=$(baixa "$URL/train")
+if [ -z "$TRAIN" ]; then
+    printf "  ${R}pagina vazia (sessao caida ou sem rede)${N}\n\n"
+else
+    printf "${D}  Todo trecho com a palavra 'Energia' (texto, sem tags):${N}\n"
+    printf '%s' "$TRAIN" | sed 's/<[^>]*>/ /g' | tr -s ' ' \
+        | grep -o -i -E ".{0,45}Energia.{0,45}" | head -n 6 \
+        | sed 's/^/    /' || printf "    ${R}nenhuma ocorrencia de 'Energia'${N}\n"
+
+    printf "\n${D}  Todos os numeros entre parenteses (HP maximo sai daqui):${N}\n"
+    printf '%s' "$TRAIN" | grep -o -E '\([0-9]{1,9}\)' | head -n 5 | sed 's/^/    /'
+
+    printf "\n${Y}  O que o bot extrai hoje:${N}\n"
+    _ene=$(printf '%s' "$TRAIN" | grep -o -E "Energia:? ?[0-9][0-9.,']{0,14}[KMBkmb]?" \
+           | head -n1 | sed -E 's@^Energia:?[[:space:]]*@@')
+    _fix=$(printf '%s' "$TRAIN" | grep -o -E '\([0-9]{1,9}\)' | head -n1 | tr -d '()')
+    printf "    Energia = %s\n" "${_ene:-<vazio>}"
+    printf "    HP max  = %s\n\n" "${_fix:-<vazio>}"
+fi
+
+# ---------- /user : HP, MP, nivel, ouro, prata ----------
+printf "${C}== pagina /user ==${N}\n"
+USERPG=$(baixa "$URL/user")
+if [ -z "$USERPG" ]; then
+    printf "  ${R}pagina vazia (sessao caida ou sem rede)${N}\n"
+else
+    printf "${Y}  O que o bot extrai hoje:${N}\n"
+    printf "    HP    = %s\n" "$(printf '%s' "$USERPG" | grep -o -E "health\.png' alt='hp'/> <span[^>]*>[0-9]{1,9}" | grep -o -E '[0-9]{1,9}$' | head -n1)"
+    printf "    MP    = %s\n" "$(printf '%s' "$USERPG" | grep -o -E "mana\.png' alt='mp'/>[^0-9<]{0,4}[0-9]{1,9}" | grep -o -E '[0-9]{1,9}$' | head -n1)"
+    printf "    Nivel = %s\n" "$(printf '%s' "$USERPG" | grep -o -E "level\.png' alt='[^']*'/> ?[0-9]{1,4}" | grep -o -E '[0-9]{1,4}$' | head -n1)"
+    printf "    Ouro  = %s\n" "$(printf '%s' "$USERPG" | grep -o -E "gold\.png' alt='g'/> ?[0-9][0-9.,']{0,14}[KMBkmb]?" | sed -E "s@.*/> ?@@" | head -n1)"
+    printf "    Prata = %s\n" "$(printf '%s' "$USERPG" | grep -o -E "silver\.png' alt='s'/> ?[0-9][0-9.,']{0,14}[KMBkmb]?" | sed -E "s@.*/> ?@@" | head -n1)"
+fi
+
+printf "\n${C}== o que esta gravado para o painel ==${N}\n"
+if [ -s "$ACC_DIR/stats" ]; then
+    IFS='|' read -r _n _hp _mp _en _lv _ou _pr _ts < "$ACC_DIR/stats"
+    printf "    nome=%s HP=%s MP=%s Energia=%s LV=%s Ouro=%s Prata=%s\n" \
+        "$_n" "$_hp" "$_mp" "$_en" "$_lv" "$_ou" "$_pr"
+    case "$_ts" in
+        ''|*[!0-9]*) ;;
+        *) printf "    ${D}gravado ha %s minuto(s)${N}\n" "$(( ( $(date +%s) - _ts ) / 60 ))" ;;
+    esac
+else
+    printf "    ${R}arquivo stats ausente${N}\n"
+fi
+
+printf "\n${D}Compare a Energia acima com a do navegador. Se o bot extrai um\n"
+printf "numero diferente do que o jogo mostra, o trecho cru de /train diz por que.${N}\n"
