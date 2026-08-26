@@ -338,6 +338,26 @@ parse_status() {
 # Dados que so existem na pagina /train: HP maximo e energia.
 # Uma requisicao por ciclo de start(), nao por minuto.
 fetch_train_stats() {
+    # ENERGIA ZERADA ANTES DE LER.
+    #
+    # CORRECAO (painel mostrando energia de horas atras): quando o /train nao
+    # respondia — rede oscilando, timeout, sessao caida — a funcao devolvia 1
+    # no "[ -n "$_t" ] || return 1" abaixo e o ACC_ENE CONTINUAVA com o valor
+    # da ultima leitura boa. Como o worker e um unico processo que vive por
+    # dias, essa variavel ficava presa: uma conta com 231 de energia aparecia
+    # no painel com 2115, o valor lido no boot, indefinidamente.
+    #
+    # Zerando aqui, uma leitura que falha resulta em "-" no painel — que e
+    # honesto (nao sabemos) em vez de errado (numero congelado). O aviso de
+    # "numeros parados" do painel cobre o resto.
+    #
+    # O FIXHP recebe tratamento diferente de proposito: ele e o HP MAXIMO, que
+    # so muda quando a conta sobe de nivel. O ultimo valor conhecido continua
+    # valido, entao mante-lo nao mente — e evita perder o percentual de HP a
+    # cada oscilacao de rede. Os dois usos dele ja sao protegidos por
+    # [ -n "$FIXHP" ].
+    ACC_ENE=""
+
     _t=`run_curl "${URL}/train" 2>/dev/null`
     [ -n "$_t" ] || return 1
     FIXHP=`printf '%s' "$_t" | grep -o -E '\([0-9]{1,9}\)' | head -n1 | tr -d '()'`
