@@ -88,6 +88,8 @@ cd ~/Furia-de-titas && ./stop.sh && git pull && sha256sum -c .integrity --quiet 
 
 As contas cadastradas e os dados em `~/.twm` não são afetados — só os scripts.
 
+> **Reiniciar faz parte da atualização.** Cada conta lê os scripts uma única vez, ao subir. Um `git pull` sozinho troca os arquivos no disco, mas as contas que já estavam no ar seguem com o código antigo — use o comando acima, que já para e sobe de novo. O `./saude.sh` avisa (`PROC on/old`) quando isso acontece.
+
 ---
 
 ## Melhorias desta versão
