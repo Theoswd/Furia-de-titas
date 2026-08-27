@@ -105,6 +105,12 @@ As contas cadastradas e os dados em `~/.twm` não são afetados — só os scrip
 **Sessão**
 - A sessão é revalidada durante o ócio, e não só nos horários da agenda. Antes a conta aparecia no painel mas não no jogo.
 - Entre os ciclos a conta descansa de fato na página inicial.
+- Reconexões saem espaçadas entre as contas, para uma queda não virar uma rajada de logins do mesmo IP.
+
+**Estabilidade**
+- Menos processos por requisição: 16 contas cabem no limite de 32 processos do Android 12+ sem o encerramento por *signal 9*.
+- O painel foi separado do orquestrador: abrir e fechar o `./status.sh` não derruba conta nenhuma.
+- Log de cada conta com rotação, e todo laço de batalha com teto de tempo.
 
 **Eventos**
 - Horários conferidos contra o cronograma do jogo; inscrição 5 minutos antes em todos.
@@ -124,6 +130,11 @@ As contas cadastradas e os dados em `~/.twm` não são afetados — só os scrip
 - Atividade de cada conta visível, e batalha em andamento em destaque.
 - Energia, HP, ouro e prata deixaram de ficar congelados; o painel avisa quando os números estão parados.
 - Atualização a cada 5 segundos.
+
+**Diagnóstico**
+- `./saude.sh` põe numa tela só o que costuma ser perguntado num diagnóstico remoto: memória, processos, sessão e log de cada conta.
+- Ele avisa quando as contas ficaram rodando o código anterior a um `git pull` sem reinício.
+- `./lerstats.sh` mostra a página crua que o bot lê, para comparar com o navegador quando um número não bate.
 
 ---
 
