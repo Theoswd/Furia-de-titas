@@ -21,29 +21,37 @@ twm_play() {
 
         # --- 1. Torneio dos Clas
         (10:5[5-9]|18:5[5-9])
+            evento_dedicar
             if [ -n "$CLD" ]; then
                 clanfight_start
             fi
+            evento_espera
             start
             ;;
 
         # --- 2. Altares dos Deuses
         (13:5[5-9]|20:5[5-9])
+            evento_dedicar
             if [ -n "$CLD" ]; then
                 altars_start
             fi
+            evento_espera
             start
             ;;
 
         # --- 3. Vale dos Imortais
         (09:5[5-9]|15:5[5-9]|21:5[5-9])
+            evento_dedicar
             undying_start
+            evento_espera
             start
             ;;
 
         # --- 4. Rei dos Imortais
         (12:2[5-9]|16:2[5-9]|22:2[5-9])
+            evento_dedicar
             king_start
+            evento_espera
             start
             ;;
 
@@ -61,9 +69,11 @@ twm_play() {
         # 90s, coliseu ate 600s) ou dormindo, dois minutos se perdem com
         # facilidade — e o Coliseu do Cla passava em branco no dia.
         (10:2[5-9]|14:5[5-9])
+            evento_dedicar
             if [ -n "$CLD" ]; then
                 clancoliseum_start
             fi
+            evento_espera
             start
             ;;
 

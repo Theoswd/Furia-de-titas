@@ -436,6 +436,64 @@ ativ_liberada() {
 }
 ativ_marcar() { date +%s > "$TMP/last_$1" 2>/dev/null; }
 
+# ============================================================
+#  PERIODO DEDICADO AO EVENTO
+#
+#  Durante os cinco eventos de prioridade — Torneio dos Clas, Coliseu do
+#  Cla, Altares, Rei dos Imortais e Vale dos Imortais — nenhuma atividade
+#  comum deve rodar: da inscricao ate o fim do evento a conta e so daquilo.
+#
+#  A varredura (tarefas_livres) ja nao e chamada nesses ramos do run.sh, e
+#  enquanto o modulo do evento esta lutando ele bloqueia, entao nada mais
+#  acontece. O furo esta no RETORNO ANTECIPADO: quando a conta cai da luta
+#  antes da hora — o que se via no painel como a conta trocando o evento por
+#  "Cla" no meio do horario —, o modulo devolve o controle e o start() logo
+#  abaixo dispara a varredura inteira COM O EVENTO AINDA EM ANDAMENTO.
+#
+#  Aqui o inicio do evento e anotado antes de entrar, e depois do modulo a
+#  conta espera o evento terminar antes de voltar as atividades. Durante a
+#  espera ela descansa na pagina inicial, o que ainda mantem a sessao viva.
+# ============================================================
+
+# Epoch do inicio do evento: o proximo :00 ou :30 a partir de agora.
+# Os ramos de prioridade entram em :55-:59 (evento em :00) ou :25-:29
+# (evento em :30), entao a conta e direta.
+evento_dedicar() {
+    _ed_m=`date +%M | sed 's/^0//'`
+    case "$_ed_m" in ''|*[!0-9]*) _ed_m=0 ;; esac
+    if   [ "$_ed_m" -ge 50 ]; then _ed_f=$(( 60 - _ed_m ))
+    elif [ "$_ed_m" -ge 20 ] && [ "$_ed_m" -lt 30 ]; then _ed_f=$(( 30 - _ed_m ))
+    else _ed_f=0
+    fi
+    echo $(( `date +%s` + _ed_f * 60 )) > "$TMP/em_evento" 2>/dev/null
+    unset _ed_m _ed_f
+}
+
+# Segura a conta ate o evento acabar. Volta na hora se o modulo ja tiver
+# consumido o tempo todo lutando, que e o caso normal.
+#
+# A duracao vem de FUNC_evento_min (padrao 10). Se os eventos do seu
+# servidor durarem mais ou menos que isso, e so ajustar essa chave no
+# config.cfg da conta — nao ha como o bot descobrir a duracao sozinho.
+evento_espera() {
+    _ee_ini=`cat "$TMP/em_evento" 2>/dev/null`
+    rm -f "$TMP/em_evento" 2>/dev/null
+    case "$_ee_ini" in ''|*[!0-9]*) unset _ee_ini; return 0 ;; esac
+
+    _ee_dur=${FUNC_evento_min:-10}
+    case "$_ee_dur" in ''|*[!0-9]*) _ee_dur=10 ;; esac
+    _ee_fim=$(( _ee_ini + _ee_dur * 60 ))
+
+    while [ "`date +%s`" -lt "$_ee_fim" ]; do
+        printf "Evento em andamento - atividades suspensas (%ss)\n" \
+            $(( _ee_fim - `date +%s` ))
+        descansar
+        sleep 30
+    done
+    unset _ee_ini _ee_dur _ee_fim
+    return 0
+}
+
 # Apaga os marcadores de combate ao vivo deixados no disco.
 #
 # Os modulos de batalha (king, altares, torneio, masmorra, bandeiras,
