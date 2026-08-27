@@ -162,7 +162,7 @@ clancoliseum_start() {
       run_curl_exec "$URL/clancoliseum/" > "$src_ram"
     ) </dev/null > /dev/null 2>&1 &
     time_exit 17
-    ACCESS=`grep -o -E '(/clancoliseum(/[a-z]+/[?]r[=][0-9]+|/))' "$src_ram" | grep -v 'dodge' | sed -n '1p'`
+    ACCESS=`link_acao "$src_ram" clancoliseum`
     printf " Entering...\n"
     printf " Waiting...\n"
 

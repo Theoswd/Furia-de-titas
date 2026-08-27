@@ -1,7 +1,9 @@
 altars_fight() {
   cd "$TMP" || return 1
-  apply_event
-
+  # CORRECAO: sem o argumento, o apply_event monta "/${1}/" com $1
+  # vazio e pede "//" — um request invalido que ainda gravava "//"
+  # como atividade da conta no painel.
+  apply_event altars
   LA=4
   echo "48" > HPER
   echo "15" > RPER
@@ -92,7 +94,10 @@ altars_fight() {
 
   unset cf_access _random
   func_unset
-  apply_event
+  # CORRECAO: sem o argumento, o apply_event monta "/${1}/" com $1
+  # vazio e pede "//" — um request invalido que ainda gravava "//"
+  # como atividade da conta no painel.
+  apply_event altars
   printf "Altars ok\n"
   sleep 10s
   [ -t 1 ] && clear
@@ -116,14 +121,14 @@ altars_start() {
 
     fetch_page "/altars/enterFight" "$TMP/src.html"
     printf "Altars will be started...\n"
-    grep -o -E '(/altars(/[A-Za-z]+/[^A-Za-z0-9]r[^A-Za-z0-9][0-9]+|/))' "$TMP/src.html" | sed -n 1p > "$TMP/ACCESS" 2>/dev/null
+    link_acao "$TMP/src.html" altars > "$TMP/ACCESS" 2>/dev/null
     printf " Entering...\n"
     printf " Waiting...\n"
     BREAK=$(($(date +%s) + 30))
     until grep -q -o 'altars/dodge/' "$TMP/ACCESS" || [ "$(date +%s)" -gt "$BREAK" ]; do
       printf "%s\n ...\n%s\n" "$URL" "`cat "$TMP/ACCESS"`"
       fetch_page "/altars" "$TMP/src.html"
-      grep -o -E '(/altars(/[A-Za-z]+/[^A-Za-z0-9]r[^A-Za-z0-9][0-9]+|/))' "$TMP/src.html" | sed -n 1p > "$TMP/ACCESS" 2>/dev/null
+      link_acao "$TMP/src.html" altars > "$TMP/ACCESS" 2>/dev/null
       sleep 3
     done
     altars_fight

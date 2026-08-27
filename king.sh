@@ -223,7 +223,10 @@ king_fight() {
 
   unset cl_access
   func_unset
-  apply_event
+  # CORRECAO: sem o argumento, o apply_event monta "/${1}/" com $1
+  # vazio e pede "//" — um request invalido que ainda gravava "//"
+  # como atividade da conta no painel.
+  apply_event king
   printf "King ok\n"
   sleep 10s
   [ -t 1 ] && clear

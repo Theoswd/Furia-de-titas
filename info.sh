@@ -253,6 +253,33 @@ fetch_page() {
     return 0
 }
 
+# Primeiro link de ACAO de um evento, preferindo o que tem nonce (?r=N).
+#
+# CORRECAO (conta abandonando o evento): os modulos extraiam o link com uma
+# alternacao do tipo
+#     /altars(/[A-Za-z]+/?r=[0-9]+|/)
+# cujo segundo ramo casa o caminho NU "/altars/". Como "/altars/" aparece em
+# qualquer link da pagina e o "sed -n 1p" pega a primeira ocorrencia, o
+# ACCESS virava quase sempre o caminho nu — nunca o link de dodge/ataque.
+#
+# O laco de entrada espera justamente por "dodge" nesse arquivo, entao ele
+# nunca era satisfeito: a conta queimava o tempo limite, entrava no laco de
+# luta sem estar na luta, via "Battle over" na primeira volta e voltava para
+# a rotina comum. No painel isso aparece como a conta trocando o evento por
+# "Cla" no meio do horario — abandonando o evento.
+#
+# Aqui o link com nonce tem prioridade; o caminho nu so e devolvido quando
+# nao existe nenhuma acao disponivel, que e a informacao verdadeira.
+link_acao() {
+    _la_f="$1"; _la_p="$2"
+    [ -r "$_la_f" ] || { printf ''; unset _la_f _la_p; return 1; }
+    _la=`grep -o -E "/${_la_p}/[A-Za-z]+/[^A-Za-z0-9]r[^A-Za-z0-9][0-9]+" "$_la_f" 2>/dev/null | sed -n 1p`
+    [ -n "$_la" ] || _la=`grep -o -E "/${_la_p}/" "$_la_f" 2>/dev/null | sed -n 1p`
+    printf '%s' "$_la"
+    unset _la_f _la_p _la
+    return 0
+}
+
 hpmp() {
     if echo "$@" | grep -q '\-fix'; then
         (

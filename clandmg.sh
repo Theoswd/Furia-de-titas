@@ -159,7 +159,7 @@ clandmgfight_start() {
         run_curl_exec "${URL}/clandmgfight/" > "$TMP/SRC"
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
-      grep -o -E '(/clandmgfight(/[a-z]+/[^A-Za-z0-9]r[^A-Za-z0-9][0-9]+|/))' "$TMP/SRC" | sed -n '1p' > "$TMP/ACCESS" 2>/dev/null
+      link_acao "$TMP/SRC" clandmgfight > "$TMP/ACCESS" 2>/dev/null
       sleep 3
     done
     clandmgfight_fight
@@ -183,7 +183,7 @@ clandmgfight_start() {
         run_curl_exec "${URL}/clandmgfight/" > "$TMP/SRC"
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
-      grep -o -E '(/clandmgfight(/[a-z]+/[^A-Za-z0-9]r[^A-Za-z0-9][0-9]+|/))' "$TMP/SRC" | sed -n '1p' > "$TMP/ACCESS" 2>/dev/null
+      link_acao "$TMP/SRC" clandmgfight > "$TMP/ACCESS" 2>/dev/null
       sleep 3
     done
     clandmgfight_fight
