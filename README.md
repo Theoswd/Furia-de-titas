@@ -91,6 +91,8 @@ As contas cadastradas e os dados em `~/.twm` não são afetados — só os scrip
 
 > **Reiniciar faz parte da atualização.** Cada conta lê os scripts uma única vez, ao subir. Um `git pull` sozinho troca os arquivos no disco, mas as contas que já estavam no ar seguem com o código antigo — use o comando acima, que já para e sobe de novo. O `./saude.sh` avisa (`PROC on/old`) quando isso acontece.
 
+> **O painel também.** O `./status.sh` lê o layout uma vez, quando sobe. Deixado aberto durante a atualização — típico no WSL, onde ele fica num painel do `tmux` —, continua desenhando a versão antiga. O `./stop.sh` agora o encerra junto, e o próprio painel avisa `codigo atualizado — feche e abra o painel` quando está defasado.
+
 ---
 
 ## Melhorias desta versão

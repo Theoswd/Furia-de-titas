@@ -129,6 +129,31 @@ EVENTOS="0030|Coliseu
 2155|Imortais
 2225|Rei dos Imortais"
 
+# O codigo em disco e mais novo que ESTE processo de painel?
+#
+# POR QUE ISTO EXISTE
+#
+# O painel le o panel.sh uma unica vez, quando sobe. Depois de um git pull os
+# arquivos no disco sao novos, mas um painel que ja estava aberto continua
+# desenhando com o codigo anterior — e nao ha nada na tela que diga isso.
+#
+# Aparece mais no WSL do que no Termux por causa do jeito de usar: o README
+# recomenda tmux, e o ./status.sh fica num painel do tmux que sobrevive a
+# tudo — inclusive ao ./stop.sh, que so encerra os workers e o play.sh. No
+# Termux o painel costuma morrer junto com a janela, entao o problema nao
+# aparece.
+#
+# A data de /proc/$$ e a hora em que este processo comecou. O teste "-nt" e
+# interno ao shell: 47 comparacoes por desenho, nenhum processo criado.
+painel_desatualizado() {
+    for _pd_f in "$TWMDIR"/*.sh; do
+        [ -f "$_pd_f" ] || continue
+        if [ "$_pd_f" -nt "/proc/$$" ]; then unset _pd_f; return 0; fi
+    done
+    unset _pd_f
+    return 1
+}
+
 # "HHMM" -> minutos desde a meia-noite, em $_HM. Sem criar processo.
 #
 # O zero a esquerda e removido na mao: "$((10#$_h))" e bashism (o dash e o
@@ -944,6 +969,22 @@ while true; do
                 _msg="somente leitura — nao interfere nas contas; ctrl+c sai sem parar nada"
             fi
             printf "  %b%.*s%b\n" "$C_DIM" "$((LARG - 2))" "$_msg" "$C_RESET"
+        fi
+
+        # PAINEL RODANDO CODIGO ANTIGO.
+        #
+        # Sem este aviso a atualizacao parece nao ter funcionado: os arquivos
+        # sao novos, o bot ja subiu com eles, mas a tela continua igual —
+        # porque quem desenha e um processo que subiu antes do git pull.
+        if painel_desatualizado; then
+            if [ "${PANEL_SUPERVISE:-0}" = "1" ]; then
+                _msg="codigo atualizado — reinicie: ./stop.sh && ./play.sh"
+            elif [ "$LARG" -lt 50 ]; then
+                _msg="codigo novo — ctrl+c e ./status.sh"
+            else
+                _msg="codigo atualizado — feche e abra o painel: ctrl+c e ./status.sh"
+            fi
+            printf "  %b%.*s%b\n" "$C_YELLOW" "$((LARG - 2))" "$_msg" "$C_RESET"
         fi
 
         # Quantas contas precisam de atencao, e o que fazer.
