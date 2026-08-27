@@ -260,7 +260,13 @@ case "$total" in *[!0-9]*) total=0 ;; esac
 [ -z "$total" ] && total=0
 
 printf "${CYAN}TWM Multi-contas - %s conta(s) [%s]${RESET}\n" "$total" "$TOYBOX"
-printf "${GOLD}Contas:${RESET} %s\n" "$ACCOUNTS_FILE"
+# O caminho do accounts.conf so aparece quando NAO e o do proprio
+# repositorio. No uso normal e uma linha que nao informa nada — o arquivo
+# esta onde deveria. Fora do lugar, e a primeira coisa que se quer saber:
+# o resolve_accounts_file procura em quatro pastas e ja aconteceu de o bot
+# subir lendo um arquivo antigo de outra instalacao.
+[ "$ACCOUNTS_FILE" = "$TWMDIR/accounts.conf" ] || \
+    printf "${GOLD}Contas:${RESET} %s\n" "$ACCOUNTS_FILE"
 printf "${GOLD}Mod Author:${RESET} Stephenn Curry\n\n"
 
 # Android 12+ derruba a sessao inteira com SIGKILL.
