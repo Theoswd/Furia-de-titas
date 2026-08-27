@@ -1,1 +1,0 @@
-' read -r srv user _enc <    while IFS='3; do$|' read -r srv user _enc <&3; do
