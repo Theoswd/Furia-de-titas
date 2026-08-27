@@ -405,6 +405,25 @@ while true; do
             esac
         fi
 
+        # SESSAO NO JOGO, separada do estado do worker.
+        #
+        # "[on]" diz que o PROCESSO da conta esta vivo — nao que ela esteja
+        # online no jogo. Sao coisas diferentes: com o cookie morto o worker
+        # segue pedindo paginas normalmente, e o servidor o ve como visitante
+        # anonimo. Era exatamente o caso de contas que apareciam online no
+        # painel mas nao no jogo.
+        #
+        # O worker carimba $TMP/last_ok toda vez que confirma, na propria
+        # pagina do descanso, que a sessao esta viva. Passando de 4 minutos
+        # sem confirmacao — o descanso roda a cada ~1 min —, a conta ganha o
+        # aviso "sessao caida".
+        _sessao=""
+        ler_arq "$acc_dir/last_ok"; _ok="$_LIDO"
+        case "$_ok" in
+            ''|*[!0-9]*) [ "$status" = "running" ] && _sessao="sessao ?" ;;
+            *) [ $(( (_agora_ep - _ok) / 60 )) -gt 4 ] && _sessao="sessao caida" ;;
+        esac
+
         # Atribuicao direta no lugar de "cor=$(estado_cor ...)": a
         # substituicao de comando forka mesmo para uma funcao de uma linha.
         case "$status" in
@@ -485,9 +504,14 @@ while true; do
                     "$_l1" "$hp" "$_l2" "$ene" "$_l3" "$lvl" \
                     "$_l4" "$ouro" "$_l5" "$prata")" "$C_RESET")
 "
-            [ -n "$_velho" ] && LISTA="${LISTA}$(printf "    %bnumeros parados ha %s%b" \
-                "$C_YELLOW" "$_velho" "$C_RESET")
+            if [ -n "$_sessao" ]; then
+                LISTA="${LISTA}$(printf "    %b%s%b" "$C_RED" "$_sessao" "$C_RESET")
 "
+            elif [ -n "$_velho" ]; then
+                LISTA="${LISTA}$(printf "    %bnumeros parados ha %s%b" \
+                    "$C_YELLOW" "$_velho" "$C_RESET")
+"
+            fi
             # O combate ao vivo (dano/morte) aparece no overlay de batalhas,
             # nao aqui — evita uma terceira linha por conta no celular.
         else
@@ -510,7 +534,13 @@ while true; do
             # CONJUNTO" — mesma confirmacao, sem repetir os nomes nem gastar
             # cabecalho e reguas. O combate ao vivo continua no overlay.
             _aw=$((LARG - 8)); [ "$_aw" -lt 6 ] && _aw=6
-            if [ -n "$_velho" ]; then
+            if [ -n "$_sessao" ]; then
+                _aw=$((_aw - 18)); [ "$_aw" -lt 6 ] && _aw=6
+                LISTA="${LISTA}$(printf "     %b%s %b%-*.*s  %b%s%b" \
+                    "$C_DIM" "$I_ARROW" "$C_CYAN" "$_aw" "$_aw" "$_aba" \
+                    "$C_RED" "$_sessao" "$C_RESET")
+"
+            elif [ -n "$_velho" ]; then
                 _aw=$((_aw - 24)); [ "$_aw" -lt 6 ] && _aw=6
                 LISTA="${LISTA}$(printf "     %b%s %b%-*.*s  %bnumeros parados ha %s%b" \
                     "$C_DIM" "$I_ARROW" "$C_CYAN" "$_aw" "$_aw" "$_aba" \

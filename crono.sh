@@ -510,6 +510,19 @@ limpar_combate() {
 # Volta para a pagina inicial. As contas devem descansar ali entre os
 # ciclos, e nao numa pagina de combate ou de evento — o jogo mantem o
 # personagem "em batalha" e a navegacao seguinte cai em "Fuja da batalha".
+# A pagina baixada corresponde a uma sessao viva?
+#
+# Mesma regra do is_logged_in, mas lendo o ARQUIVO em vez de carregar a
+# pagina inteira numa variavel: sao dois ou tres greps, sem o custo de
+# guardar o HTML na memoria a cada ciclo, por conta.
+sessao_viva_arquivo() {
+    [ -s "$1" ] || return 1
+    grep -qiE "name=['\"]?pass['\"]?|action=[^>]*sign_in" "$1" && return 1
+    grep -q "icon/level\.png" "$1" && return 0
+    grep -qiE "/logout|[?&]exit" "$1" && return 0
+    return 1
+}
+
 descansar() {
     fetch_page "/?out_gate_confirm=true" "$TMP/REST" 2>/dev/null
     fetch_page "/" "$TMP/REST" 2>/dev/null
@@ -517,6 +530,44 @@ descansar() {
     # "ao vivo" da luta que acabou.
     printf %s "/" > "$TMP/pagina" 2>/dev/null
     limpar_combate
+
+    # SESSAO CONFERIDA AQUI, DE GRACA.
+    #
+    # Esta pagina ja foi baixada acima e era descartada sem ninguem olhar.
+    # Ela diz na hora se a sessao esta viva, entao a checagem nao custa
+    # nenhuma requisicao nova.
+    #
+    # Antes a sessao so era verificada pelo atualiza_stats, a cada 3 minutos
+    # e ao preco de duas requisicoes extras (/train e /user). No intervalo, a
+    # conta seguia pedindo paginas com cookie morto: o servidor a via como
+    # visitante anonimo e ela NAO aparecia online para os outros jogadores,
+    # embora o painel a mostrasse rodando — porque o worker estava vivo.
+    #
+    # Como o descansar() roda ao fim de cada ciclo, a janela em que a conta
+    # fica invisivel cai de ~3 minutos para ~1, sem custo.
+    if sessao_viva_arquivo "$TMP/REST"; then
+        date +%s > "$TMP/last_ok" 2>/dev/null
+        return 0
+    fi
+
+    # Nao reconecta em rajada: com 16 contas, uma queda simultanea faria
+    # todas tentarem a cada volta do laco. Uma tentativa por minuto, por
+    # conta, ja recupera rapido sem alimentar o rate-limit do IP.
+    _ds_ult=`cat "$TMP/last_reconn" 2>/dev/null`
+    case "$_ds_ult" in ''|*[!0-9]*) _ds_ult=0 ;; esac
+    if [ $(( `date +%s` - _ds_ult )) -lt 60 ]; then
+        unset _ds_ult
+        return 1
+    fi
+    date +%s > "$TMP/last_reconn" 2>/dev/null
+    unset _ds_ult
+
+    printf "Sessao caiu no descanso - reconectando\n"
+    if type login_logoff > /dev/null 2>&1 && login_logoff; then
+        date +%s > "$TMP/last_ok" 2>/dev/null
+        return 0
+    fi
+    return 1
 }
 
 start() {
