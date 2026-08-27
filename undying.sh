@@ -6,6 +6,8 @@ undying_fight() {
     grep -o -E '/undying/(hit|mana)/[?][r][=][0-9]+' "$TMP/SRC" | sed -n '1p' > HITMANA 2>/dev/null
 
     if grep -q -o 'out_gate' "$TMP/SRC"; then
+      # A pagina respondeu com a luta: sessao confirmada.
+      sessao_marcar
       printf "Em batalha undying\n"
     else
       echo 1 > BREAK_LOOP

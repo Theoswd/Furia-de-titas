@@ -111,13 +111,28 @@ for _d in "$TWMHOME"/BR_*/; do
     fi
 
     # sessao no jogo
+    #
+    # Dentro de um evento a conta passa minutos sem pedir pagina (o modulo
+    # entra em :55 e espera a hora cheia), entao nao ha confirmacao a cobrar.
+    # O em_evento guarda o instante do evento; vale como janela.
+    _eve=$(cat "${_d}em_evento" 2>/dev/null)
+    _emev=0
+    case "$_eve" in
+        ''|*[!0-9]*) ;;
+        *) [ "$AGORA" -gt $((_eve - 600)) ] && [ "$AGORA" -lt $((_eve + 900)) ] && _emev=1 ;;
+    esac
+
     _ok=$(cat "${_d}last_ok" 2>/dev/null)
     _si=$(idade "$_ok")
-    case "$_ok" in
-        ''|*[!0-9]*) _sess="?" ; _sess_sem=$((_sess_sem + 1)) ;;
-        *) if [ $(( (AGORA - _ok) / 60 )) -gt 4 ]; then _sess="CAIDA"; _sess_caida=$((_sess_caida + 1))
-           else _sess="$_si"; _sess_ok=$((_sess_ok + 1)); fi ;;
-    esac
+    if [ "$_emev" = 1 ]; then
+        _sess="evento"; _sess_ok=$((_sess_ok + 1))
+    else
+        case "$_ok" in
+            ''|*[!0-9]*) _sess="?" ; _sess_sem=$((_sess_sem + 1)) ;;
+            *) if [ $(( (AGORA - _ok) / 60 )) -gt 4 ]; then _sess="CAIDA"; _sess_caida=$((_sess_caida + 1))
+               else _sess="$_si"; _sess_ok=$((_sess_ok + 1)); fi ;;
+        esac
+    fi
 
     # idade dos numeros do painel
     _num="-"
@@ -145,6 +160,7 @@ printf "  ${D}PROC${N}     worker rodando (nao significa online no jogo)\n"
 printf "  ${D}         on/old = rodando codigo anterior ao ultimo git pull${N}\n"
 printf "  ${D}SESSAO${N}   ha quanto tempo a sessao foi confirmada no jogo\n"
 printf "  ${D}         CAIDA = passou de 4 min;  ? = a conta ainda nao gravou${N}\n"
+printf "  ${D}         evento = em evento, onde o silencio e esperado${N}\n"
 printf "  ${D}NUMEROS${N}  idade dos dados do painel (HP, energia, ouro)\n"
 printf "  ${D}RELOGINS${N} reconexoes e recusas nas ultimas 200 linhas do log\n"
 

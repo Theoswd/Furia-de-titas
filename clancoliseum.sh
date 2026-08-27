@@ -19,6 +19,8 @@ clancoliseum_fight() {
     awk -v ush="$(cat "$full_ram")" -v hper="$HPER" 'BEGIN { printf "%.0f", ush * hper / 100 }' > HLHP
 
     if grep -q -o '/dodge/' "$src_ram"; then
+      # A pagina respondeu com a luta: sessao confirmada.
+      sessao_marcar
       printf "Em batalha clancoliseum - HP: %s\n" "`cat USH`"
     else
       echo 1 > BREAK_LOOP

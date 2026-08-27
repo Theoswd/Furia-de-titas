@@ -82,6 +82,8 @@ coliseum_fight() {
             HLHP=`awk -v ush="$(cat "$full_ram")" -v hper="$HPER" 'BEGIN { printf "%.0f", ush * hper / 100 }'`
 
             if grep -q -o '/dodge/' "$src_ram"; then
+                # A pagina respondeu com a luta: sessao confirmada.
+                sessao_marcar
                 printf "Em batalha - HP: %s\n" "$USH"
             else
                 if grep -q -o '?end_fight=true' "$src_ram"; then

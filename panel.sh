@@ -686,11 +686,34 @@ while true; do
         # sem confirmacao — o descanso roda a cada ~1 min —, a conta ganha o
         # aviso "sessao caida".
         _sessao=""
-        ler_arq "$acc_dir/last_ok"; _ok="$_LIDO"
-        case "$_ok" in
-            ''|*[!0-9]*) [ "$status" = "running" ] && _sessao="sessao ?" ;;
-            *) [ $(( (_agora_ep - _ok) / 60 )) -gt 4 ] && _sessao="sessao caida" ;;
+
+        # DENTRO DE UM EVENTO O SILENCIO E ESPERADO.
+        #
+        # O modulo entra em :55, espera ate a hora cheia num laco de sleep e
+        # so entao luta. Nessa espera a conta nao pede pagina nenhuma — nao
+        # ha o que confirmar —, e cobrar confirmacao a cada 4 minutos fazia
+        # o painel anunciar "sessao caida" em praticamente todo evento, com
+        # a conta perfeitamente logada.
+        #
+        # O em_evento guarda o INSTANTE em que o evento comeca, gravado na
+        # inscricao. Vale como janela: dez minutos antes (a inscricao) ate
+        # quinze depois (a luta). Fora disso o aviso volta a valer — inclusive
+        # se o worker morrer no meio e deixar o arquivo para tras.
+        _em_ev=0
+        ler_arq "$acc_dir/em_evento"; _eve="$_LIDO"
+        case "$_eve" in
+            ''|*[!0-9]*) ;;
+            *) if [ "$_agora_ep" -gt $((_eve - 600)) ] && \
+                  [ "$_agora_ep" -lt $((_eve + 900)) ]; then _em_ev=1; fi ;;
         esac
+
+        ler_arq "$acc_dir/last_ok"; _ok="$_LIDO"
+        if [ "$_em_ev" = 0 ]; then
+            case "$_ok" in
+                ''|*[!0-9]*) [ "$status" = "running" ] && _sessao="sessao ?" ;;
+                *) [ $(( (_agora_ep - _ok) / 60 )) -gt 4 ] && _sessao="sessao caida" ;;
+            esac
+        fi
 
         # Atribuicao direta no lugar de "cor=$(estado_cor ...)": a
         # substituicao de comando forka mesmo para uma funcao de uma linha.

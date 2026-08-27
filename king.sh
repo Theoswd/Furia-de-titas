@@ -18,6 +18,8 @@ king_fight() {
     RHP=`awk -v ush="$(cat HP)" -v rper="$RPER" 'BEGIN { printf "%.0f", ush * rper / 100 + ush }'`
     HLHP=`awk -v ush="$(cat FULL)" -v hper="$HPER" 'BEGIN { printf "%.0f", ush * hper / 100 }'`
     if grep -q -o '/dodge/' "$TMP/SRC"; then
+      # A pagina respondeu com a luta: sessao confirmada.
+      sessao_marcar
       printf "Em batalha - HP: %s\n" "`cat HP`"
     else
       (

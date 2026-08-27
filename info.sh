@@ -253,6 +253,23 @@ fetch_page() {
     return 0
 }
 
+# A sessao esta viva: carimba a hora da ultima confirmacao.
+#
+# POR QUE ISTO EXISTE
+#
+# Quem escrevia o last_ok era so o descansar(), no fim de cada ciclo. Dentro
+# de um evento o ciclo nao termina: o modulo entra em 15:55, espera ate as
+# 16:00 num laco de sleep e so entao luta, com teto de 600s. Sao dez, quinze
+# minutos sem passar pelo descanso — e o painel, que cobra confirmacao a
+# cada 4 minutos, anunciava "sessao caida" em praticamente todo evento, com
+# a conta lutando normalmente.
+#
+# Nao da para chamar o descansar ali: ele volta para a Home e ABANDONARIA a
+# batalha. Mas a confirmacao ja existe de graca dentro da luta: a pagina de
+# combate so responde com o link de golpe para quem esta logado. Onde o
+# modulo reconhece esse link, a sessao esta provada — e e so carimbar.
+sessao_marcar() { date +%s > "$TMP/last_ok" 2>/dev/null; }
+
 # Primeiro link de ACAO de um evento, preferindo o que tem nonce (?r=N).
 #
 # CORRECAO (conta abandonando o evento): os modulos extraiam o link com uma
@@ -274,6 +291,8 @@ link_acao() {
     _la_f="$1"; _la_p="$2"
     [ -r "$_la_f" ] || { printf ''; unset _la_f _la_p; return 1; }
     _la=`grep -o -E "/${_la_p}/[A-Za-z]+/[^A-Za-z0-9]r[^A-Za-z0-9][0-9]+" "$_la_f" 2>/dev/null | sed -n 1p`
+    # Link com nonce so aparece em pagina logada: serve de confirmacao.
+    [ -n "$_la" ] && sessao_marcar
     [ -n "$_la" ] || _la=`grep -o -E "/${_la_p}/" "$_la_f" 2>/dev/null | sed -n 1p`
     printf '%s' "$_la"
     unset _la_f _la_p _la
