@@ -252,7 +252,7 @@ king_start() {
     ) </dev/null > /dev/null 2>&1 &
     time_exit 17
     printf "\nKing\n%s\n" "$URL"
-    grep -o -E '(/[a-z]+(/[a-z]+/[^A-Za-z0-9]r[^A-Za-z0-9][0-9]+|/))' "$TMP/SRC" | sed -n '1p' > "$TMP/ACCESS" 2>/dev/null
+    link_acao "$TMP/SRC" king > "$TMP/ACCESS" 2>/dev/null
     printf " Entering...\n%s\n" "`cat "$TMP/ACCESS"`"
     printf " Waiting...\n"
     cat "$TMP/SRC" | grep -o 'king/kingatk/' > "$TMP/EXIT" 2>/dev/null

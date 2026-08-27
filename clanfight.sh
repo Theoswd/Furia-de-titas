@@ -138,7 +138,7 @@ clanfight_start() {
       run_curl_exec "$URL/clanfight/enterFight" > "$TMP/SRC"
     ) </dev/null > /dev/null 2>&1 &
     time_exit 17
-    grep -o -E '(/[a-z]+(/[a-z]+/[^A-Za-z0-9]r[^A-Za-z0-9][0-9]+|/))' "$TMP/SRC" | sed -n '1p' > "$TMP/ACCESS" 2>/dev/null
+    link_acao "$TMP/SRC" clanfight > "$TMP/ACCESS" 2>/dev/null
     printf " Entering...\n"
     printf " Waiting...\n"
     BREAK=$(($(date +%s) + 60))
