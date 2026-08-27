@@ -550,15 +550,29 @@ descansar() {
         return 0
     fi
 
-    # Nao reconecta em rajada: com 16 contas, uma queda simultanea faria
-    # todas tentarem a cada volta do laco. Uma tentativa por minuto, por
-    # conta, ja recupera rapido sem alimentar o rate-limit do IP.
+    # NAO RECONECTA EM BLOCO.
+    #
+    # Com muitas contas no mesmo IP, uma queda costuma atingir varias ao
+    # mesmo tempo — e se todas reconectam juntas, o servidor estrangula a
+    # rajada e ainda pode derrubar sessao de quem estava bem, criando um
+    # ciclo em que as contas se expulsam uma a outra. E o padrao que aparece
+    # como "algumas online, outras nao, alternando".
+    #
+    # O intervalo minimo entre tentativas leva um deslocamento fixo por
+    # conta, derivado do PID: cada uma tenta num segundo diferente dentro da
+    # janela, em vez de todas no mesmo instante. Sem isso o intervalo apenas
+    # adia a rajada, nao a dispersa.
+    _ds_min=${FUNC_reconn_min:-60}
+    case "$_ds_min" in ''|*[!0-9]*) _ds_min=60 ;; esac
+    _ds_min=$(( _ds_min + ($$ % 45) ))
+
     _ds_ult=`cat "$TMP/last_reconn" 2>/dev/null`
     case "$_ds_ult" in ''|*[!0-9]*) _ds_ult=0 ;; esac
-    if [ $(( `date +%s` - _ds_ult )) -lt 60 ]; then
-        unset _ds_ult
+    if [ $(( `date +%s` - _ds_ult )) -lt "$_ds_min" ]; then
+        unset _ds_ult _ds_min
         return 1
     fi
+    unset _ds_min
     date +%s > "$TMP/last_reconn" 2>/dev/null
     unset _ds_ult
 

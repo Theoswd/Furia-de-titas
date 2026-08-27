@@ -73,6 +73,7 @@ sha256sum -c .integrity --quiet && echo "Scripts integros"
 | Cadastrar contas | `cd ~/Furia-de-titas && ./setup.sh` |
 | Deslogar todas as contas | `cd ~/Furia-de-titas && ./logout.sh` |
 | Diagnosticar login | `cd ~/Furia-de-titas && ./diagnose.sh` |
+| **Relatório de saúde** (uma tela, tudo) | `cd ~/Furia-de-titas && ./saude.sh` |
 | Conferir os dados de uma conta | `cd ~/Furia-de-titas && ./lerstats.sh NomeDaConta` |
 | Ver log de uma conta | `tail -f ~/.twm/BR_NomeConta/twm.log` |
 | Desinstalar | `cd ~/Furia-de-titas && ./uninstall.sh` |
