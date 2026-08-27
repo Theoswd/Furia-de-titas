@@ -128,8 +128,12 @@ As contas cadastradas e os dados em `~/.twm` não são afetados — só os scrip
 
 **Painel**
 - Atividade de cada conta visível, e batalha em andamento em destaque.
+- No bloco **AO VIVO — BATALHAS**, o registro da luta aparece logo abaixo do nome: quem acertou a conta, com quanto, se foi crítico, e a habilidade, erva ou pedra que a conta usou.
+- Larguras adaptadas à tela: o HP deixou de ser empurrado para fora do campo de visão no celular.
 - Energia, HP, ouro e prata deixaram de ficar congelados; o painel avisa quando os números estão parados.
 - Atualização a cada 5 segundos.
+
+> Mais (ou menos) linhas do registro da luta: `PANEL_LOG_LINHAS=4 ./status.sh` — `0` desliga.
 
 **Diagnóstico**
 - `./saude.sh` põe numa tela só o que costuma ser perguntado num diagnóstico remoto: memória, processos, sessão e log de cada conta.

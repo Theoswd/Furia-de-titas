@@ -24,6 +24,10 @@ C_RESET='\033[0m';   C_DIM='\033[2m';      C_BOLD='\033[1m'
 C_CYAN='\033[1;36m'; C_GREEN='\033[1;32m'; C_YELLOW='\033[1;33m'
 C_RED='\033[1;31m';  C_MAG='\033[1;35m';   C_WHITE='\033[1;37m'
 C_GOLD='\033[0;33m'; C_GRAY='\033[0;37m';  C_BLUE='\033[1;34m'
+# O caractere ESC de verdade. As constantes acima sao strings com "\033"
+# literal, que so viram cor quando passam pelo printf %b — e o awk do
+# registro de combate imprime direto, sem esse tratamento.
+ESC=$(printf '\033')
 
 # Emoji ou ASCII.
 #
@@ -310,7 +314,16 @@ combate_de() {
 
     if [ -n "$_old" ] && [ "$_old" -gt 0 ] 2>/dev/null; then
         _dif=$((_hp - _old))
-        if [ "$_dif" -lt 0 ]; then
+        # Na tela do celular a frase por extenso empurra o numero para fora
+        # do campo de visao. Com o registro da luta logo abaixo dizendo quem
+        # bateu e com quanto, a forma curta nao perde nada.
+        if [ "${ESTREITO:-0}" = 1 ]; then
+            case "$_dif" in
+                -*) printf 'HP %s (%s)' "$_hp" "$_dif" ;;
+                0)  printf 'HP %s' "$_hp" ;;
+                *)  printf 'HP %s (+%s)' "$_hp" "$_dif" ;;
+            esac
+        elif [ "$_dif" -lt 0 ]; then
             printf 'HP %s  (%s de dano recebido)' "$_hp" "$_dif"
         elif [ "$_dif" -gt 0 ]; then
             printf 'HP %s  (+%s recuperado)' "$_hp" "$_dif"
@@ -322,6 +335,135 @@ combate_de() {
     fi
     unset _d _hp _old _dif
 }
+
+# ============================================================
+#  REGISTRO DA BATALHA AO VIVO
+#
+#  O painel mostrava so o HP e o dano do ultimo golpe. Isso diz QUANTO a
+#  conta levou, nunca DE QUEM nem COM O QUE — e e justamente isso que se
+#  quer ver enquanto o evento corre: quem esta batendo, se o golpe foi
+#  critico, que habilidade, erva ou pedra a conta usou.
+#
+#  A pagina da luta ja esta no disco: cada modulo de batalha grava o HTML
+#  que acabou de baixar no diretorio da conta. O painel le esse arquivo — o
+#  mesmo que o modulo esta usando — e nao custa nenhuma requisicao nova,
+#  nem exige alterar os sete modulos de combate.
+# ============================================================
+
+# Arquivo da pagina de luta mais recente desta conta.
+#
+# Cada modulo usa um nome proprio (SRC no torneio/rei/masmorra, src.html
+# nos altares, ccol_src no coliseu do cla, e assim por diante). Em vez de
+# adivinhar qual evento esta rodando, vale o mais novo: e sempre o da luta
+# em andamento.
+pagina_batalha() {
+    _pb_f=""
+    for _pb_c in "$1/SRC" "$1/src.html" "$1/ccol_src" "$1/col_src" \
+                 "$1/flag_src" "$1/ARENA"; do
+        [ -s "$_pb_c" ] || continue
+        if [ -z "$_pb_f" ] || [ "$_pb_c" -nt "$_pb_f" ]; then _pb_f="$_pb_c"; fi
+    done
+    printf '%s' "$_pb_f"
+    unset _pb_c _pb_f
+}
+
+# As ultimas linhas do combate que dizem respeito A ESTA CONTA.
+#
+# Entram tres coisas, e so elas:
+#
+#   quem acertou a conta   "Bahamut acertar Voce por 2864 critico"
+#   o que a conta usou     "Voce usou Posicao defensiva"
+#   a habilidade de quem   "Bahamut usou Contra ataque"
+#   esta batendo nela
+#
+# Golpe de terceiro em terceiro — "Stallone Blood acertar Bahamut" — fica
+# de fora de proposito: numa batalha de cla o log inteiro nao caberia na
+# tela do celular, e nao e o que se quer acompanhar. Por isso o "usou" so
+# passa quando o nome ja apareceu acertando a conta: e a habilidade de quem
+# esta batendo nela, nao a de um duelo alheio ao lado.
+#
+# O log do jogo vem do mais novo para o mais antigo, entao as primeiras
+# linhas que casam ja sao as ultimas acoes.
+#
+# Um unico processo (awk) por conta em luta, e so enquanto ha luta: o bloco
+# ao vivo so e montado para quem esta com HP/old_HP no disco.
+combate_log() {
+    _cl_f=`pagina_batalha "$1"`
+    [ -n "$_cl_f" ] || return 0
+    _cl_n="${2:-2}"
+    _cl_w="${3:-60}"
+    [ "$_cl_w" -lt 24 ] && _cl_w=24
+
+    # Cores montadas com o ESC de verdade: quem imprime aqui e o awk, que
+    # nao expande "\033" como o printf %b faz no resto do painel.
+    awk -v lim="$_cl_n" -v larg="$_cl_w" -v pre="      " \
+        -v cLevou="${ESC}[1;31m" -v cUsou="${ESC}[1;32m" \
+        -v cDeles="${ESC}[0;37m" -v cFim="${ESC}[0m" '
+        { todo = todo $0 " " }
+        END {
+            # Fim de bloco vira quebra de linha: e o que separa uma acao da
+            # seguinte no log do jogo.
+            gsub(/<\/div>|<\/p>|<\/li>|<\/tr>|<br[^>]*>/, "\n", todo)
+            gsub(/<[^>]*>/, " ", todo)
+            gsub(/&nbsp;|&#160;/, " ", todo)
+            # O painel imprime tudo com printf %b: uma barra invertida vinda
+            # da pagina viraria sequencia de escape no meio do texto.
+            gsub(/\\/, " ", todo)
+            n = split(todo, linha, "\n")
+
+            # Passada 1: quem acertou esta conta.
+            for (i = 1; i <= n; i++) {
+                t = limpa(linha[i])
+                if (t ~ /acert/ && t ~ /[Vv]oc/ && t !~ /^[Vv]oc/) {
+                    quem = t
+                    sub(/ +acert.*$/, "", quem)
+                    if (length(quem) > 0 && length(quem) < 30) bate[quem] = 1
+                }
+            }
+
+            # Passada 2: as ultimas acoes que interessam, do topo para baixo.
+            achou = 0
+            for (i = 1; i <= n && achou < lim; i++) {
+                t = limpa(linha[i])
+                if (length(t) < 6) continue
+
+                cor = ""
+                if (t ~ /^[Vv]oc/)          cor = cUsou      # a conta agiu
+                else if (t ~ /[Vv]oc/)      cor = cLevou     # a conta levou
+                else {
+                    autor = t
+                    sub(/ +usou.*$/, "", autor)
+                    if (t ~ / usou / && autor in bate) cor = cDeles
+                }
+                if (cor == "") continue
+
+                # Corta na ultima palavra que couber, e nao no meio de um
+                # caractere: acentuado ocupa dois bytes, e um corte cego
+                # deixaria meio caractere na tela.
+                if (length(t) > larg) {
+                    corte = substr(t, 1, larg - 1)
+                    p = match(corte, / [^ ]*$/)
+                    if (p > larg / 2) corte = substr(corte, 1, p - 1)
+                    t = corte "…"
+                }
+                print pre cor t cFim
+                achou++
+            }
+        }
+        function limpa(x) {
+            gsub(/[ \t\r]+/, " ", x)
+            sub(/^ /, "", x); sub(/ $/, "", x)
+            return x
+        }
+    ' "$_cl_f" 2>/dev/null
+
+    unset _cl_f _cl_n _cl_w
+}
+
+# Quantas linhas do registro da luta aparecem por conta. 0 desliga.
+#     PANEL_LOG_LINHAS=4 ./status.sh
+PANEL_LOG_LINHAS="${PANEL_LOG_LINHAS:-2}"
+case "$PANEL_LOG_LINHAS" in ''|*[!0-9]*) PANEL_LOG_LINHAS=2 ;; esac
 
 painel_loop() {
 while true; do
@@ -464,12 +606,47 @@ while true; do
         # que a conta faz; este mostra a luta em detalhe (HP, dano, morte).
         if [ -n "$_cbt" ]; then
             n_fight=$((n_fight + 1))
-            _bw=$((LARG - 30))
-            [ "$_bw" -lt 6 ] && _bw=6
-            BATALHAS="${BATALHAS}$(printf "  %b%s %b%-14.14s %b%-*.*s %b%s%b" \
-                "$_cor_c" "$I_LIVE" "$C_WHITE" "$nome" \
+
+            # LARGURA DA COLUNA DE ATIVIDADE: FIXA, NAO ELASTICA.
+            #
+            # CORRECAO: era "LARG - 30", ou seja a atividade era esticada ate
+            # quase o fim da tela e empurrava o HP para a margem direita. Num
+            # terminal largo isso abria um vao de dezenas de espacos entre o
+            # nome e o dano — e no celular o HP saia do campo de visao, que e
+            # exatamente a informacao que o bloco existe para mostrar.
+            #
+            # Agora a coluna tem o tamanho do maior rotulo de atividade e nada
+            # mais, entao nome, atividade e HP ficam encostados.
+            # Larguras derivadas da tela, e nao fixas: o que sobra depois
+            # do HP (ate 16 colunas, "HP 41834 (-2864)") e repartido entre
+            # nome e atividade. Assim a linha cabe tanto num terminal de 40
+            # colunas quanto num de 120, sem estourar nem sobrar vao.
+            if [ "$ESTREITO" = 1 ]; then
+                _sobra=$((LARG - 22))
+                [ "$_sobra" -lt 14 ] && _sobra=14
+                _nw=$(( _sobra * 6 / 10 )); [ "$_nw" -gt 16 ] && _nw=16
+                _bw=$(( _sobra - _nw ));    [ "$_bw" -gt 18 ] && _bw=18
+                [ "$_bw" -lt 5 ] && _bw=5
+            else
+                _nw=14; _bw=16
+            fi
+            BATALHAS="${BATALHAS}$(printf "  %b%s %b%-*.*s %b%-*.*s %b%s%b" \
+                "$_cor_c" "$I_LIVE" "$C_WHITE" "$_nw" "$_nw" "$nome" \
                 "$C_CYAN" "$_bw" "$_bw" "$_aba" "$_cor_c" "$_cbt" "$C_RESET")
 "
+            # REGISTRO DA LUTA, LOGO ABAIXO DO NOME.
+            #
+            # Quem acertou a conta, com quanto e se foi critico; e o que a
+            # conta usou. Comeca na margem esquerda, entao continua legivel
+            # na tela do celular.
+            if [ "$PANEL_LOG_LINHAS" -gt 0 ]; then
+                # 6 colunas de recuo + o texto tem de caber na tela.
+                _log=$(combate_log "$acc_dir" "$PANEL_LOG_LINHAS" $((LARG - 7)))
+                # %s, e nao %b: o texto vem da pagina do jogo e nao deve ter
+                # barra invertida interpretada como escape.
+                [ -n "$_log" ] && BATALHAS="${BATALHAS}$(printf '%s' "$_log")
+"
+            fi
         fi
 
         if [ "$ESTREITO" = 1 ]; then
