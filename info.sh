@@ -354,10 +354,38 @@ parse_status() {
         HPPER=""
     fi
 
+    # ENERGIA: ATUAL / TETO.
+    #
+    # CORRECAO (o painel mostrava sempre o teto). Havia dois numeros e o bot
+    # exibia o errado:
+    #
+    #   ACC_ENE  vem de /train  ("Energia: 2109")  -> e o TETO, praticamente
+    #                                                 fixo para a conta
+    #   ACC_MP   vem do cabecalho da pagina        -> e o valor que MUDA:
+    #            (mana.png alt='mp')                  cai quando a arena gasta
+    #                                                 e sobe com a regeneracao
+    #
+    # O campo de energia do painel recebia o ACC_ENE, e o ACC_MP era lido e
+    # descartado — o painel nem chegava a exibi-lo. Resultado: uma conta com
+    # 231 de energia aparecia com 2109, que e o teto dela.
+    #
+    # Agora o campo traz os dois, no formato "atual/teto" (ex.: 809/2109),
+    # que e como o proprio jogo apresenta. Quando so um dos dois e conhecido,
+    # mostra o que houver, sem inventar o outro.
+    _ene_campo="-"
+    if [ -n "$ACC_MP" ] && [ -n "$ACC_ENE" ]; then
+        _ene_campo="${ACC_MP}/${ACC_ENE}"
+    elif [ -n "$ACC_MP" ]; then
+        _ene_campo="$ACC_MP"
+    elif [ -n "$ACC_ENE" ]; then
+        _ene_campo="$ACC_ENE"
+    fi
+
     printf '%s|%s|%s|%s|%s|%s|%s|%s\n' \
-        "${ACC:-$TWM_USER}" "${ACC_HP:--}" "${ACC_MP:--}" "${ACC_ENE:--}" \
+        "${ACC:-$TWM_USER}" "${ACC_HP:--}" "${ACC_MP:--}" "$_ene_campo" \
         "${ACC_LVL:--}" "${ACC_GOLD:--}" "${ACC_SILVER:--}" "$(date +%s)" \
         > "$TMP/stats" 2>/dev/null
+    unset _ene_campo
 
     unset _pg
 }

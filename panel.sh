@@ -495,7 +495,7 @@ while true; do
             # "[on]" (4 colunas) e "[off]" (5) empurravam o nome para
             # posicoes diferentes e a coluna inteira ficava torta. Agora o
             # simbolo tem campo proprio de largura fixa.
-            LISTA="${LISTA}$(printf "%b%2s %b%-5s %b%-18.18s %b%s %-7s %b%s %-6s %b%s %-4s %b%s %-8s %b%s %s%b" \
+            LISTA="${LISTA}$(printf "%b%2s %b%-5s %b%-18.18s %b%s %-7s %b%s %-10s %b%s %-4s %b%s %-8s %b%s %s%b" \
                 "$C_DIM" "$idx" "$cor" "$sim" \
                 "$C_WHITE" "$nome" \
                 "$C_RED" "$I_HP" "$hp" \
