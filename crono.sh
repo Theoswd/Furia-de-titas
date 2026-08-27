@@ -186,9 +186,6 @@ func_sleep() {
     func_cat
 }
 
-# Janelas fixas da Masmorra do Cla.
-# A propria pagina informa: "10 acessos gratis a cada 8 horas a partir
-# das 10:00" — ou seja 02:00, 10:00 e 18:00. Nao ha o que calcular.
 # Intervalo do checklist de missoes do cla.
 cq_liberado() {
     _m=${FUNC_cq_min:-15}
@@ -269,14 +266,38 @@ atualiza_stats() {
     unset _pg _a _aba_ant
 }
 
-# A masmorra libera 10 golpes por janela de 8h. Um marcador por
-# janela evita repetir a rotina a cada volta do laco.
+# MASMORRA DO CLA: QUEM DECIDE E A PAGINA, NAO O RELOGIO.
+#
+# CORRECAO: a masmorra era a UNICA atividade presa a uma hora fixa do dia.
+# O portao masmorra_na_janela so deixava passar nas horas 02, 10 e 18 e,
+# junto com ele, a execucao era marcada como cumprida mesmo quando nenhum
+# golpe saia. Bastava a conta estar ocupada, a pagina falhar ou o link nao
+# ser reconhecido dentro daquela hora para a janela inteira de 8h ser
+# perdida em silencio — no jogo os golpes seguiam disponiveis e o bot nao
+# voltava la. E exatamente o sintoma relatado: a atividade disponivel, a
+# conta passando por ali e nada sendo feito.
+#
+# Agora o marcador guarda a PROXIMA TENTATIVA, e ela depende do resultado:
+#
+#   masmorra_marcar   golpe saiu -> proxima leva so em 7h
+#   masmorra_adiar    nao saiu   -> tenta de novo em FUNC_masmorra_min
+#
+# O custo de reabrir a pagina e uma requisicao por conta a cada 45 min.
 masmorra_liberada() {
-    _u=`cat "$TMP/last_masmorra" 2>/dev/null`
+    # A chave existia no config.cfg desde sempre e NINGUEM a lia: quem
+    # desligasse a masmorra ali continuava com ela ligada.
+    [ "${FUNC_masmorra:-y}" = "y" ] || return 1
+    _u=`cat "$TMP/next_masmorra" 2>/dev/null`
     case "$_u" in ''|*[!0-9]*) _u=0 ;; esac
-    [ $(( $(date +%s) - _u )) -ge 25200 ]
+    [ "`date +%s`" -ge "$_u" ]
 }
-masmorra_marcar() { date +%s > "$TMP/last_masmorra" 2>/dev/null; }
+masmorra_marcar() { echo $(( `date +%s` + 25200 )) > "$TMP/next_masmorra" 2>/dev/null; }
+masmorra_adiar() {
+    _mm=${FUNC_masmorra_min:-45}
+    case "$_mm" in ''|*[!0-9]*) _mm=45 ;; esac
+    echo $(( `date +%s` + _mm * 60 )) > "$TMP/next_masmorra" 2>/dev/null
+    unset _mm
+}
 
 # Tarefas que NAO dependem da agenda de eventos.
 #
@@ -318,14 +339,12 @@ tarefas_livres() {
         cq_marcar
     fi
 
-    # --- Masmorra do cla nas janelas de 8h (02h, 10h, 18h)
+    # --- Masmorra do cla
     #
-    # Depender da agenda nao funcionava: as 02:00 o ramo do Coliseu
-    # vence e nunca chama start(), e 10:00 nem esta na lista da rotina
-    # comum. Das tres janelas do dia, so a das 18h tinha chance.
-    if masmorra_na_janela && [ -n "$CLD" ] && masmorra_liberada; then
-        clanDungeon
-        masmorra_marcar
+    # Sem hora marcada: a pagina diz se ha golpe. Deu certo, so volta na
+    # proxima leva de 8h; nao deu, volta em minutos.
+    if [ -n "$CLD" ] && masmorra_liberada; then
+        if clanDungeon; then masmorra_marcar; else masmorra_adiar; fi
     fi
 
     # --- Arena, sempre tomando antes a missao do cla que ela completa
@@ -393,14 +412,6 @@ tarefas_livres() {
         specialEvent 2>/dev/null
         ativ_marcar evento
     fi
-}
-
-masmorra_na_janela() {
-    _h=`date +%H`
-    case "$_h" in
-        02|10|18) return 0 ;;
-        *)        return 1 ;;
-    esac
 }
 
 # Arena a cada 30 minutos, controlada por marcador em disco para
@@ -645,13 +656,10 @@ start() {
     campaign_func
     ativ_marcar campanha
 
-    # Masmorra do cla: mesmo portao de 8h que tarefas_livres usa. Antes
-    # so checava a janela, entao reentrava a cada ciclo enquanto a janela
-    # estivesse aberta e nunca registrava a execucao, deixando o portao
-    # de tarefas_livres cego.
-    if masmorra_na_janela && [ -n "$CLD" ] && masmorra_liberada; then
-        clanDungeon
-        masmorra_marcar
+    # Masmorra do cla: mesmo portao que o tarefas_livres usa, entao os dois
+    # pontos de chamada nao se atropelam.
+    if [ -n "$CLD" ] && masmorra_liberada; then
+        if clanDungeon; then masmorra_marcar; else masmorra_adiar; fi
     fi
 
     func_trade

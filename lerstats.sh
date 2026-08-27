@@ -12,6 +12,7 @@
 #
 # Uso:  ./lerstats.sh            lista as contas
 #       ./lerstats.sh Grimlock   mostra os dados dessa conta
+#       ./lerstats.sh Grimlock masmorra   mostra a pagina da Masmorra do Cla
 
 umask 077
 
@@ -52,6 +53,47 @@ baixa() {
 }
 
 printf "${C}Conta:${N} %s\n\n" "$(basename "$ACC_DIR")"
+
+# ---------- modo masmorra: ./lerstats.sh Conta masmorra ----------
+#
+# Mostra a pagina da Masmorra do Cla como o bot a ve. E o unico jeito de
+# saber, sem estar com o aparelho, por que a masmorra nao acha o golpe:
+# o endereco esta errado, o painel de recompensa esta na frente, ou os
+# acessos gratis realmente acabaram.
+case "$2" in
+    masmorra|-m|dungeon)
+        printf "${C}== pagina /clandungeon/?close ==${N}\n"
+        DUN=$(baixa "$URL/clandungeon/?close")
+        printf "  tamanho: %s bytes\n" "$(printf '%s' "$DUN" | wc -c)"
+        if [ -z "$DUN" ]; then
+            printf "  ${R}pagina vazia (sessao caida, sem rede ou endereco inexistente)${N}\n"
+            exit 1
+        fi
+
+        printf "\n${D}  Titulo da pagina:${N}\n"
+        printf '%s' "$DUN" | grep -o -E "<title>[^<]{0,60}" | sed 's/<title>/    /'
+
+        printf "\n${D}  Trechos com golpe / acesso / masmorra (texto, sem tags):${N}\n"
+        printf '%s' "$DUN" | sed 's/<[^>]*>/ /g' | tr -s ' \t' ' ' \
+            | grep -o -i -E ".{0,40}(golpe|acesso|masmorra|dungeon).{0,40}" | head -n 8 | sed 's/^/    /'
+
+        printf "\n${D}  TODOS os links acionaveis (com nonce ?r=):${N}\n"
+        printf '%s' "$DUN" | grep -o -E "/[a-z0-9_-]{3,24}/[a-z0-9_-]{0,24}/?[^A-Za-z0-9]r[^A-Za-z0-9][0-9]+" \
+            | sort -u | head -n 15 | sed 's/^/    /'
+
+        printf "\n${Y}  O que o bot procura hoje:${N}\n"
+        _gp=$(printf '%s' "$DUN" | grep -o -E "/clandungeon/at[a-z]{0,3}k/[^A-Za-z0-9]r[^A-Za-z0-9][0-9]+" | sed -n 1p)
+        [ -n "$_gp" ] || _gp=$(printf '%s' "$DUN" | grep -o -E "/[a-z]{4,20}/at[a-z]{0,3}k/[^A-Za-z0-9]r[^A-Za-z0-9][0-9]+" | sed -n 1p)
+        if [ -n "$_gp" ]; then
+            printf "    ${G}link de golpe encontrado: %s${N}\n" "$_gp"
+        else
+            printf "    ${R}nenhum link de golpe nesta pagina${N}\n"
+            printf "    ${D}Compare com a lista de links acima: se houver um golpe ali${N}\n"
+            printf "    ${D}com outro formato, e ele que o bot precisa aprender.${N}\n"
+        fi
+        exit 0
+        ;;
+esac
 
 # ---------- /train : energia e HP maximo ----------
 printf "${C}== pagina /train ==${N}\n"

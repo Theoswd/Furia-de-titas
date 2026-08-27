@@ -248,7 +248,10 @@ aba_de() {
         /coliseum*)       echo "Coliseu" ;;
         /clancoliseum*)   echo "Coliseu do Clã" ;;
         /clanfight*)      echo "Torneio dos Clãs" ;;
-        /clandungeon*|/clandmgfight*) echo "Masmorra do Clã" ;;
+        /clandungeon*)    echo "Masmorra do Clã" ;;
+        # /clandmgfight e o duelo do cla (evento de 09:25 e 21:25), outra
+        # atividade — vinha rotulado como Masmorra e confundia o painel.
+        /clandmgfight*)   echo "Duelo do Clã" ;;
         /clan/*quest*)    echo "Missões do Clã" ;;
         /clan/*built*)    echo "Estátua do Clã" ;;
         /clan*)           echo "Clã" ;;

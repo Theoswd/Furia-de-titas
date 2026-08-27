@@ -75,6 +75,7 @@ sha256sum -c .integrity --quiet && echo "Scripts integros"
 | Diagnosticar login | `cd ~/Furia-de-titas && ./diagnose.sh` |
 | **Relatório de saúde** (uma tela, tudo) | `cd ~/Furia-de-titas && ./saude.sh` |
 | Conferir os dados de uma conta | `cd ~/Furia-de-titas && ./lerstats.sh NomeDaConta` |
+| Ver a página da Masmorra do Clã | `cd ~/Furia-de-titas && ./lerstats.sh NomeDaConta masmorra` |
 | Ver log de uma conta | `tail -f ~/.twm/BR_NomeConta/twm.log` |
 | Desinstalar | `cd ~/Furia-de-titas && ./uninstall.sh` |
 
@@ -116,6 +117,7 @@ As contas cadastradas e os dados em `~/.twm` não são afetados — só os scrip
 - Arena, carreira, campanha, caverna, cabana do sábio, liga, troca, missões e masmorra revisadas contra o projeto original.
 - Liga, Troca, Missões do Clã e Eventos passaram a rodar também fora dos minutos da agenda.
 - Missões concluídas voltaram a ser recolhidas; o mercador do clã faz as três produções.
+- Masmorra do Clã deixou de depender de hora fixa: procura o golpe na própria página e insiste enquanto houver acesso livre.
 - O bot nunca gasta ouro.
 
 **Painel**
