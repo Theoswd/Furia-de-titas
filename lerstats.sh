@@ -118,10 +118,10 @@ else
         | grep -o -E "[0-9][0-9.,']{0,9} ?(/|de) ?[0-9][0-9.,']{0,9}" | head -n 6 | sed 's/^/    /'
 
     printf "\n${Y}  O que o bot extrai hoje:${N}\n"
-    _ene=$(printf '%s' "$TRAIN" | grep -o -E "Energia:? ?[0-9][0-9.,']{0,14}[KMBkmb]?" \
-           | head -n1 | sed -E 's@^Energia:?[[:space:]]*@@')
+    _ene=$(printf '%s' "$TRAIN" | grep -o -E "Energia:?[^0-9]{0,40}[0-9][0-9.,']{0,14}[KMBkmb]?" \
+           | grep -o -E "[0-9][0-9.,']{0,14}[KMBkmb]?$" | head -n1)
     _fix=$(printf '%s' "$TRAIN" | grep -o -E '\([0-9]{1,9}\)' | head -n1 | tr -d '()')
-    printf "    Energia = %s\n" "${_ene:-<vazio>}"
+    printf "    Energia (teto) = %s\n" "${_ene:-<vazio>}"
     printf "    HP max  = %s\n\n" "${_fix:-<vazio>}"
 fi
 
@@ -140,11 +140,11 @@ else
 
 
     printf "\n${Y}  O que o bot extrai hoje:${N}\n"
-    printf "    HP    = %s\n" "$(printf '%s' "$USERPG" | grep -o -E "health\.png' alt='hp'/> <span[^>]*>[0-9]{1,9}" | grep -o -E '[0-9]{1,9}$' | head -n1)"
-    printf "    MP    = %s\n" "$(printf '%s' "$USERPG" | grep -o -E "mana\.png' alt='mp'/>[^0-9<]{0,4}[0-9]{1,9}" | grep -o -E '[0-9]{1,9}$' | head -n1)"
-    printf "    Nivel = %s\n" "$(printf '%s' "$USERPG" | grep -o -E "level\.png' alt='[^']*'/> ?[0-9]{1,4}" | grep -o -E '[0-9]{1,4}$' | head -n1)"
-    printf "    Ouro  = %s\n" "$(printf '%s' "$USERPG" | grep -o -E "gold\.png' alt='g'/> ?[0-9][0-9.,']{0,14}[KMBkmb]?" | sed -E "s@.*/> ?@@" | head -n1)"
-    printf "    Prata = %s\n" "$(printf '%s' "$USERPG" | grep -o -E "silver\.png' alt='s'/> ?[0-9][0-9.,']{0,14}[KMBkmb]?" | sed -E "s@.*/> ?@@" | head -n1)"
+    printf "    HP    = %s\n" "$(printf '%s' "$USERPG" | grep -o -E "health\.png' alt='hp'/>[^0-9]{0,40}[0-9]{1,9}" | grep -o -E '[0-9]{1,9}$' | head -n1)"
+    printf "    Energia (atual) = %s\n" "$(printf '%s' "$USERPG" | grep -o -E "mana\.png' alt='mp'/>[^0-9]{0,40}[0-9]{1,9}" | grep -o -E '[0-9]{1,9}$' | head -n1)"
+    printf "    Nivel = %s\n" "$(printf '%s' "$USERPG" | grep -o -E "level\.png' alt='[^']*'/>[^0-9]{0,40}[0-9]{1,4}" | grep -o -E '[0-9]{1,4}$' | head -n1)"
+    printf "    Ouro  = %s\n" "$(printf '%s' "$USERPG" | grep -o -E "gold\.png' alt='g'/>[^0-9]{0,40}[0-9][0-9.,']{0,14}[KMBkmb]?" | grep -o -E "[0-9][0-9.,']{0,14}[KMBkmb]?$" | head -n1)"
+    printf "    Prata = %s\n" "$(printf '%s' "$USERPG" | grep -o -E "silver\.png' alt='s'/>[^0-9]{0,40}[0-9][0-9.,']{0,14}[KMBkmb]?" | grep -o -E "[0-9][0-9.,']{0,14}[KMBkmb]?$" | head -n1)"
 fi
 
 printf "\n${C}== o que esta gravado para o painel ==${N}\n"

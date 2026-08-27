@@ -357,13 +357,28 @@ parse_status() {
     _pg="$1"
     [ -n "$_pg" ] || return 1
 
-    ACC_HP=`printf '%s' "$_pg" | grep -o -E "health\.png' alt='hp'/> <span[^>]*>[0-9]{1,9}" | grep -o -E '[0-9]{1,9}$' | head -n1`
-    ACC_MP=`printf '%s' "$_pg" | grep -o -E "mana\.png' alt='mp'/>[^0-9<]{0,4}[0-9]{1,9}" | grep -o -E '[0-9]{1,9}$' | head -n1`
-    ACC_LVL=`printf '%s' "$_pg" | grep -o -E "level\.png' alt='[^']*'/> ?[0-9]{1,4}" | grep -o -E '[0-9]{1,4}$' | head -n1`
+    # DISTANCIA LIVRE ENTRE O ICONE E O NUMERO.
+    #
+    # CORRECAO (energia mostrando so o teto): entre o icone e o valor o jogo
+    # intercala tags e espacos —
+    #     <img src='/images/icon/mana.png' alt='mp'/> <span class='white'>809</span>
+    # e o seletor do MP exigia o numero a no maximo 4 caracteres do icone e
+    # PROIBIA "<" no meio. Qualquer <span> ali zerava a leitura. Com o ACC_MP
+    # vazio, o campo de energia caia no unico valor que restava — o teto, do
+    # /train —, e era esse que aparecia no painel. O do HP ja tolerava um
+    # <span>, e por isso o HP funcionava e a energia nao.
+    #
+    # Agora todos usam a mesma regra: ate 40 caracteres entre o marcador e o
+    # numero, contanto que nenhum deles seja digito. Como "[^0-9]" nao casa
+    # digito, o numero capturado e sempre o PRIMEIRO depois do icone — a
+    # folga nao deixa o seletor pular para um numero vizinho.
+    ACC_HP=`printf '%s' "$_pg" | grep -o -E "health\.png' alt='hp'/>[^0-9]{0,40}[0-9]{1,9}" | grep -o -E '[0-9]{1,9}$' | head -n1`
+    ACC_MP=`printf '%s' "$_pg" | grep -o -E "mana\.png' alt='mp'/>[^0-9]{0,40}[0-9]{1,9}" | grep -o -E '[0-9]{1,9}$' | head -n1`
+    ACC_LVL=`printf '%s' "$_pg" | grep -o -E "level\.png' alt='[^']*'/>[^0-9]{0,40}[0-9]{1,4}" | grep -o -E '[0-9]{1,4}$' | head -n1`
 
     # Ouro e prata: guarda o texto como o jogo mostra (pode vir "408,1M").
-    ACC_GOLD=`printf '%s' "$_pg" | grep -o -E "gold\.png' alt='g'/> ?[0-9][0-9.,']{0,14}[KMBkmb]?" | sed -E "s@.*/> ?@@" | head -n1`
-    ACC_SILVER=`printf '%s' "$_pg" | grep -o -E "silver\.png' alt='s'/> ?[0-9][0-9.,']{0,14}[KMBkmb]?" | sed -E "s@.*/> ?@@" | head -n1`
+    ACC_GOLD=`printf '%s' "$_pg" | grep -o -E "gold\.png' alt='g'/>[^0-9]{0,40}[0-9][0-9.,']{0,14}[KMBkmb]?" | grep -o -E "[0-9][0-9.,']{0,14}[KMBkmb]?$" | head -n1`
+    ACC_SILVER=`printf '%s' "$_pg" | grep -o -E "silver\.png' alt='s'/>[^0-9]{0,40}[0-9][0-9.,']{0,14}[KMBkmb]?" | grep -o -E "[0-9][0-9.,']{0,14}[KMBkmb]?$" | head -n1`
 
     NOWHP="$ACC_HP"; NOWMP="$ACC_MP"
 
@@ -441,8 +456,9 @@ fetch_train_stats() {
     # fallback abaixo, que ainda perde o sufixo K/M ("2,1M" virava "2,1").
     # Agora a remocao e ancorada no proprio rotulo, preservando o numero e o
     # sufixo.
-    ACC_ENE=`printf '%s' "$_t" | grep -o -E "Energia:? ?[0-9][0-9.,']{0,14}[KMBkmb]?" | head -n1 | sed -E 's@^Energia:?[[:space:]]*@@'`
-    [ -z "$ACC_ENE" ] && ACC_ENE=`printf '%s' "$_t" | grep -o -E "Energia:? ?[0-9.,']{1,15}" | grep -o -E "[0-9.,']{1,15}$" | head -n1`
+    # Mesma regra do parse_status: o rotulo e o numero quase nunca estao
+    # colados no HTML cru — entre eles vem "</span> <span class='white'>".
+    ACC_ENE=`printf '%s' "$_t" | grep -o -E "Energia:?[^0-9]{0,40}[0-9][0-9.,']{0,14}[KMBkmb]?" | grep -o -E "[0-9][0-9.,']{0,14}[KMBkmb]?$" | head -n1`
     unset _t
 }
 
