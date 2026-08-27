@@ -129,50 +129,173 @@ EVENTOS="0030|Coliseu
 2155|Imortais
 2225|Rei dos Imortais"
 
-# Devolve: "Nome  HH:MM BRT  (em Xh Ym)"
+# "HHMM" -> minutos desde a meia-noite, em $_HM. Sem criar processo.
+#
+# O zero a esquerda e removido na mao: "$((10#$_h))" e bashism (o dash e o
+# toybox recusam) e sem isso varias implementacoes leem "08" como octal.
+_hhmm_min() {
+    _hm_t="$1"
+    case "$_hm_t" in ????) ;; *) _HM=-1; return 1 ;; esac
+    _hm_h=${_hm_t%??}
+    _hm_m=${_hm_t#??}
+    case "$_hm_h$_hm_m" in *[!0-9]*) _HM=-1; return 1 ;; esac
+    while :; do case "$_hm_h" in 0?*) _hm_h=${_hm_h#0} ;; *) break ;; esac; done
+    while :; do case "$_hm_m" in 0?*) _hm_m=${_hm_m#0} ;; *) break ;; esac; done
+    [ -z "$_hm_h" ] && _hm_h=0
+    [ -z "$_hm_m" ] && _hm_m=0
+    _HM=$(( _hm_h * 60 + _hm_m ))
+    unset _hm_t _hm_h _hm_m
+    return 0
+}
+
+# Percorre UMA lista de eventos e devolve, em variaveis:
+#   _SC_NOW  nome do evento acontecendo agora (vazio se nenhum)
+#   _SC_NOW_T  minuto em que ele comecou
+#   _SC_T    minuto do proximo evento
+#   _SC_N    nome do proximo
+#   _SC_HM   horario "HHMM" do proximo
+#
+# CORRECAO: a versao anterior parava no PRIMEIRO horario maior que agora,
+# confiando que a lista estivesse ordenada. Aqui procura o MENOR, entao uma
+# agenda fora de ordem — a pagina /fights/ nao vem em ordem cronologica —
+# deixa de apontar um evento qualquer.
+#
+# $1 lista, $2 agora em minutos, $3 duracao da janela do evento
+_scan_eventos() {
+    _SC_NOW=""; _SC_NOW_T=0; _SC_T=""; _SC_N=""; _SC_HM=""
+    _sc_1t=""; _sc_1n=""; _sc_1hm=""
+    _sc_oifs=$IFS
+    # IFS so de nova linha: sem isto o "for" divide tambem nos espacos e
+    # nomes como "Coliseu do Cla" viram tres iteracoes.
+    IFS='
+'
+    for _sc_e in $1; do
+        [ -n "$_sc_e" ] || continue
+        _sc_hm=${_sc_e%%|*}; _sc_n=${_sc_e#*|}
+        [ -n "$_sc_n" ] || continue
+        _hhmm_min "$_sc_hm" || continue
+        _sc_v=$_HM
+        [ -n "$_sc_1t" ] || { _sc_1t=$_sc_v; _sc_1n=$_sc_n; _sc_1hm=$_sc_hm; }
+        # Acontecendo agora: comecou ha menos que a duracao da janela.
+        if [ "$_sc_v" -le "$2" ] && [ $(( $2 - _sc_v )) -lt "$3" ]; then
+            if [ -z "$_SC_NOW" ] || [ "$_sc_v" -gt "$_SC_NOW_T" ]; then
+                _SC_NOW=$_sc_n; _SC_NOW_T=$_sc_v
+            fi
+        fi
+        if [ "$_sc_v" -gt "$2" ]; then
+            if [ -z "$_SC_T" ] || [ "$_sc_v" -lt "$_SC_T" ]; then
+                _SC_T=$_sc_v; _SC_N=$_sc_n; _SC_HM=$_sc_hm
+            fi
+        fi
+    done
+    IFS=$_sc_oifs
+    # Nao sobrou nada hoje: o proximo e o primeiro de amanha.
+    if [ -z "$_SC_T" ] && [ -n "$_sc_1t" ]; then
+        _SC_T=$(( _sc_1t + 1440 )); _SC_N=$_sc_1n; _SC_HM=$_sc_1hm
+    fi
+    unset _sc_e _sc_hm _sc_n _sc_v _sc_1t _sc_1n _sc_1hm _sc_oifs
+}
+
+# A linha de evento do rodape: "Proximo: Nome  HH:MM BRT  (em Xh Ym)" ou,
+# enquanto um evento corre, "AGORA: Nome".
+#
+# DUAS FONTES, E A MAIS PROXIMA VENCE.
+#
+# CORRECAO (painel apontando um evento fora de hora): a agenda do jogo
+# (~/.twm/agenda, lida de /fights/) substituia por completo a lista fixa. Se
+# ela viesse sem um dos eventos — nome grafado de outro jeito, horario que a
+# pagina nao mostrou como "HH:MM BRT", agenda escrita antes do evento entrar
+# na pagina — aquele evento simplesmente sumia do painel, e o rodape pulava
+# direto para o seguinte. Visto em producao: faltando 22 minutos para o Vale
+# das 16:00, o painel ja anunciava o Torneio das 19:00.
+#
+# Agora as duas listas sao consultadas e vale a mais proxima. A lista fixa
+# sai do proprio case de horarios do run.sh, ou seja e o que o bot REALMENTE
+# vai fazer — com ela no jogo o painel nunca pode anunciar um evento mais
+# tarde do que a proxima acao das contas.
+#
+# Quando as duas apontam o mesmo evento (a fixa marca a inscricao, 5 min
+# antes; a agenda marca a hora oficial), prevalece a agenda: e o nome e o
+# horario que o jogador ve no jogo.
 proximo_evento() {
-    # Agenda oficial do jogo, escrita pelo worker a partir de /fights/.
-    # Usada quando tiver menos de 2 horas; caso contrario cai na lista
-    # fixa abaixo, que foi conferida contra o jogo e bate com folga de
-    # 2 a 5 minutos (janela em que o bot se prepara para entrar).
-    _ag="$HOME/.twm/agenda"
-    if [ -s "$_ag" ]; then
-        _idade=$(( $(date +%s) - $(stat -c %Y "$_ag" 2>/dev/null || echo 0) ))
-        if [ "$_idade" -lt 7200 ]; then
-            # Aqui o cat continua: sao varias linhas, e o read builtin le
-            # so a primeira. E uma vez por desenho, nao por conta.
-            EVENTOS=`cat "$_ag"`
+    _pe_agenda=""
+    _pe_ag="$HOME/.twm/agenda"
+    if [ -s "$_pe_ag" ]; then
+        _pe_idade=$(( $(date +%s) - $(stat -c %Y "$_pe_ag" 2>/dev/null || echo 0) ))
+        [ "$_pe_idade" -lt 7200 ] && _pe_agenda=`cat "$_pe_ag"`
+    fi
+
+    _hhmm_min "`TZ=America/Bahia date +%H%M`"
+    _pe_ai=$_HM
+    [ "$_pe_ai" -lt 0 ] && _pe_ai=0
+
+    # DUAS JANELAS, PORQUE AS DUAS LISTAS MARCAM COISAS DIFERENTES.
+    #
+    # A lista fixa guarda o minuto da INSCRICAO, 5 minutos antes; a agenda do
+    # jogo guarda a hora OFICIAL do evento. Usar a mesma janela nas duas faria
+    # o "ate" mudar sozinho quando a agenda assumisse — como se o evento
+    # tivesse ganhado 5 minutos no meio do caminho.
+    _pe_dur=${FUNC_evento_min:-10}
+    case "$_pe_dur" in ''|*[!0-9]*) _pe_dur=10 ;; esac
+    _pe_jan=$(( _pe_dur + 5 ))
+
+    _scan_eventos "$EVENTOS" "$_pe_ai" "$_pe_jan"
+    _pe_fnow=$_SC_NOW; _pe_fnow_t=$_SC_NOW_T
+    _pe_ft=$_SC_T; _pe_fn=$_SC_N; _pe_fhm=$_SC_HM
+
+    _pe_anow=""; _pe_anow_t=0; _pe_at=""; _pe_an=""; _pe_ahm=""
+    if [ -n "$_pe_agenda" ]; then
+        _scan_eventos "$_pe_agenda" "$_pe_ai" "$_pe_dur"
+        _pe_anow=$_SC_NOW; _pe_anow_t=$_SC_NOW_T
+        _pe_at=$_SC_T; _pe_an=$_SC_N; _pe_ahm=$_SC_HM
+    fi
+
+    # ACONTECENDO AGORA — o painel so avanca depois que o evento termina.
+    if [ -n "$_pe_anow" ] || [ -n "$_pe_fnow" ]; then
+        # Ate quando: o inicio da janela mais a duracao. Sem isso o rodape
+        # diz que ha evento mas nao quanto falta para o painel voltar a
+        # apontar o proximo.
+        if [ -n "$_pe_anow" ]; then _pe_fim=$(( _pe_anow_t + _pe_dur ))
+        else                         _pe_fim=$(( _pe_fnow_t + _pe_jan ))
+        fi
+        _pe_fim=$(( _pe_fim % 1440 ))
+        printf "AGORA: %s  (ate %02d:%02d)" "${_pe_anow:-$_pe_fnow}" \
+               $(( _pe_fim / 60 )) $(( _pe_fim % 60 ))
+        unset _pe_fim
+        unset _pe_agenda _pe_ag _pe_idade _pe_ai _pe_jan _pe_dur \
+              _pe_fnow _pe_fnow_t _pe_ft _pe_fn _pe_fhm _pe_anow _pe_anow_t _pe_at _pe_an _pe_ahm
+        return 0
+    fi
+
+    # A mais proxima das duas listas.
+    _pe_t=$_pe_ft; _pe_n=$_pe_fn; _pe_hm=$_pe_fhm
+    if [ -n "$_pe_at" ]; then
+        if [ -z "$_pe_t" ] || [ "$_pe_at" -lt "$_pe_t" ]; then
+            _pe_t=$_pe_at; _pe_n=$_pe_an; _pe_hm=$_pe_ahm
+        elif [ $(( _pe_at - _pe_t )) -le 10 ]; then
+            # Mesmo evento visto pelas duas: fica o nome e a hora do jogo.
+            _pe_t=$_pe_at; _pe_n=$_pe_an; _pe_hm=$_pe_ahm
         fi
     fi
-    _agora=`TZ=America/Bahia date +%H%M`
-    _ai=`printf %s "$_agora" | sed "s/^0*//"`; [ -z "$_ai" ] && _ai=0
-    _pn=""; _pt=""
-    # IFS so de nova linha: sem isto o "for" divide tambem nos espacos
-    # e nomes como "Coliseu do Cla" viram tres iteracoes.
-    _oifs=$IFS
-    IFS="
-"
-    for _e in $EVENTOS; do
-        _t=${_e%%|*}; _n=${_e#*|}
-        _ti=`printf %s "$_t" | sed "s/^0*//"`; [ -z "$_ti" ] && _ti=0
-        if [ "$_ti" -gt "$_ai" ]; then _pn=$_n; _pt=$_t; break; fi
-    done
-    IFS=$_oifs
-    # Nenhum restante hoje: o proximo e o primeiro de amanha.
-    if [ -z "$_pt" ]; then
-        _pe=`printf %s "$EVENTOS" | head -n1`
-        _pt=${_pe%%|*}; _pn=${_pe#*|}
-        _ti=`printf %s "$_pt" | sed "s/^0*//"`; [ -z "$_ti" ] && _ti=0
-        _falta=$(( (24*60) - (_ai/100*60 + _ai%100) + (_ti/100*60 + _ti%100) ))
+
+    if [ -z "$_pe_t" ]; then
+        printf "Proximo: --"
     else
-        _falta=$(( (_ti/100*60 + _ti%100) - (_ai/100*60 + _ai%100) ))
+        _pe_falta=$(( _pe_t - _pe_ai ))
+        [ "$_pe_falta" -lt 0 ] && _pe_falta=0
+        _pe_h=${_pe_hm%??}; _pe_m=${_pe_hm#??}
+        if [ "$_pe_falta" -ge 60 ]; then
+            printf "Proximo: %s  %s:%s BRT  (em %dh%02dm)" \
+                   "$_pe_n" "$_pe_h" "$_pe_m" $((_pe_falta/60)) $((_pe_falta%60))
+        else
+            printf "Proximo: %s  %s:%s BRT  (em %dm)" \
+                   "$_pe_n" "$_pe_h" "$_pe_m" "$_pe_falta"
+        fi
+        unset _pe_falta _pe_h _pe_m
     fi
-    _hh=`printf %s "$_pt" | cut -c1-2`; _mm=`printf %s "$_pt" | cut -c3-4`
-    if [ "$_falta" -ge 60 ]; then
-        printf "%s  %s:%s BRT  (em %dh%02dm)" "$_pn" "$_hh" "$_mm" $((_falta/60)) $((_falta%60))
-    else
-        printf "%s  %s:%s BRT  (em %dm)" "$_pn" "$_hh" "$_mm" "$_falta"
-    fi
+    unset _pe_agenda _pe_ag _pe_idade _pe_ai _pe_jan _pe_dur \
+          _pe_fnow _pe_fnow_t _pe_ft _pe_fn _pe_fhm _pe_anow _pe_anow_t _pe_at _pe_an _pe_ahm \
+          _pe_t _pe_n _pe_hm
 }
 
 
@@ -765,7 +888,7 @@ while true; do
         # 100 colunas. Abaixo disso vao em duas — a versao anterior somava
         # 100 caracteres fixos e quebrava em qualquer tela menor.
         if [ "$LARG" -ge 100 ]; then
-            printf "  %b%s %s online%b  %b%s %s subindo%b  %b%s %s parada(s)%b   %b%sProximo: %s%b\n" \
+            printf "  %b%s %s online%b  %b%s %s subindo%b  %b%s %s parada(s)%b   %b%s%s%b\n" \
                    "$C_GREEN" "$S_ON" "$n_on" "$C_RESET" \
                    "$C_YELLOW" "$S_WAIT" "$n_up" "$C_RESET" \
                    "$C_RED" "$S_ERR" "$n_off" "$C_RESET" \
