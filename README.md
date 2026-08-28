@@ -79,14 +79,21 @@ sha256sum -c .integrity --quiet && echo "Scripts integros"
 | Ver log de uma conta | `tail -f ~/.twm/BR_NomeConta/twm.log` |
 | Desinstalar | `cd ~/Furia-de-titas && ./uninstall.sh` |
 
-> **Ícones do painel.** Por padrão o painel usa texto (`[on]`, `HP`, `Ouro`), que funciona em qualquer terminal. Para ligar os emoji, ponha `TWM_EMOJI=1` antes do comando:
+> **Ícones do painel.** Três modos, escolhidos por `TWM_EMOJI`:
+>
+> | | Como fica |
+> |---|---|
+> | *(padrão)* | texto: `[on]`, `HP`, `Ouro` — funciona em qualquer terminal |
+> | `TWM_EMOJI=2` | símbolos: `● ♥ ◆ ★ ¤ ○` — qualquer fonte monoespaçada desenha |
+> | `TWM_EMOJI=1` | emoji: 🟢 ❤️ ⚡ ⭐ 🪙 🥈 — exige fonte com emoji |
 >
 > ```bash
-> TWM_EMOJI=1 ./status.sh
-> TWM_EMOJI=1 ./play.sh
+> TWM_EMOJI=2 ./status.sh
 > ```
 >
-> Para deixar fixo, acrescente `export TWM_EMOJI=1` ao `~/.bashrc` (Termux e WSL) ou ao `~/.profile` (iSH) e abra um terminal novo. Se aparecerem quadrados no lugar dos ícones, o terminal não tem fonte de emoji — volte ao padrão tirando a variável.
+> Para deixar fixo, acrescente `export TWM_EMOJI=2` ao `~/.bashrc` (Termux e WSL) ou ao `~/.profile` (iSH) e abra um terminal novo.
+>
+> **Quadradinhos no lugar dos ícones?** É a fonte do terminal, não o bot: a caixa vazia sai pintada pela cor de quem estaria ali. Use o modo `2`, ou troque a fonte — no Windows Terminal, *Configurações → Aparência → Tipo de letra* (Cascadia Mono e Consolas cobrem emoji); no Termux, o app **Termux:Styling**.
 
 ---
 

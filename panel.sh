@@ -35,6 +35,21 @@ ESC=$(printf '\033')
 # desenham quadrados no lugar dos simbolos. Por isso o padrao e ASCII com
 # cor, que funciona em qualquer lugar. Para ligar os emoji:
 #     TWM_EMOJI=1 ./play.sh
+#
+# TRES MODOS, e nao dois.
+#
+# Os emoji do modo 1 dependem de o terminal ter fonte para eles. Quando nao
+# tem, o que aparece nao e o icone: e uma caixinha vazia, pintada pela cor
+# ANSI em volta — foi o relato, com todos os icones virando quadrado enquanto
+# o "▸" saia certinho. Sinal claro do que falta: o "▸" vem do bloco de formas
+# geometricas, presente em praticamente toda fonte monoespacada; os emoji vem
+# de blocos que so uma fonte com emoji cobre.
+#
+# Dai o modo 2: icones de verdade, mas so com glifos daqueles blocos antigos
+# (♥ ★ ● ○ ◆ ▸), que qualquer fonte desenha. De quebra ocupam UMA coluna,
+# enquanto emoji ocupam duas — o alinhamento fica melhor que no modo 1.
+#
+#     TWM_EMOJI=2 ./status.sh
 if [ "${TWM_EMOJI:-0}" = "1" ]; then
     I_HP="❤️ "; I_EN="⚡ "; I_LV="⭐ "; I_GO="🪙 "; I_SI="🥈 "
     I_TIT="🎮 "; I_ACT="📋 "; I_EVT="⏰ "; I_ARROW="▸"; I_LIVE="⚔️ "
@@ -63,6 +78,15 @@ else
     A_TROCA="Troca Prata/Ouro";     A_SABIO="Cabana do Sábio"
     A_EVENTO="Evento Especial";     A_DESCANSO="Descansando"
     A_NONE="-"
+
+    # Modo 2: troca so os icones, mantendo os nomes de atividade em texto.
+    if [ "${TWM_EMOJI:-0}" = "2" ]; then
+        # O ouro nao usa "●" de proposito: e o mesmo glifo do simbolo de
+        # conta online, e as duas marcas apareceriam iguais na mesma linha.
+        I_HP="♥"; I_EN="◆"; I_LV="★"; I_GO="¤"; I_SI="○"
+        I_TIT=""; I_ACT=""; I_EVT=""; I_ARROW="▸"; I_LIVE="» "
+        S_ON="●"; S_WAIT="◐"; S_ERR="×"; S_OFF="○"; S_UNK="?"; S_PAUSE="‖"
+    fi
 fi
 
 # Largura do terminal.
