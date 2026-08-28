@@ -161,6 +161,22 @@ EVENTOS="0030|Coliseu
 2155|Imortais
 2225|Rei dos Imortais"
 
+# A conta esta AGORA numa pagina de evento?
+#
+# Devolve o nome do evento, ou vazio. E a unica fonte de verdade sobre o
+# evento estar em andamento: o caminho vem do $TMP/pagina, gravado a cada
+# requisicao pelo proprio worker.
+evento_da_pagina() {
+    case "$1" in
+        /altars*)       printf '%s' "$A_ALTARES" ;;
+        /undying*)      printf '%s' "$A_VALE" ;;
+        /king*)         printf '%s' "$A_REI" ;;
+        /clanfight*)    printf '%s' "$A_CLANFIGHT" ;;
+        /clancoliseum*) printf '%s' "$A_CLANCOL" ;;
+        *)              printf '' ;;
+    esac
+}
+
 # O codigo em disco e mais novo que ESTE processo de painel?
 #
 # POR QUE ISTO EXISTE
@@ -305,6 +321,25 @@ proximo_evento() {
         _scan_eventos "$_pe_agenda" "$_pe_ai" "$_pe_dur"
         _pe_anow=$_SC_NOW; _pe_anow_t=$_SC_NOW_T
         _pe_at=$_SC_T; _pe_an=$_SC_N; _pe_ahm=$_SC_HM
+    fi
+
+    # EVENTO VISTO NAS CONTAS TEM PRIORIDADE SOBRE O RELOGIO.
+    #
+    # CORRECAO (o painel voltando a apontar o proximo com o atual em curso):
+    # a janela do "AGORA" era calculada por FUNC_evento_min, que vale 10 por
+    # PALPITE — nao ha como o bot descobrir a duracao sozinho. Passados os 15
+    # minutos (5 de inscricao + 10), o rodape avancava mesmo com as contas
+    # ainda lutando. E o painel nem chega a ler o config.cfg das contas,
+    # entao ajustar a chave la nao mudava nada aqui.
+    #
+    # Agora, quando alguma conta esta numa pagina de evento, e isso que vale.
+    # Nao e estimativa: e a pagina que o worker acabou de pedir. Some sozinho
+    # quando a ultima conta sai do evento, sem depender de duracao nenhuma.
+    if [ -n "$PANEL_EVENTO_ATIVO" ]; then
+        printf "AGORA: %s" "$PANEL_EVENTO_ATIVO"
+        unset _pe_agenda _pe_ag _pe_idade _pe_ai _pe_jan _pe_dur \
+              _pe_fnow _pe_fnow_t _pe_ft _pe_fn _pe_fhm _pe_anow _pe_anow_t _pe_at _pe_an _pe_ahm
+        return 0
     fi
 
     # ACONTECENDO AGORA — o painel so avanca depois que o evento termina.
@@ -661,6 +696,7 @@ while true; do
     if [ "$LARG" -lt 86 ]; then ESTREITO=1; else ESTREITO=0; fi
 
     n_on=0; n_up=0; n_off=0; n_fight=0; idx=0
+    PANEL_EVENTO_ATIVO=''
     LISTA=""; BATALHAS=""
 
     # Le tambem a ultima linha quando o arquivo nao termina em quebra de
@@ -786,6 +822,12 @@ while true; do
 
         # Aba atual + relatorio de combate (HP ao vivo, dano, morte)
         _aba=$(aba_de "$acc_dir")
+        # Alguma conta viva numa pagina de evento? O rodape usa isso no lugar
+        # da janela estimada por FUNC_evento_min.
+        if [ "$status" = "running" ] && [ -z "$PANEL_EVENTO_ATIVO" ]; then
+            ler_arq "$acc_dir/pagina"
+            PANEL_EVENTO_ATIVO=$(evento_da_pagina "$_LIDO")
+        fi
         # Os arquivos HP/old_HP ficam no disco depois que o worker morre.
         # Mostrar "-1110 de dano recebido" numa conta fora do ar e uma
         # leitura falsa de combate — o combate acabou junto com o processo.
