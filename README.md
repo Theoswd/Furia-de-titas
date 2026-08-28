@@ -2,7 +2,7 @@
 
 Bot multi-contas para **[Fúria de Titãs](https://furiadetitas.net)**.
 
-**Autoria: Stephenn Curry** · Licença CC0 1.0
+Licença CC0 1.0
 
 ---
 
@@ -158,6 +158,6 @@ Se algum arquivo estiver diferente, restaure com `git checkout -- . && git pull`
 
 <div align="center">
 
-**Stephenn Curry** · CC0 1.0
+CC0 1.0
 
 </div>
