@@ -80,6 +80,20 @@ if [ "${TWM_EMOJI:-0}" = "1" ]; then
     # emoji por padrao: e de graca e obriga o desenho colorido em renderizador
     # que prefira a forma de texto (⚡ e ⭐ existem nas duas versoes).
     I_HP="❤️ "; I_EN="⚡️ "; I_LV="⭐️ "; I_GO="💰 "; I_SI="🥈 "
+    # BYTES A MAIS QUE COLUNAS.
+    #
+    # O printf conta BYTES; o terminal desenha COLUNAS. Um "❤️" ocupa 6
+    # bytes e 2 colunas, um "💰" 4 bytes e 2 colunas. A linha de status em
+    # modo emoji tem 55 bytes para ~40 colunas de tela — e o corte final,
+    # feito com "%.*s" na largura do terminal, cortava no meio de um numero.
+    # Era o "🥈 22," do relato.
+    #
+    # Estas duas constantes devolvem a diferenca ao calculo:
+    #   I_EXTRA  bytes a mais dos cinco icones da linha de status
+    #   S_W      largura em BYTES da coluna do simbolo, para dar 5 colunas
+    I_EXTRA=16
+    S_W=7
+    T_COLS=3
     I_TIT="🎮 "; I_ACT="📋 "; I_EVT="⏰ "; I_ARROW="▸"; I_LIVE="⚔️ "
     S_ON="🟢"; S_WAIT="🟡"; S_ERR="🔴"; S_OFF="⚫"; S_UNK="⚪"; S_PAUSE="⏸️"
     A_CLANFIGHT="🏆  Torneio do Clã";   A_ALTARES="🔥  Altares dos Deuses"
@@ -94,6 +108,10 @@ if [ "${TWM_EMOJI:-0}" = "1" ]; then
     A_NONE="—"
 else
     I_HP="HP"; I_EN="Eng"; I_LV="LV"; I_GO="Ouro"; I_SI="PR"
+    # Em texto puro byte e coluna sao a mesma coisa.
+    I_EXTRA=0
+    S_W=5
+    T_COLS=0
     I_TIT=""; I_ACT=""; I_EVT=""; I_ARROW="->"; I_LIVE=""
     S_ON="[on]"; S_WAIT="[..]"; S_ERR="[off]"; S_OFF="[--]"; S_UNK="[??]"; S_PAUSE="[||]"
     A_CLANFIGHT="Torneio do Clã";   A_ALTARES="Altares dos Deuses"
@@ -112,6 +130,9 @@ else
         # O ouro nao usa "●" de proposito: e o mesmo glifo do simbolo de
         # conta online, e as duas marcas apareceriam iguais na mesma linha.
         I_HP="♥"; I_EN="◆"; I_LV="★"; I_GO="¤"; I_SI="○"
+        I_EXTRA=9
+        S_W=7
+        T_COLS=0
         I_TIT=""; I_ACT=""; I_EVT=""; I_ARROW="▸"; I_LIVE="» "
         S_ON="●"; S_WAIT="◐"; S_ERR="×"; S_OFF="○"; S_UNK="?"; S_PAUSE="‖"
     fi
@@ -697,6 +718,12 @@ combate_log() {
 
 # Quantas linhas do registro da luta aparecem por conta. 0 desliga.
 #     PANEL_LOG_LINHAS=4 ./status.sh
+# Quantas contas existem, para o painel decidir se cabe respiro entre elas.
+# Lido uma vez aqui; a cada desenho o proprio laco atualiza com o que contou,
+# sem custar processo nenhum.
+PANEL_TOTAL=$(grep -c -E '^[0-9]+\|' "$ACCOUNTS_FILE" 2>/dev/null)
+case "$PANEL_TOTAL" in ''|*[!0-9]*) PANEL_TOTAL=0 ;; esac
+
 PANEL_LOG_LINHAS="${PANEL_LOG_LINHAS:-2}"
 case "$PANEL_LOG_LINHAS" in ''|*[!0-9]*) PANEL_LOG_LINHAS=2 ;; esac
 
@@ -925,8 +952,8 @@ while true; do
             [ "$_nw" -lt 8 ]  && _nw=8
             _aw=$((LARG - _nw - 13))
             [ "$_aw" -lt 6 ] && _aw=6
-            LISTA="${LISTA}$(printf "%b%2s %b%-5s %b%-*.*s %b%s %b%-.*s%b" \
-                "$C_DIM" "$idx" "$cor" "$sim" \
+            LISTA="${LISTA}$(printf "%b%2s %b%-*s %b%-*.*s %b%s %b%-.*s%b" \
+                "$C_DIM" "$idx" "$cor" "$S_W" "$sim" \
                 "$C_WHITE" "$_nw" "$_nw" "$nome" \
                 "$C_DIM" "$I_ARROW" \
                 "$C_CYAN" "$_aw" "$_aba" "$C_RESET")
@@ -938,12 +965,15 @@ while true; do
             # justamente o defeito. Abreviando fica em 42; o corte final
             # garante que NENHUMA largura quebre, mesmo com valores maiores
             # do que os de hoje.
+            # Abaixo de 56 colunas os rotulos viram texto curto — e ai byte
+            # e coluna voltam a ser a mesma coisa, entao o I_EXTRA nao entra.
             if [ "$LARG" -lt 56 ]; then
-                _l1="HP"; _l2="En"; _l3="LV"; _l4="Ou"; _l5="PR"
+                _l1="HP"; _l2="En"; _l3="LV"; _l4="Ou"; _l5="PR"; _lx=0
             else
                 _l1="$I_HP"; _l2="$I_EN"; _l3="$I_LV"; _l4="$I_GO"; _l5="$I_SI"
+                _lx=$I_EXTRA
             fi
-            _num=$((LARG - 4))
+            _num=$((LARG - 4 + _lx))
             LISTA="${LISTA}$(printf "    %b%.*s%b" "$C_GRAY" "$_num" \
                 "$(printf "%s %s %s %s %s %s %s %s %s %s" \
                     "$_l1" "$hp" "$_l2" "$ene" "$_l3" "$lvl" \
@@ -957,6 +987,14 @@ while true; do
                     "$C_YELLOW" "$_velho" "$C_RESET")
 "
             fi
+            # UMA LINHA EM BRANCO ENTRE AS CONTAS.
+            #
+            # Sao duas linhas por conta e, sem separacao, os blocos ficam
+            # colados: no celular a leitura vira um paredao. A linha vazia
+            # so entra quando ha poucas contas — com muitas, o espaco na tela
+            # vale mais que o respiro.
+            [ "$PANEL_TOTAL" -le 8 ] && LISTA="${LISTA}
+"
             # O combate ao vivo (dano/morte) aparece no overlay de batalhas,
             # nao aqui — evita uma terceira linha por conta no celular.
         else
@@ -1003,8 +1041,19 @@ while true; do
         painel_regua "$LARG"
         # O relogio e alinhado a direita pela largura real, nao por um
         # recuo fixo de 26 espacos que so servia para uma tela de 68.
-        _tit="  TWM Multi-contas · BR"
-        _pad=$((LARG - ${#_tit} - ${#agora} - 1))
+        PANEL_TOTAL=$idx
+        # LARGURA DO TITULO EM COLUNAS, NAO EM BYTES.
+        #
+        # O calculo era "${#_tit}", que conta BYTES: o "·" ocupa dois e o
+        # icone do titulo, quando ligado, cinco para tres colunas. A conta
+        # saia errada nos dois sentidos e, em modo emoji, a linha passava da
+        # largura — o relogio aparecia cortado ("19:37:4") porque o terminal
+        # quebrava a linha.
+        #
+        # Parte fixa: 2 de recuo + "TWM Multi-contas" (16) + 1 + "· BR" (4).
+        # O T_COLS vale para os icones do cabecalho e do rodape, que tem a
+        # mesma forma: um emoji mais um espaco, tres colunas.
+        _pad=$(( LARG - 23 - T_COLS - 8 ))
         [ "$_pad" -lt 1 ] && _pad=1
         printf "  %b%sTWM Multi-contas%b %b· BR%b%*s%b%s%b\n" \
                "$C_CYAN$C_BOLD" "$I_TIT" "$C_RESET" "$C_DIM" "$C_RESET" \
@@ -1049,8 +1098,9 @@ while true; do
             fi
             # Truncado na largura: numa tela muito estreita o nome do evento
             # sozinho ja passa da borda.
+            # 2 de recuo + as colunas do icone; o resto e o texto.
             printf "  %b%s%.*s%b\n" "$C_YELLOW" "$I_EVT" \
-                   "$((LARG - 2))" "$(proximo_evento)" "$C_RESET"
+                   "$((LARG - 2 - T_COLS))" "$(proximo_evento)" "$C_RESET"
         fi
 
         # Aviso curto no celular; a frase longa quebrava em duas linhas.
