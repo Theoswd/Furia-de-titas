@@ -50,6 +50,26 @@ ESC=$(printf '\033')
 # enquanto emoji ocupam duas — o alinhamento fica melhor que no modo 1.
 #
 #     TWM_EMOJI=2 ./status.sh
+#
+# PREFERENCIA GRAVADA, PARA NAO DEPENDER DE COMO A JANELA FOI ABERTA.
+#
+# A variavel de ambiente vale so para o comando em que foi escrita. Quem
+# sobe o bot com "TWM_EMOJI=1 ./play.sh" e depois abre o painel noutra aba
+# com "./status.sh" ve os icones num lugar e texto no outro — e o mesmo
+# painel. Gravando a escolha em ~/.twm/emoji ela passa a valer para os
+# dois, e sobrevive a reinicio e a troca de terminal.
+#
+#     echo 1 > ~/.twm/emoji     emoji
+#     echo 2 > ~/.twm/emoji     simbolos simples
+#     echo 0 > ~/.twm/emoji     texto (padrao)
+#
+# A variavel de ambiente continua tendo prioridade, para testar sem mexer
+# no arquivo.
+if [ -z "$TWM_EMOJI" ] && [ -r "$HOME/.twm/emoji" ]; then
+    read -r TWM_EMOJI < "$HOME/.twm/emoji" 2>/dev/null || :
+    case "$TWM_EMOJI" in ''|*[!0-9]*) TWM_EMOJI=0 ;; esac
+fi
+
 if [ "${TWM_EMOJI:-0}" = "1" ]; then
     # O ouro usava 🪙 (U+1FA99), que so entrou no Unicode 13, de 2020: e o
     # unico glifo do conjunto novo o bastante para faltar mesmo numa fonte
