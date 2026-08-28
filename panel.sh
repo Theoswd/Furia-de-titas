@@ -54,8 +54,12 @@ if [ "${TWM_EMOJI:-0}" = "1" ]; then
     # O ouro usava 🪙 (U+1FA99), que so entrou no Unicode 13, de 2020: e o
     # unico glifo do conjunto novo o bastante para faltar mesmo numa fonte
     # que ja tem emoji. 💰 e do Unicode 6.0 (2010) — nao falta em lugar
-    # nenhum. Os demais ja vinham com o seletor U+FE0F onde precisam.
-    I_HP="❤️ "; I_EN="⚡ "; I_LV="⭐ "; I_GO="💰 "; I_SI="🥈 "
+    # nenhum.
+    #
+    # O raio e a estrela levam o seletor U+FE0F mesmo tendo apresentacao de
+    # emoji por padrao: e de graca e obriga o desenho colorido em renderizador
+    # que prefira a forma de texto (⚡ e ⭐ existem nas duas versoes).
+    I_HP="❤️ "; I_EN="⚡️ "; I_LV="⭐️ "; I_GO="💰 "; I_SI="🥈 "
     I_TIT="🎮 "; I_ACT="📋 "; I_EVT="⏰ "; I_ARROW="▸"; I_LIVE="⚔️ "
     S_ON="🟢"; S_WAIT="🟡"; S_ERR="🔴"; S_OFF="⚫"; S_UNK="⚪"; S_PAUSE="⏸️"
     A_CLANFIGHT="🏆  Torneio do Clã";   A_ALTARES="🔥  Altares dos Deuses"
