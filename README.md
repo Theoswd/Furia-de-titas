@@ -79,6 +79,15 @@ sha256sum -c .integrity --quiet && echo "Scripts integros"
 | Ver log de uma conta | `tail -f ~/.twm/BR_NomeConta/twm.log` |
 | Desinstalar | `cd ~/Furia-de-titas && ./uninstall.sh` |
 
+> **Ícones do painel.** Por padrão o painel usa texto (`[on]`, `HP`, `Ouro`), que funciona em qualquer terminal. Para ligar os emoji, ponha `TWM_EMOJI=1` antes do comando:
+>
+> ```bash
+> TWM_EMOJI=1 ./status.sh
+> TWM_EMOJI=1 ./play.sh
+> ```
+>
+> Para deixar fixo, acrescente `export TWM_EMOJI=1` ao `~/.bashrc` (Termux e WSL) ou ao `~/.profile` (iSH) e abra um terminal novo. Se aparecerem quadrados no lugar dos ícones, o terminal não tem fonte de emoji — volte ao padrão tirando a variável.
+
 ---
 
 ## Atualização
