@@ -470,6 +470,21 @@ ativ_marcar() { date +%s > "$TMP/last_$1" 2>/dev/null; }
 # Os ramos de prioridade entram em :55-:59 (evento em :00) ou :25-:29
 # (evento em :30), entao a conta e direta.
 evento_dedicar() {
+    # ENTRADA ESCALONADA ENTRE AS CONTAS.
+    #
+    # Todas as contas aplicam no MESMO segundo: o ramo do run.sh dispara no
+    # mesmo minuto para todas, e o modulo pede /enterGame na hora. Do lado do
+    # servidor sao N inscricoes simultaneas do mesmo IP — o mesmo padrao de
+    # rajada que ja obrigou a serializar o login. Do lado do aparelho e o pico
+    # de processos, todos no mesmo instante.
+    #
+    # O deslocamento vem do PID, entao e fixo para cada conta e diferente
+    # entre elas. Ate 9 segundos, dentro dos 5 minutos de antecedencia que o
+    # agendador ja reserva — ninguem perde a janela por causa disso.
+    _ed_esp=$(( $$ % 10 ))
+    [ "$_ed_esp" -gt 0 ] && sleep "$_ed_esp"
+    unset _ed_esp
+
     _ed_m=`date +%M | sed 's/^0//'`
     case "$_ed_m" in ''|*[!0-9]*) _ed_m=0 ;; esac
     if   [ "$_ed_m" -ge 50 ]; then _ed_f=$(( 60 - _ed_m ))
