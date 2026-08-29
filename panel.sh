@@ -79,7 +79,12 @@ if [ "${TWM_EMOJI:-0}" = "1" ]; then
     # O raio e a estrela levam o seletor U+FE0F mesmo tendo apresentacao de
     # emoji por padrao: e de graca e obriga o desenho colorido em renderizador
     # que prefira a forma de texto (⚡ e ⭐ existem nas duas versoes).
-    I_HP="❤️ "; I_EN="⚡️ "; I_LV="⭐️ "; I_GO="💰 "; I_SI="🥈 "
+    # O NIVEL USA SETA, E VERDE.
+    #
+    # Emoji carregam a propria cor e ignoram o ANSI: um "⬆️" sairia azul,
+    # nao verde. O "▲" e desenho de texto — o terminal o pinta com a cor
+    # que mandarmos. Dai a seta geometrica no lugar do emoji.
+    I_HP="❤️ "; I_EN="⚡️ "; I_LV="▲  "; I_GO="💰 "; I_SI="🥈 "
     # BYTES A MAIS QUE COLUNAS.
     #
     # O printf conta BYTES; o terminal desenha COLUNAS. Um "❤️" ocupa 6
@@ -94,6 +99,8 @@ if [ "${TWM_EMOJI:-0}" = "1" ]; then
     I_EXTRA=16
     S_W=7
     T_COLS=3
+    # Rotulos de EXATAMENTE 2 colunas, para a linha alinhada do celular.
+    L_HP="❤️"; L_EN="⚡️"; L_LV="▲ "; L_GO="💰"; L_SI="🥈"
     I_TIT="🎮 "; I_ACT="📋 "; I_EVT="⏰ "; I_ARROW="▸"; I_LIVE="⚔️ "
     S_ON="🟢"; S_WAIT="🟡"; S_ERR="🔴"; S_OFF="⚫"; S_UNK="⚪"; S_PAUSE="⏸️"
     A_CLANFIGHT="🏆  Torneio do Clã";   A_ALTARES="🔥  Altares dos Deuses"
@@ -112,6 +119,7 @@ else
     I_EXTRA=0
     S_W=5
     T_COLS=0
+    L_HP="HP"; L_EN="En"; L_LV="LV"; L_GO="Ou"; L_SI="PR"
     I_TIT=""; I_ACT=""; I_EVT=""; I_ARROW="->"; I_LIVE=""
     S_ON="[on]"; S_WAIT="[..]"; S_ERR="[off]"; S_OFF="[--]"; S_UNK="[??]"; S_PAUSE="[||]"
     A_CLANFIGHT="Torneio do Clã";   A_ALTARES="Altares dos Deuses"
@@ -129,10 +137,11 @@ else
     if [ "${TWM_EMOJI:-0}" = "2" ]; then
         # O ouro nao usa "●" de proposito: e o mesmo glifo do simbolo de
         # conta online, e as duas marcas apareceriam iguais na mesma linha.
-        I_HP="♥"; I_EN="◆"; I_LV="★"; I_GO="¤"; I_SI="○"
+        I_HP="♥"; I_EN="◆"; I_LV="▲"; I_GO="¤"; I_SI="○"
         I_EXTRA=9
         S_W=7
         T_COLS=0
+        L_HP="♥ "; L_EN="◆ "; L_LV="▲ "; L_GO="¤ "; L_SI="○ "
         I_TIT=""; I_ACT=""; I_EVT=""; I_ARROW="▸"; I_LIVE="» "
         S_ON="●"; S_WAIT="◐"; S_ERR="×"; S_OFF="○"; S_UNK="?"; S_PAUSE="‖"
     fi
@@ -958,27 +967,46 @@ while true; do
                 "$C_DIM" "$I_ARROW" \
                 "$C_CYAN" "$_aw" "$_aba" "$C_RESET")
 "
-            # Rotulos curtos e truncamento na largura da tela.
+            # NUMEROS EM COLUNAS, QUANDO CABE.
             #
-            # "HP 98062 Eng 2195 LV 104 Ouro 5,2M PR 1477,8M" tem 45
-            # colunas: cabe em 56, estoura em 46 e quebra a linha, que era
-            # justamente o defeito. Abreviando fica em 42; o corte final
-            # garante que NENHUMA largura quebre, mesmo com valores maiores
-            # do que os de hoje.
-            # Abaixo de 56 colunas os rotulos viram texto curto — e ai byte
-            # e coluna voltam a ser a mesma coisa, entao o I_EXTRA nao entra.
-            if [ "$LARG" -lt 56 ]; then
-                _l1="HP"; _l2="En"; _l3="LV"; _l4="Ou"; _l5="PR"; _lx=0
-            else
-                _l1="$I_HP"; _l2="$I_EN"; _l3="$I_LV"; _l4="$I_GO"; _l5="$I_SI"
-                _lx=$I_EXTRA
-            fi
-            _num=$((LARG - 4 + _lx))
-            LISTA="${LISTA}$(printf "    %b%.*s%b" "$C_GRAY" "$_num" \
-                "$(printf "%s %s %s %s %s %s %s %s %s %s" \
-                    "$_l1" "$hp" "$_l2" "$ene" "$_l3" "$lvl" \
-                    "$_l4" "$ouro" "$_l5" "$prata")" "$C_RESET")
+            # Com os valores separados por um espaco so, cada conta ficava
+            # com os campos em posicao diferente e a leitura entre linhas
+            # nao acontecia: o ouro de uma ficava sobre a energia da outra.
+            # Aqui cada valor ganha largura fixa, entao ❤️ ⚡ ▲ 💰 🥈 caem
+            # sempre na mesma coluna, conta a conta.
+            #
+            #   4 de recuo + 5 campos de (rotulo 2 + espaco + valor) + 4
+            #   separadores = 53 colunas. Abaixo disso nao cabe, e a linha
+            #   volta ao formato compacto de antes, cortado na largura.
+            #
+            # Os rotulos L_* tem EXATAMENTE 2 colunas em qualquer modo, entao
+            # o alinhamento e o mesmo com emoji, com simbolo ou com texto.
+            if [ $((LARG - 4)) -ge 53 ]; then
+                LISTA="${LISTA}$(printf "    %b%s %-6s %b%s %-9s %b%s %-3s %b%s %-6s %b%s %-6s%b" \
+                    "$C_RED"    "$L_HP" "$hp" \
+                    "$C_YELLOW" "$L_EN" "$ene" \
+                    "$C_GREEN"  "$L_LV" "$lvl" \
+                    "$C_GOLD"   "$L_GO" "$ouro" \
+                    "$C_GRAY"   "$L_SI" "$prata" "$C_RESET")
 "
+            else
+                # Tela curta demais para colunas: formato compacto, com o
+                # corte na largura. Abaixo de 56 os rotulos ja sao texto — e
+                # ai byte e coluna voltam a ser a mesma coisa, entao o
+                # I_EXTRA nao entra.
+                if [ "$LARG" -lt 56 ]; then
+                    _l1="HP"; _l2="En"; _l3="LV"; _l4="Ou"; _l5="PR"; _lx=0
+                else
+                    _l1="$I_HP"; _l2="$I_EN"; _l3="$I_LV"; _l4="$I_GO"; _l5="$I_SI"
+                    _lx=$I_EXTRA
+                fi
+                _num=$((LARG - 4 + _lx))
+                LISTA="${LISTA}$(printf "    %b%.*s%b" "$C_GRAY" "$_num" \
+                    "$(printf "%s %s %s %s %s %s %s %s %s %s" \
+                        "$_l1" "$hp" "$_l2" "$ene" "$_l3" "$lvl" \
+                        "$_l4" "$ouro" "$_l5" "$prata")" "$C_RESET")
+"
+            fi
             if [ -n "$_sessao" ]; then
                 LISTA="${LISTA}$(printf "    %b%s%b" "$C_RED" "$_sessao" "$C_RESET")
 "
@@ -1007,7 +1035,7 @@ while true; do
                 "$C_WHITE" "$nome" \
                 "$C_RED" "$I_HP" "$hp" \
                 "$C_YELLOW" "$I_EN" "$ene" \
-                "$C_MAG" "$I_LV" "$lvl" \
+                "$C_GREEN" "$I_LV" "$lvl" \
                 "$C_GOLD" "$I_GO" "$ouro" \
                 "$C_GRAY" "$I_SI" "$prata" "$C_RESET")
 "
