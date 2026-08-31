@@ -178,9 +178,19 @@ func_sleep() {
     # espera curta cair no minuto errado.
     _fs_min=`date +%M | sed 's/^0//'`
     case "$_fs_min" in ''|*[!0-9]*) _fs_min=0 ;; esac
+    # A espera curta (15s) tem de cobrir TODA a janela de entrada de cada
+    # evento, senao uma espera de 60s iniciada perto do fim da janela acorda
+    # com ela ja fechada e o evento passa em branco:
+    #   Bandeiras    :10-:14   (com :09 de folga)
+    #   Rei/Especiais/Coliseu do Cla  :25-:29
+    #   Torneio/Altares/Vale/Coliseu do Cla  :55-:59
+    # CORRECAO: a lista anterior parava em 13, 30 e 57 — deixava de fora os
+    # minutos 14, 58 e 59, justamente as bordas onde a espera longa engolia a
+    # janela (ex.: dormir 60s em :58:10 acorda em :59:10, com a inscricao do
+    # evento de :00 ja perdida).
     case "$_fs_min" in
-        9|10|11|12|13|24|25|26|27|28|29|30|54|55|56|57) i=15 ;;
-        *)                                              i=60 ;;
+        9|1[0-4]|2[4-9]|30|5[4-9]) i=15 ;;
+        *)                         i=60 ;;
     esac
     unset _fs_min
     func_cat

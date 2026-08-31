@@ -132,5 +132,16 @@ done
 pkill -f "$TWMDIR/twm.sh" 2>/dev/null
 pkill -f "$TWMDIR/worker.sh" 2>/dev/null
 
+# TRAVA GLOBAL DE LOGIN — libera para o proximo ./play.sh.
+#
+# O login e serializado por uma trava atomica ($HOME/.twm/.login.lock). Se um
+# worker foi morto enquanto a segurava, o diretorio da trava fica para tras.
+# No proximo arranque, os novos workers so a liberam se o PID gravado estiver
+# morto — mas esse PID pode ter sido RECICLADO pelo kernel para um processo
+# vivo, e ai a trava so cai depois do teto de 180s, atrasando o login de todas
+# as contas. Como aqui tudo ja foi encerrado, remove-la e sempre seguro e
+# garante um restart (e um git pull) limpo.
+rm -rf "$HOME/.twm/.login.lock" 2>/dev/null
+
 printf "\n${GREEN}%s worker(s) encerrado(s).${RESET}\n" "$stopped"
 termux-wake-unlock 2>/dev/null

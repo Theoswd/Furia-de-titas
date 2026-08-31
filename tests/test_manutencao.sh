@@ -342,6 +342,83 @@ for _pair in "setsid:util-linux" "pgrep:procps" "pkill:procps" "readlink:coreuti
     fi
 done
 
+printf "\n=== 10. Cronograma: espera curta cobre TODA janela de evento ===\n"
+# Replica a decisao do func_sleep (crono.sh). i=15 tem de valer em todos os
+# minutos de entrada de evento; senao uma espera de 60s engole a janela e o
+# evento e abandonado (nem chega a inscrever).
+_fs_i() { case "$1" in 9|1[0-4]|2[4-9]|30|5[4-9]) echo 15 ;; *) echo 60 ;; esac; }
+# Minutos de entrada reais dos eventos:
+#   Bandeiras 10-14 ; Rei/Especiais/ColiseuCla 25-29 ; Torneio/Altares/Vale/ColiseuCla 55-59
+_ev_min="10 11 12 13 14 25 26 27 28 29 55 56 57 58 59"
+_falhou=""
+for _m in $_ev_min; do [ "$(_fs_i "$_m")" = 15 ] || _falhou="$_falhou $_m"; done
+if [ -z "$_falhou" ]; then
+    ok "todos os minutos de entrada de evento usam espera curta (15s)"
+else
+    bad "espera longa (60s) em minutos de evento:$_falhou"
+fi
+# Regressao: os minutos 14, 58 e 59 (bordas antes descobertas) agora sao 15s.
+for _m in 14 58 59; do
+    [ "$(_fs_i "$_m")" = 15 ] && ok "minuto $_m coberto (antes engolia o evento)" \
+                              || bad "minuto $_m ainda em espera longa"
+done
+# Minuto fora de evento continua com espera longa (nao gasta a toa).
+[ "$(_fs_i 45)" = 60 ] && ok "minuto sem evento (45) mantem espera de 60s" \
+                       || bad "minuto 45 nao deveria usar espera curta"
+# E o codigo real traz o padrao corrigido.
+if grep -q '9|1\[0-4\]|2\[4-9\]|30|5\[4-9\])' "$ROOT/crono.sh"; then
+    ok "crono.sh contem o padrao de minutos corrigido"
+else
+    bad "crono.sh nao tem o padrao de janela corrigido"
+fi
+
+printf "\n=== 11. Encerramento limpo para atualizacao (git pull) ===\n"
+# stop.sh remove a trava global de login, senao um restart pode travar ate 180s.
+if grep -q 'rm -rf "\$HOME/.twm/.login.lock"' "$ROOT/stop.sh"; then
+    ok "stop.sh libera a trava global de login (.login.lock) no encerramento"
+else
+    bad "stop.sh nao remove a trava de login (restart pode atrasar 180s)"
+fi
+# stop.sh tambem derruba painel (status.sh) e tem redes de seguranca finais.
+grep -q 'pkill -f "\$TWMDIR/twm.sh"'    "$ROOT/stop.sh" && ok "stop.sh: rede de seguranca pkill twm.sh"    || bad "stop.sh sem pkill twm.sh"
+grep -q 'pkill -f "\$TWMDIR/worker.sh"' "$ROOT/stop.sh" && ok "stop.sh: rede de seguranca pkill worker.sh" || bad "stop.sh sem pkill worker.sh"
+# update_check.sh e manual e so aceita fast-forward (nao roda sozinho).
+if grep -q 'ff-only' "$ROOT/update_check.sh" && grep -q 'stop.sh' "$ROOT/update_check.sh"; then
+    ok "update_check.sh: atualizacao manual, exige stop antes e so fast-forward"
+else
+    bad "update_check.sh: fluxo de atualizacao inseguro/ausente"
+fi
+
+printf "\n=== 12. Escala: isolamento por conta e serializacao do login ===\n"
+# Cada modulo de batalha grava seu estado APOS 'cd \"\$TMP\"' (TMP e por conta).
+# Sem esse cd, os arquivos bare (HP, BREAK_LOOP, ...) colidiriam entre contas.
+for f in king.sh clanfight.sh clandmg.sh altars.sh clancoliseum.sh flagfight.sh; do
+    if grep -q 'cd "\$TMP"' "$ROOT/$f"; then
+        ok "$f: isola estado por conta (cd \$TMP)"
+    else
+        bad "$f: nao faz 'cd \$TMP' — risco de colisao entre contas"
+    fi
+done
+# Login serializado por trava atomica (mkdir) com recuperacao de dono morto:
+# e o que segura o rate-limit de login por IP com 15-30 contas subindo juntas.
+if grep -q 'mkdir "\$LOCKDIR"' "$ROOT/twm.sh" && grep -q 'kill -0 "\$_dono"' "$ROOT/twm.sh"; then
+    ok "twm.sh: login serializado (trava atomica) com recuperacao de dono morto"
+else
+    bad "twm.sh: serializacao de login ausente/fragil"
+fi
+# Sessao reaproveitada (cookie) evita re-autenticar a cada restart -> menos rajada.
+if grep -q 'sessao reaproveitada' "$ROOT/twm.sh"; then
+    ok "twm.sh: reaproveita a sessao do cookie (menos logins em rajada)"
+else
+    bad "twm.sh: nao reaproveita sessao (rajada de login no restart)"
+fi
+# Entrada de evento escalonada por conta (nao todas no mesmo segundo).
+if grep -q '\$\$ % 10' "$ROOT/crono.sh"; then
+    ok "crono.sh: entrada de evento escalonada por conta"
+else
+    bad "crono.sh: entrada de evento sem escalonamento"
+fi
+
 printf "\n=== RESUMO ===\n"
 printf "  PASS=%s  FALHA=%s\n" "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]
