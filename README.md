@@ -58,17 +58,12 @@ cd Furia-de-titas
 chmod +x *.sh
 ```
 
-**7. Conferir que os arquivos estão íntegros**
-```bash
-sha256sum -c .integrity --quiet && echo "Scripts integros"
-```
-
-**8. Cadastrar as contas**
+**7. Cadastrar as contas**
 ```bash
 ./setup.sh
 ```
 
-**9. Iniciar o bot**
+**8. Iniciar o bot**
 ```bash
 ./play.sh
 ```
@@ -119,17 +114,12 @@ cd Furia-de-titas
 chmod +x *.sh
 ```
 
-**7. Conferir que os arquivos estão íntegros**
-```bash
-sha256sum -c .integrity --quiet && echo "Scripts integros"
-```
-
-**8. Cadastrar as contas**
+**7. Cadastrar as contas**
 ```bash
 ./setup.sh
 ```
 
-**9. Iniciar o bot**
+**8. Iniciar o bot**
 ```bash
 ./play.sh
 ```
@@ -172,17 +162,12 @@ cd Furia-de-titas
 chmod +x *.sh
 ```
 
-**7. Conferir que os arquivos estão íntegros**
-```bash
-sha256sum -c .integrity --quiet && echo "Scripts integros"
-```
-
-**8. Cadastrar as contas**
+**7. Cadastrar as contas**
 ```bash
 ./setup.sh
 ```
 
-**9. Iniciar o bot**
+**8. Iniciar o bot**
 ```bash
 ./play.sh
 ```
