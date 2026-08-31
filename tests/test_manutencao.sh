@@ -419,6 +419,64 @@ else
     bad "crono.sh: entrada de evento sem escalonamento"
 fi
 
+printf "\n=== 13. Batalha do Rei: relogio unico de 5s (ataque/erva/pedra/cura) ===\n"
+K="$ROOT/king.sh"
+# Intervalo unico de 5s entre QUALQUER acao.
+if grep -q '^  LA=5' "$K"; then
+    ok "king.sh: intervalo unico LA=5s entre acoes"
+else
+    bad "king.sh: LA nao esta em 5s"
+fi
+# Um golpe por ciclo: nao pode haver ATKRND (era o golpe duplo <4s).
+if grep -q 'cat ATKRND' "$K"; then
+    bad "king.sh ainda dispara ATKRND (golpe duplo <4s)"
+else
+    ok "king.sh: sem ATKRND — uma unica acao por ciclo"
+fi
+# Relogio UNICO: ataque, erva, pedra e cura marcam o MESMO _last_act.
+_n=$(grep -c '_last_act="\$_agora"' "$K")
+if [ "${_n:-0}" -ge 4 ]; then
+    ok "king.sh: todas as acoes marcam o mesmo relogio _last_act ($_n pontos)"
+else
+    bad "king.sh: acoes nao compartilham o relogio unico (_last_act em $_n pontos)"
+fi
+# So age quando 5s ja passaram (>= LA).
+grep -q '_agora - _last_act )) -ge "\$LA"' "$K" \
+    && ok "king.sh: so age quando o intervalo de 5s ja venceu" \
+    || bad "king.sh: nao respeita o intervalo unico antes de agir"
+# Dentro do intervalo apenas espera, sem requisitar.
+grep -q 'LA - ( _agora - _last_act )' "$K" \
+    && ok "king.sh: dentro dos 5s so espera, sem recarregar a pagina" \
+    || bad "king.sh: pode recarregar a pagina dentro do intervalo"
+# Erva/pedra SO quando disponiveis (link presente = arquivo nao-vazio).
+grep -q 'elif \[ -s GRASS \]' "$K" && ok "king.sh: erva so quando disponivel (-s GRASS)" || bad "king.sh: erva nao checa disponibilidade"
+grep -q 'elif \[ -s STONE \]' "$K" && ok "king.sh: pedra so quando disponivel (-s STONE)" || bad "king.sh: pedra nao checa disponibilidade"
+# Ordem de prioridade: CURA -> ERVA -> PEDRA -> ATAQUE.
+_c=$(grep -n 'PRIORIDADE 1 — CURA'   "$K" | head -n1 | cut -d: -f1)
+_e=$(grep -n 'PRIORIDADE 2 — ERVA'   "$K" | head -n1 | cut -d: -f1)
+_p=$(grep -n 'PRIORIDADE 3 — PEDRA'  "$K" | head -n1 | cut -d: -f1)
+_t=$(grep -n 'PRIORIDADE 4 — ATAQUE' "$K" | head -n1 | cut -d: -f1)
+if [ -n "$_c" ] && [ -n "$_e" ] && [ -n "$_p" ] && [ -n "$_t" ] && \
+   [ "$_c" -lt "$_e" ] && [ "$_e" -lt "$_p" ] && [ "$_p" -lt "$_t" ]; then
+    ok "king.sh: ordem cura -> erva -> pedra -> ataque"
+else
+    bad "king.sh: ordem de prioridade incorreta (cura=$_c erva=$_e pedra=$_p atk=$_t)"
+fi
+# Esquiva SO pos-morte: nenhum uso de DODGE antes do bloco POS-MORTE.
+_pm=$(grep -n 'POS-MORTE DO REI' "$K" | head -n1 | cut -d: -f1)
+_d1=$(grep -n 'cat DODGE' "$K" | head -n1 | cut -d: -f1)
+if [ -n "$_pm" ] && [ -n "$_d1" ] && [ "$_d1" -gt "$_pm" ]; then
+    ok "king.sh: esquiva ocorre so apos a morte do rei (pos-morte)"
+else
+    bad "king.sh: ha esquiva durante o combate (deveria ser so pos-morte; dodge=$_d1 posmorte=$_pm)"
+fi
+# Nao restou o spam do sniper.
+if grep -q 'FINALIZACAO\|modo espera' "$K"; then
+    bad "king.sh: ainda ha modo sniper com spam de ataques"
+else
+    ok "king.sh: sem spam do sniper (toda acao respeita o intervalo)"
+fi
+
 printf "\n=== RESUMO ===\n"
 printf "  PASS=%s  FALHA=%s\n" "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

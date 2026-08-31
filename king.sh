@@ -1,7 +1,10 @@
 # shellcheck disable=SC2148
 king_fight() {
   cd "$TMP" || return 1
-  LA=4
+  # LA = intervalo unico entre QUALQUER acao (ataque, erva, pedra, cura).
+  # O jogo recusa uma acao que venha menos de ~4-5s depois da anterior, entao
+  # ataque, erva e pedra compartilham o MESMO relogio: um por vez, a cada 5s.
+  LA=5
   HPER="38"
   RPER=5
 
@@ -47,52 +50,68 @@ king_fight() {
     fi
   }
 
-  # Calcula porcentagem de HP do rei
-  # HP2 = HP atual do rei, FULL = HP maximo do rei
-  # Os dois valores ja vem do cl_access e do cache do FULL: eram dois "cat"
-  # por volta do laco, so para calcular esta porcentagem.
-  king_percent() {
-    if [ -n "$_hp2at" ] && [ -n "$_fullat" ] && [ "$_fullat" -gt 0 ] 2>/dev/null; then
-      awk -v h="$_hp2at" -v f="$_fullat" 'BEGIN { printf "%.2f", h / f * 100 }'
-    else
-      echo "100"
-    fi
-  }
-
-  cl_access
-  cat HP > old_HP
-  # ESTADO DO LACO EM VARIAVEIS.
+  # ============================================================
+  #  LACO DE LUTA DO REI — UM GOLPE POR CICLO, 4 A 5 SEGUNDOS
   #
-  # last_atk, last_heal e FULL eram lidos com "$(cat ...)" a cada
-  # comparacao — dois processos cada, varias vezes por volta. Os arquivos
-  # continuam sendo gravados (outros pontos e o painel os leem), mas quem
-  # decide dentro do laco passa a ler a variavel, que nao custa processo.
+  #  ANALISE DO QUE HAVIA ANTES (causava golpe perdido no jogo):
+  #   1. No modo normal sem kingatk, disparava ATKRND e logo ATK no MESMO
+  #      ciclo (~2s de intervalo) — o segundo golpe saia abaixo de 4s e o
+  #      jogo nao o aceitava.
+  #   2. O ramo de espera recarregava /king a cada ~1,5s — cada atualizacao
+  #      de pagina em menos de 4s atrapalha o proximo golpe.
+  #   3. O last_atk era marcado no FIM do request, somando o tempo do golpe
+  #      em cima da recarga (intervalo real ~6-7s, lento demais).
+  #   4. Nao usava a erva (GRASS); so a pedra (STONE).
+  #   5. Os modos "sniper" spammavam 3 ataques sem intervalo (todos <4s).
+  #
+  #  AGORA — RELOGIO UNICO DE ACOES (LA = 5s):
+  #  O jogo recusa qualquer acao que venha menos de ~4-5s depois da anterior
+  #  (o golpe/ item "falha" e nao acerta). Por isso ATAQUE, ERVA, PEDRA e CURA
+  #  compartilham UM SO relogio (_last_act): sai UMA acao por vez, a cada 5s.
+  #  A cada janela de 5s escolhe-se UMA acao, nesta prioridade:
+  #     1) CURA (esmalte) — so com a vida baixa (recarga propria de 90s);
+  #     2) ERVA  — so quando disponivel (link na pagina);
+  #     3) PEDRA — so quando disponivel (link na pagina);
+  #     4) ATAQUE — kingatk (golpe forte), senao o ataque normal.
+  #  Assim o intervalo ataque->erva, erva->pedra, pedra->ataque etc. e sempre
+  #  ~5s, seguindo a mesma logica do ataque — nunca duas acoes coladas (<4s).
+  #  O _last_act e marcado no INICIO da acao, para o tempo do request contar
+  #  DENTRO do intervalo em vez de somar-se a ele. Dentro dos 5s o bot so
+  #  espera, SEM nenhuma requisicao (uma atualizacao de pagina <5s tambem
+  #  atrapalharia a proxima acao).
+  #
+  #  ERVA/PEDRA: usadas so quando o jogo mostra o link (mesma base dos outros
+  #  modulos: arquivo GRASS/STONE nao-vazio = item disponivel). Nao estao
+  #  presas ao botao de ataque nem a cura — sao acoes proprias no relogio.
+  #
+  #  ESQUIVA: no rei ela ocorre SO APOS A MORTE do rei (bloco pos-morte, no
+  #  fim da funcao), para garantir a posicao na proxima rodada. Nao ha esquiva
+  #  durante o combate — e assim de proposito.
+  # ============================================================
+  cl_access
   _agora=`date +%s`
-  _last_dodge=$(( _agora - 20 ))
   _last_heal=$(( _agora - 90 ))
-  _last_atk=$(( _agora - LA ))
-  _fullat=`cat FULL 2>/dev/null`
-  echo "$_last_dodge" > last_dodge
-  echo "$_last_heal"  > last_heal
-  echo "$_last_atk"   > last_atk
+  _last_act=$(( _agora - LA ))       # relogio unico das acoes (ataque/erva/pedra/cura)
+  # old_HP gravado uma vez para o painel mostrar o dano acumulado da luta.
+  echo "$_hpat"      > old_HP
+  echo "$_last_heal" > last_heal
+  echo "$_last_act"  > last_atk      # o painel le last_atk como "ultima acao"
   : > BREAK_LOOP
 
-  # LIMITE DE TEMPO: BREAK_LOOP so e gravado quando a luta termina.
-  # Se o estado nunca resolver (pagina muda, servidor devolve algo
-  # inesperado), o laco ficava requisitando para sempre e a conta
-  # travava naquela batalha. Teto de 10 minutos.
-  FIGHT_BREAK=$(($(date +%s) + 600))
-  until [ -s "BREAK_LOOP" ] || [ "$_agora" -gt "$FIGHT_BREAK" ]; do
-    : > BREAK_LOOP
+  # Teto de 10 min: BREAK_LOOP so e gravado quando a luta termina. Sem isso,
+  # se o estado nunca resolver, o laco requisitaria para sempre.
+  FIGHT_BREAK=$(( _agora + 600 ))
+  until [ -s "BREAK_LOOP" ] || [ "`date +%s`" -gt "$FIGHT_BREAK" ]; do
     _agora=`date +%s`
 
-    KPCT=`king_percent`
+    # RELOGIO UNICO: so age uma vez a cada LA (5s). Qualquer acao (ataque,
+    # erva, pedra, cura) antes disso "falha" no jogo, entao todas esperam o
+    # mesmo intervalo. Dentro dos 5s o bot so espera, sem NENHUMA requisicao.
+    if [ $(( _agora - _last_act )) -ge "$LA" ]; then
 
-    # ── MODO NORMAL: HP > 10% ──────────────────────────────────────────────
-    # Comportamento original sem dodge
-    if awk -v p="$KPCT" 'BEGIN { exit !(p > 10) }'; then
-
-      # Heal do jogador (mantido em modo normal)
+      # PRIORIDADE 1 — CURA (esmalte): vida baixa cura primeiro, para a conta
+      # nao morrer (tem recarga propria de 90s). O HP maximo (FULL, do /train)
+      # NUNCA e sobrescrito pelo HP atual pos-cura.
       if awk -v ush="$_hpat" -v hlhp="$HLHP" 'BEGIN { exit !(ush < hlhp) }' && \
          [ $(( _agora - _last_heal )) -gt 90 ] && \
          [ $(( _agora - _last_heal )) -lt 300 ]; then
@@ -101,138 +120,66 @@ king_fight() {
         ) </dev/null > /dev/null 2>&1 &
         time_exit 17
         cl_access
-        # HP maximo (FULL) NAO e tocado aqui: ele vem do /train e representa
-        # a capacidade real da conta. Sobrescreve-lo com o HP atual pos-cura
-        # fazia o bot "achar" que continuava com HP cheio e baixava o limiar
-        # de cura (HLHP) a cada golpe. FULL permanece o maximo lido no inicio.
-        _last_heal=`date +%s`; echo "$_last_heal" > last_heal
-        sleep 0.3s
+        _last_heal="$_agora"; echo "$_last_heal" > last_heal
+        _last_act="$_agora";  echo "$_last_act"  > last_atk
 
-      # Ataque com cooldown normal
-      elif [ $(( _agora - _last_atk )) -gt "$LA" ]; then
-        if grep -q -o -E '(king/kingatk/[^A-Za-z0-9_]r[^A-Za-z0-9_][0-9]+)' "$TMP/SRC"; then
-          # kingatk disponivel — prioridade maxima
+      # PRIORIDADE 2 — ERVA: acao propria, SO quando disponivel (link na
+      # pagina = arquivo GRASS nao-vazio). Nao esta presa ao ataque nem a cura.
+      elif [ -s GRASS ]; then
+        (
+          run_curl_exec "${URL}$(cat GRASS)" > "$TMP/SRC"
+        ) </dev/null > /dev/null 2>&1 &
+        time_exit 17
+        cl_access
+        _last_act="$_agora"; echo "$_last_act" > last_atk
+
+      # PRIORIDADE 3 — PEDRA: acao propria, SO quando disponivel (STONE nao-vazio).
+      elif [ -s STONE ]; then
+        (
+          run_curl_exec "${URL}$(cat STONE)" > "$TMP/SRC"
+        ) </dev/null > /dev/null 2>&1 &
+        time_exit 17
+        cl_access
+        _last_act="$_agora"; echo "$_last_act" > last_atk
+
+      # PRIORIDADE 4 — ATAQUE: kingatk preferido (golpe forte no rei), senao o
+      # ataque normal. So quando o alvo NAO esta grey (invulneravel).
+      elif ! grep -q -o 'txt smpl grey' "$TMP/SRC"; then
+        if [ -s KINGATK ] && \
+           grep -q -o -E '(king/kingatk/[^A-Za-z0-9_]r[^A-Za-z0-9_][0-9]+)' "$TMP/SRC"; then
           (
             run_curl_exec "${URL}$(cat KINGATK)" > "$TMP/SRC"
           ) </dev/null > /dev/null 2>&1 &
           time_exit 17
           cl_access
-          # Stone se rei com HP baixo
-          if awk -v ush="$_hp2at" 'BEGIN { exit !(ush < 25) }'; then
-            (
-              run_curl_exec "${URL}$(cat STONE)" > "$TMP/SRC"
-            ) </dev/null > /dev/null 2>&1 &
-            time_exit 17
-            cl_access
-          fi
         else
-          # Ataque random ou normal
-          if [ $(( _agora - _last_atk )) -ne "$LA" ] && \
-             ! grep -q -o 'txt smpl grey' "$TMP/SRC" && \
-             awk -v rhp="$RHP" -v enh="$_hp2at" 'BEGIN { exit !(rhp < enh) }' || \
-             [ $(( _agora - _last_atk )) -ne "$LA" ] && \
-             ! grep -q -o 'txt smpl grey' "$TMP/SRC" && \
-             grep -q -o "`cat USER`" allies.txt; then
-            (
-              run_curl_exec "${URL}$(cat ATKRND)" > "$TMP/SRC"
-            ) </dev/null > /dev/null 2>&1 &
-            time_exit 17
-            cl_access
-            _last_atk=`date +%s`; echo "$_last_atk" > last_atk
-          fi
           (
             run_curl_exec "${URL}$(cat ATK)" > "$TMP/SRC"
           ) </dev/null > /dev/null 2>&1 &
           time_exit 17
           cl_access
         fi
-        _last_atk=`date +%s`; echo "$_last_atk" > last_atk
+        # Marca o INICIO da acao (nao o fim do request): o intervalo ate a
+        # proxima acao fica em ~LA (5s), sem inflar com o tempo do request.
+        _last_act="$_agora"; echo "$_last_act" > last_atk
 
       else
-        # Aguarda cooldown — apenas atualiza pagina.
-        # Sleep intermediario de 0,5s (antes 1s): somado ao espacamento do
-        # time_exit, mantem o intervalo real entre ataques em 4-5s.
+        # Alvo grey (invulneravel) e sem cura/item a fazer: rele a pagina para
+        # ver quando o rei libera. Conta como o turno do relogio (5s), para
+        # nao virar atualizacao em rajada (<5s tambem atrapalha).
         (
           run_curl_exec "${URL}/king" > "$TMP/SRC"
         ) </dev/null > /dev/null 2>&1 &
         time_exit 17
         cl_access
-        sleep 0.5s
+        _last_act="$_agora"; echo "$_last_act" > last_atk
       fi
 
-    # ── MODO ESPERA: 1% < HP <= 10% ────────────────────────────────────────
-    # Para todos os ataques exceto kingatk — guarda o golpe para o fim
-    elif awk -v p="$KPCT" 'BEGIN { exit !(p > 1) }'; then
-      printf "King sniper — modo espera: %s%%\n" "$KPCT"
-
-      # Apenas kingatk e permitido nesse intervalo
-      if grep -q -o -E '(king/kingatk/[^A-Za-z0-9_]r[^A-Za-z0-9_][0-9]+)' "$TMP/SRC"; then
-        (
-          run_curl_exec "${URL}$(cat KINGATK)" > "$TMP/SRC"
-        ) </dev/null > /dev/null 2>&1 &
-        time_exit 17
-        cl_access
-        _last_atk=`date +%s`; echo "$_last_atk" > last_atk
-      else
-        # Sem kingatk — apenas atualiza e monitora HP
-        (
-          run_curl_exec "${URL}/king" > "$TMP/SRC"
-        ) </dev/null > /dev/null 2>&1 &
-        time_exit 17
-        cl_access
-        sleep 0.5s
-      fi
-
-    # ── MODO FINALIZACAO: HP <= 1% ─────────────────────────────────────────
-    # Modo agressivo — spam de ataques, sem delays, sem heal, sem dodge
     else
-      printf "King sniper — FINALIZACAO: %s%%\n" "$KPCT"
-
-      # Sequencia de finalizacao: kingatk > stone > atk > atk > atk > repeat
-      if grep -q -o -E '(king/kingatk/[^A-Za-z0-9_]r[^A-Za-z0-9_][0-9]+)' "$TMP/SRC"; then
-        # 1. kingatk — prioridade absoluta
-        (
-          run_curl_exec "${URL}$(cat KINGATK)" > "$TMP/SRC"
-        ) </dev/null > /dev/null 2>&1 &
-        time_exit 17
-        cl_access
-        # 2. stone imediatamente apos kingatk
-        if [ -s STONE ]; then
-          (
-            run_curl_exec "${URL}$(cat STONE)" > "$TMP/SRC"
-          ) </dev/null > /dev/null 2>&1 &
-          time_exit 17
-          cl_access
-        fi
-      fi
-
-      # 3-5. Spam ataque normal — sem delay
-      (
-        run_curl_exec "${URL}$(cat ATK)" > "$TMP/SRC"
-      ) </dev/null > /dev/null 2>&1 &
-      time_exit 17
-      cl_access
-      (
-        run_curl_exec "${URL}$(cat ATK)" > "$TMP/SRC"
-      ) </dev/null > /dev/null 2>&1 &
-      time_exit 17
-      cl_access
-      (
-        run_curl_exec "${URL}$(cat ATK)" > "$TMP/SRC"
-      ) </dev/null > /dev/null 2>&1 &
-      time_exit 17
-      cl_access
-
-      # 6. kingatk novamente se disponivel
-      if grep -q -o -E '(king/kingatk/[^A-Za-z0-9_]r[^A-Za-z0-9_][0-9]+)' "$TMP/SRC"; then
-        (
-          run_curl_exec "${URL}$(cat KINGATK)" > "$TMP/SRC"
-        ) </dev/null > /dev/null 2>&1 &
-        time_exit 17
-        cl_access
-      fi
-
-      _last_atk=`date +%s`; echo "$_last_atk" > last_atk
+      # Dentro do intervalo de 5s: espera o restante SEM nenhuma requisicao —
+      # uma atualizacao de pagina antes de 5s atrapalharia a proxima acao.
+      _resta=$(( LA - ( _agora - _last_act ) ))
+      [ "$_resta" -gt 0 ] && sleep "$_resta"
     fi
 
   done
