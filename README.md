@@ -26,14 +26,50 @@ Automação viola os termos de uso do jogo e pode resultar em **banimento das co
 
 Instale o Termux **[pela F-Droid](https://f-droid.org/packages/com.termux/)**. A versão da Play Store não funciona.
 
+Copie e rode **um comando de cada vez**, na ordem:
+
+**1. Atualizar o Termux**
 ```bash
 pkg update && pkg upgrade -y
+```
+
+**2. Instalar os programas necessários**
+```bash
 pkg install git curl wget util-linux coreutils procps tmux -y
+```
+
+**3. Manter o aparelho acordado**
+```bash
 termux-wake-lock
-cd ~ && git clone https://github.com/Theoswd/Furia-de-titas.git && cd Furia-de-titas
+```
+
+**4. Baixar o bot**
+```bash
+git clone https://github.com/Theoswd/Furia-de-titas.git
+```
+
+**5. Entrar na pasta**
+```bash
+cd Furia-de-titas
+```
+
+**6. Dar permissão de execução**
+```bash
 chmod +x *.sh
+```
+
+**7. Conferir que os arquivos estão íntegros**
+```bash
 sha256sum -c .integrity --quiet && echo "Scripts integros"
+```
+
+**8. Cadastrar as contas**
+```bash
 ./setup.sh
+```
+
+**9. Iniciar o bot**
+```bash
 ./play.sh
 ```
 
@@ -51,13 +87,50 @@ sha256sum -c .integrity --quiet && echo "Scripts integros"
 
 ## Instalação — WSL (Windows)
 
+Copie e rode **um comando de cada vez**, na ordem:
+
+**1. Atualizar a lista de pacotes**
 ```bash
-sudo apt update && sudo apt install -y git curl util-linux procps coreutils tmux
+sudo apt update
+```
+
+**2. Instalar os programas necessários**
+```bash
+sudo apt install -y git curl util-linux procps coreutils tmux
+```
+
+**3. Ir para a pasta pessoal** (nunca instale em `/mnt/c`)
+```bash
 cd ~
-git clone https://github.com/Theoswd/Furia-de-titas.git && cd Furia-de-titas
+```
+
+**4. Baixar o bot**
+```bash
+git clone https://github.com/Theoswd/Furia-de-titas.git
+```
+
+**5. Entrar na pasta**
+```bash
+cd Furia-de-titas
+```
+
+**6. Dar permissão de execução**
+```bash
 chmod +x *.sh
+```
+
+**7. Conferir que os arquivos estão íntegros**
+```bash
 sha256sum -c .integrity --quiet && echo "Scripts integros"
+```
+
+**8. Cadastrar as contas**
+```bash
 ./setup.sh
+```
+
+**9. Iniciar o bot**
+```bash
 ./play.sh
 ```
 
@@ -67,12 +140,50 @@ sha256sum -c .integrity --quiet && echo "Scripts integros"
 
 ## Instalação — iSH (iPhone / iPad)
 
+Copie e rode **um comando de cada vez**, na ordem:
+
+**1. Atualizar a lista de pacotes**
 ```bash
-apk update && apk add git curl tzdata bash coreutils procps util-linux
-cd ~ && git clone https://github.com/Theoswd/Furia-de-titas.git && cd Furia-de-titas
+apk update
+```
+
+**2. Instalar os programas necessários**
+```bash
+apk add git curl tzdata bash coreutils procps util-linux
+```
+
+**3. Ir para a pasta pessoal**
+```bash
+cd ~
+```
+
+**4. Baixar o bot**
+```bash
+git clone https://github.com/Theoswd/Furia-de-titas.git
+```
+
+**5. Entrar na pasta**
+```bash
+cd Furia-de-titas
+```
+
+**6. Dar permissão de execução**
+```bash
 chmod +x *.sh
+```
+
+**7. Conferir que os arquivos estão íntegros**
+```bash
 sha256sum -c .integrity --quiet && echo "Scripts integros"
+```
+
+**8. Cadastrar as contas**
+```bash
 ./setup.sh
+```
+
+**9. Iniciar o bot**
+```bash
 ./play.sh
 ```
 
