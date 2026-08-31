@@ -54,7 +54,9 @@ flagfight_fight() {
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       cf_access
-      cat USH > "$full_ram"
+      # HP maximo (full_ram) preservado: vem do /train e nao pode ser trocado
+      # pelo HP atual pos-escudo, senao o limiar HLHP cai a cada golpe e a
+      # conta "acha" que esta sempre cheia. So a base do dodge (old_HP) muda.
       cat USH > old_HP
       date +%s > last_heal
 
@@ -93,7 +95,9 @@ flagfight_fight() {
     else
       fetch_page "/flagfight" "$src_ram"
       cf_access
-      sleep 1s
+      # Sleep intermediario de 0,5s (antes 1s): mantem o intervalo real
+      # entre ataques em 4-5s somado ao espacamento do time_exit.
+      sleep 0.5s
     fi
   done
 

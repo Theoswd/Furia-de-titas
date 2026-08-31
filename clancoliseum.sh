@@ -91,7 +91,9 @@ clancoliseum_fight() {
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       cf_access
-      sleep 1s
+      # Sleep intermediario de 0,5s (antes 1s): mantem o intervalo real
+      # entre ataques em 4-5s somado ao espacamento do time_exit.
+      sleep 0.5s
     fi
   done
 

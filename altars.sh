@@ -61,7 +61,10 @@ altars_fight() {
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       cf_access
-      cat HP > FULL; cat HP > old_HP
+      # HP maximo (FULL) preservado: vem do /train e nao pode ser trocado
+      # pelo HP atual pos-cura, senao o limiar HLHP cai a cada golpe e a
+      # conta "acha" que esta sempre cheia. So a base do dodge (old_HP) muda.
+      cat HP > old_HP
       date +%s > last_heal
 
     elif awk -v latk="$(($(date +%s) - $(cat last_atk)))" -v atktime="$LA" 'BEGIN { exit !(latk != atktime) }' && \
@@ -90,7 +93,9 @@ altars_fight() {
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       cf_access
-      sleep 1s
+      # Sleep intermediario de 0,5s (antes 1s): mantem o intervalo real
+      # entre ataques em 4-5s somado ao espacamento do time_exit.
+      sleep 0.5s
     fi
   done
 

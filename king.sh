@@ -101,7 +101,10 @@ king_fight() {
         ) </dev/null > /dev/null 2>&1 &
         time_exit 17
         cl_access
-        cat HP > FULL; _fullat="$_hpat"
+        # HP maximo (FULL) NAO e tocado aqui: ele vem do /train e representa
+        # a capacidade real da conta. Sobrescreve-lo com o HP atual pos-cura
+        # fazia o bot "achar" que continuava com HP cheio e baixava o limiar
+        # de cura (HLHP) a cada golpe. FULL permanece o maximo lido no inicio.
         _last_heal=`date +%s`; echo "$_last_heal" > last_heal
         sleep 0.3s
 
@@ -146,13 +149,15 @@ king_fight() {
         _last_atk=`date +%s`; echo "$_last_atk" > last_atk
 
       else
-        # Aguarda cooldown — apenas atualiza pagina
+        # Aguarda cooldown — apenas atualiza pagina.
+        # Sleep intermediario de 0,5s (antes 1s): somado ao espacamento do
+        # time_exit, mantem o intervalo real entre ataques em 4-5s.
         (
           run_curl_exec "${URL}/king" > "$TMP/SRC"
         ) </dev/null > /dev/null 2>&1 &
         time_exit 17
         cl_access
-        sleep 1s
+        sleep 0.5s
       fi
 
     # ── MODO ESPERA: 1% < HP <= 10% ────────────────────────────────────────

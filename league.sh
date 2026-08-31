@@ -45,6 +45,54 @@ get_enemy_stat() {
     return 1
 }
 
+# ---------------------------------------------------------------------------
+#  RECOMPENSA DA LIGA DOS FAVORITOS — ESTADO SEPARADO DAS LUTAS
+#
+#  Concluir as cinco lutas NAO significa recompensa coletada. A recompensa
+#  as vezes demora a aparecer, e liberar cinco lutas novas nao pode apagar o
+#  estado pendente. Por isso "pendente" e um marcador em disco, por conta,
+#  que sobrevive a reinicios do worker:
+#
+#     $TMP/league_reward_pending
+#
+#  A coleta so e dada como concluida quando o SERVIDOR confirma: o botao
+#  takeReward some da pagina apos o clique. Enquanto nao confirma, o estado
+#  fica pendente e a proxima passagem tenta de novo (recompensa atrasada).
+#  A Liga nao fica travada esperando — o worker segue as outras atividades e
+#  volta no proximo intervalo (portao de 30 min), que serve de nova tentativa
+#  sem loop infinito.
+# ---------------------------------------------------------------------------
+league_reward_marcar()   { : > "$TMP/league_reward_pending" 2>/dev/null; }
+league_reward_limpar()   { rm -f "$TMP/league_reward_pending" 2>/dev/null; }
+league_reward_pendente() { [ -f "$TMP/league_reward_pending" ]; }
+
+# Tenta coletar a recompensa e confirma pela resposta real do servidor.
+#   retorno 0 = coleta confirmada (o botao sumiu)
+#   retorno 1 = recompensa ainda indisponivel ou coleta nao confirmada
+league_collect_reward() {
+    fetch_page "/league/"
+    _lr_click=`grep -o -E "/league/takeReward/\?r=[0-9]+" "$TMP/SRC" | sed -n 1p`
+    if [ -z "$_lr_click" ]; then
+        unset _lr_click
+        return 1
+    fi
+
+    printf "[LIGA] Recompensa encontrada. Tentando coletar.\n"
+    fetch_page "$_lr_click"
+
+    # CONFIRMACAO REAL: recarrega a pagina; se o botao sumiu, o servidor
+    # aceitou a coleta. So entao a recompensa e dada como recebida.
+    fetch_page "/league/"
+    if grep -q -o -E "/league/takeReward/\?r=[0-9]+" "$TMP/SRC"; then
+        printf "[LIGA] Falha ao coletar recompensa. Nova tentativa sera programada.\n"
+        unset _lr_click
+        return 1
+    fi
+    printf "[LIGA] Coleta confirmada pelo servidor.\n"
+    unset _lr_click
+    return 0
+}
+
 league_play() {
     printf "League\n"
     load_config
@@ -53,6 +101,24 @@ league_play() {
 
     PLAYER_STRENGTH=`player_stats`
     fetch_available_fights
+
+    # Sem lutas na entrada = ciclo de cinco ja concluido numa passagem
+    # anterior: ha (ou havera) recompensa. Marca como pendente para a coleta
+    # nao depender do laco de lutas, que nem chega a rodar quando fights=0.
+    if [ "${AVAILABLE_FIGHTS:-0}" -eq 0 ]; then
+        league_reward_marcar
+    fi
+
+    # RECOMPENSA PENDENTE PRIMEIRO: coleta agora (inclui a recompensa que
+    # apareceu atrasada apos uma passagem anterior) antes de qualquer luta.
+    if league_reward_pendente; then
+        printf "[LIGA] Verificando recompensa pendente.\n"
+        if league_collect_reward; then
+            league_reward_limpar
+        else
+            printf "[LIGA] Recompensa ainda indisponivel. Estado preservado como pendente.\n"
+        fi
+    fi
 
     action="check_fights"
     fights_done=0
@@ -144,15 +210,30 @@ league_play() {
                 ;;
             *)
                 if [ "$AVAILABLE_FIGHTS" -eq 0 ]; then
-                    clickReward=`grep -o -E "/league/takeReward/\?r=[0-9]+" "$TMP/SRC" | sed -n 1p`
-                    if [ -n "$clickReward" ]; then
-                        fetch_page "$clickReward"
-                        printf "Claimed reward\n"
-                    fi
+                    # Cinco lutas concluidas: ha recompensa a coletar. Apenas
+                    # MARCA como pendente; a coleta (com confirmacao real) e
+                    # feita fora do laco. Nunca deduzir "coletada" das lutas.
+                    printf "[LIGA] Lutas concluidas. Recompensa pendente=sim.\n"
+                    league_reward_marcar
                 fi
                 ;;
         esac
     done
+
+    # COLETA DA RECOMPENSA — fora do laco de lutas.
+    #
+    # Chega aqui quem terminou as cinco lutas nesta passagem. Se ha recompensa
+    # pendente, tenta coletar e confirma pelo servidor; so limpa o estado com a
+    # confirmacao. Se a recompensa ainda nao apareceu, o marcador fica para a
+    # proxima passagem — a Liga nao trava esperando e o worker segue as demais
+    # atividades. Liberar cinco lutas novas NAO apaga este estado.
+    if league_reward_pendente; then
+        if league_collect_reward; then
+            league_reward_limpar
+        else
+            printf "[LIGA] Recompensa ainda indisponivel. A instancia continuara outras atividades.\n"
+        fi
+    fi
 
     unset click ENEMY_NUMBER PLAYER_STRENGTH E_STRENGTH AVAILABLE_FIGHTS fights_done enemy_index j
 
