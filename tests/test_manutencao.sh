@@ -257,6 +257,91 @@ else
 fi
 printf "  [INFO] Em producao LA=4s -> intervalo ~4-5s (confirmar com log real).\n"
 
+printf "\n=== 8. Encerramento: o worker realmente para (sem relance) ===\n"
+# 8a. Estatico: no stop.sh o orquestrador (play.sh) e morto ANTES do laco que
+# derruba os workers. Se fosse depois, o supervisor relancaria um worker ja
+# morto no meio do encerramento e ele sobreviveria.
+_orch_ln=$(grep -n 'orchestrator.pid' "$ROOT/stop.sh" | head -n1 | cut -d: -f1)
+_loop_ln=$(grep -n 'for pid_file in' "$ROOT/stop.sh" | head -n1 | cut -d: -f1)
+if [ -n "$_orch_ln" ] && [ -n "$_loop_ln" ] && [ "$_orch_ln" -lt "$_loop_ln" ]; then
+    ok "stop.sh mata o orquestrador (linha $_orch_ln) antes do laco de workers (linha $_loop_ln)"
+else
+    bad "stop.sh deveria matar o orquestrador antes do laco (orch=$_orch_ln loop=$_loop_ln)"
+fi
+
+# 8b. Empirico: reproduz a corrida supervisor/worker com processos reais.
+#     ANTIGO (mata worker antes do supervisor) -> um worker relancado sobrevive.
+#     NOVO   (mata supervisor antes do worker) -> nada sobrevive.
+_simdir=$(mktemp -d)
+_pidf="$_simdir/worker.pid"
+_allf="$_simdir/all"; : > "$_allf"
+# 'exec sleep' faz o PID rastreado SER o sleep (sem shell-pai sobrando).
+# Cada spawn e registrado em $_allf para a limpeza nao deixar orfaos.
+_novo_worker() { sh -c 'exec sleep 30' & _wp=$!; echo "$_wp" > "$_pidf"; echo "$_wp" >> "$_allf"; }
+_supervisor() {  # relanca o worker sempre que o PID do .pid estiver morto
+    while [ -f "$_simdir/sup_on" ]; do
+        _p=$(cat "$_pidf" 2>/dev/null)
+        if [ -n "$_p" ] && ! kill -0 "$_p" 2>/dev/null; then _novo_worker; fi
+        sleep 0.1
+    done
+}
+_kill_tracked() {  # mata TODOS os workers ja criados (o .pid guarda so o ultimo)
+    while read -r _ap; do [ -n "$_ap" ] && kill -KILL "$_ap" 2>/dev/null; done < "$_allf"
+    : > "$_allf"
+}
+
+# --- Cenario ANTIGO: worker primeiro, supervisor depois ---
+: > "$_simdir/sup_on"
+_novo_worker; _w0=$(cat "$_pidf")
+_supervisor & _SUP=$!
+sleep 0.3
+kill -KILL "$_w0" 2>/dev/null      # mata o worker (supervisor ainda vivo)
+sleep 0.4                          # o supervisor relanca nesse intervalo
+rm -f "$_simdir/sup_on"; kill -KILL "$_SUP" 2>/dev/null   # so agora para o supervisor
+sleep 0.2
+_wnow=$(cat "$_pidf" 2>/dev/null)
+if [ -n "$_wnow" ] && kill -0 "$_wnow" 2>/dev/null && [ "$_wnow" != "$_w0" ]; then
+    ok "ordem ANTIGA reproduz o bug: worker relancado ($_wnow) sobreviveu"
+else
+    bad "esperava um worker sobrevivente na ordem antiga (obtido='$_wnow' orig=$_w0)"
+fi
+_kill_tracked
+
+# --- Cenario NOVO: supervisor primeiro, worker depois ---
+: > "$_simdir/sup_on"
+_novo_worker; _w0=$(cat "$_pidf")
+_supervisor & _SUP=$!
+sleep 0.3
+rm -f "$_simdir/sup_on"; kill -KILL "$_SUP" 2>/dev/null   # supervisor PRIMEIRO
+sleep 0.2
+kill -KILL "$_w0" 2>/dev/null      # agora o worker, sem quem o relance
+sleep 0.4
+_wnow=$(cat "$_pidf" 2>/dev/null)
+if [ -z "$_wnow" ] || ! kill -0 "$_wnow" 2>/dev/null; then
+    ok "ordem NOVA: nenhum worker sobrevive apos o stop"
+else
+    bad "ordem nova deixou worker vivo ($_wnow)"
+fi
+_kill_tracked
+rm -rf "$_simdir"
+
+printf "\n=== 9. Dependencias: jq nao e usado; pacotes que ajudam ===\n"
+# jq nao aparece na logica do bot (so em textos de README/uninstall).
+if grep -rn '[^A-Za-z_]jq ' "$ROOT"/*.sh | grep -vq 'pkg install\|apt \|command -v\|foram mantidos\|uninstall jq\|remove --purge'; then
+    bad "jq apareceu na logica do bot (revisar)"
+else
+    ok "jq NAO e usado pela logica do bot (pode ser omitido do install)"
+fi
+# Comandos que os pacotes recomendados fornecem, realmente usados:
+for _pair in "setsid:util-linux" "pgrep:procps" "pkill:procps" "readlink:coreutils" "stat:coreutils"; do
+    _cmd=${_pair%%:*}; _pkg=${_pair##*:}
+    if grep -rqn "[^A-Za-z_]$_cmd" "$ROOT"/*.sh; then
+        ok "usa '$_cmd' (pacote $_pkg) -> recomendado instalar"
+    else
+        bad "'$_cmd' nao encontrado (esperado em uso)"
+    fi
+done
+
 printf "\n=== RESUMO ===\n"
 printf "  PASS=%s  FALHA=%s\n" "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

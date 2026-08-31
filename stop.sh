@@ -14,6 +14,48 @@ RESET='\033[00m'
 
 printf "${GOLD}Parando todos os workers TWM...${RESET}\n\n"
 
+# ============================================================
+#  O ORQUESTRADOR MORRE PRIMEIRO — SENAO ELE RELANCA O QUE MATAMOS.
+#
+#  O play.sh roda como supervisor (painel_loop com PANEL_SUPERVISE=1) e
+#  RELANCA qualquer worker cujo PID tenha morrido. Se matassemos os workers
+#  antes, o supervisor — ainda vivo durante todo o laco de encerramento —
+#  relancaria no meio do caminho um worker ja derrubado: ele ganharia um PID
+#  NOVO, o kill deste script (que guarda o PID ANTIGO) erraria, o "rm do .pid"
+#  o deixaria orfao, e o worker seguiria rodando apos o stop — exatamente o
+#  sintoma de "mandei parar e continua rodando".
+#
+#  Matando o supervisor ANTES, nenhum relance acontece durante o restante do
+#  encerramento, e o worker realmente termina.
+# ============================================================
+orch_pid=$(cat "$STATUS_DIR/orchestrator.pid" 2>/dev/null)
+case "$orch_pid" in
+    ""|*[!0-9]*) ;;
+    *) kill -TERM "$orch_pid" 2>/dev/null ;;
+esac
+rm -f "$STATUS_DIR/orchestrator.pid"
+
+# Rede de seguranca: qualquer play.sh cujo diretorio de trabalho seja o do
+# bot. Comparar o cwd evita acertar um play.sh de outro projeto.
+for p in $(pgrep -f "play\.sh" 2>/dev/null); do
+    [ "$p" = "$$" ] && continue
+    _cwd=$(readlink -f "/proc/$p/cwd" 2>/dev/null)
+    [ "$_cwd" = "$TWMDIR" ] || continue
+    kill -TERM "$p" 2>/dev/null
+done
+
+# Da ao supervisor um instante para sair antes de derrubar os workers; sem
+# isso ele poderia relancar um ultimo worker entre o TERM e a sua saida.
+sleep 1
+
+# Confirma que o supervisor morreu (KILL) antes de prosseguir: enquanto ele
+# viver, qualquer worker morto sera relancado.
+for p in $(pgrep -f "play\.sh" 2>/dev/null); do
+    [ "$p" = "$$" ] && continue
+    _cwd=$(readlink -f "/proc/$p/cwd" 2>/dev/null)
+    [ "$_cwd" = "$TWMDIR" ] && kill -KILL "$p" 2>/dev/null
+done
+
 stopped=0
 
 for pid_file in "$STATUS_DIR"/*.pid; do
@@ -65,31 +107,8 @@ for pid_file in "$STATUS_DIR"/*.pid; do
     rm -f "$pid_file"
 done
 
-# CORRECAO: o stop.sh encerrava os workers mas NAO o proprio play.sh,
-# que continua rodando como monitor e relancando workers. Cada ./play.sh
-# deixava mais um monitor vivo, e varios supervisores concorriam pelas
-# mesmas contas. Agora o orquestrador tambem e encerrado.
-orch_pid=$(cat "$STATUS_DIR/orchestrator.pid" 2>/dev/null)
-case "$orch_pid" in
-    ""|*[!0-9]*) ;;
-    *) kill -TERM "$orch_pid" 2>/dev/null ;;
-esac
-rm -f "$STATUS_DIR/orchestrator.pid"
-
-# Rede de seguranca: qualquer play.sh cujo diretorio de trabalho seja
-# o do bot. Comparar o cwd evita acertar um play.sh de outro projeto.
-for p in $(pgrep -f "play\.sh" 2>/dev/null); do
-    [ "$p" = "$$" ] && continue
-    _cwd=$(readlink -f "/proc/$p/cwd" 2>/dev/null)
-    [ "$_cwd" = "$TWMDIR" ] || continue
-    kill -TERM "$p" 2>/dev/null
-done
-sleep 1
-for p in $(pgrep -f "play\.sh" 2>/dev/null); do
-    [ "$p" = "$$" ] && continue
-    _cwd=$(readlink -f "/proc/$p/cwd" 2>/dev/null)
-    [ "$_cwd" = "$TWMDIR" ] && kill -KILL "$p" 2>/dev/null
-done
+# O orquestrador (play.sh) ja foi encerrado no inicio deste script, antes do
+# laco de workers, para nao relancar nada durante o encerramento.
 
 # PAINEL ABERTO TAMBEM PARA AQUI.
 #

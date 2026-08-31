@@ -28,7 +28,7 @@ Instale o Termux **[pela F-Droid](https://f-droid.org/packages/com.termux/)**. A
 
 ```bash
 pkg update && pkg upgrade -y
-pkg install git curl wget jq util-linux -y
+pkg install git curl wget util-linux coreutils procps tmux -y
 termux-wake-lock
 cd ~ && git clone https://github.com/Theoswd/Furia-de-titas.git && cd Furia-de-titas
 chmod +x *.sh
@@ -37,6 +37,14 @@ sha256sum -c .integrity --quiet && echo "Scripts integros"
 ./play.sh
 ```
 
+> **Pacotes e por que ajudam.** O bot roda sem eles, mas cada um melhora a
+> execução: `util-linux` traz o `setsid` (o worker vira líder de grupo, então
+> `./stop.sh` encerra a conta inteira sem deixar processo órfão); `procps` traz
+> `pgrep`/`pkill` (redes de segurança do stop mais confiáveis); `coreutils` traz
+> `date`/`stat`/`readlink`/`sleep` completos (as pausas fracionadas de 0,3–0,5 s
+> na batalha e as pequenas leituras de estado); `tmux` mantém o painel vivo se a
+> janela fechar. O `jq` **não é usado** pelo bot e pode ser omitido.
+
 > **Permissão de bateria.** Vá em **Configurações → Bateria → Termux** e marque **"Sem restrições"**. Sem isso o Android encerra o bot em segundo plano.
 
 ---
@@ -44,7 +52,7 @@ sha256sum -c .integrity --quiet && echo "Scripts integros"
 ## Instalação — WSL (Windows)
 
 ```bash
-sudo apt update && sudo apt install -y git curl jq util-linux procps
+sudo apt update && sudo apt install -y git curl util-linux procps coreutils tmux
 cd ~
 git clone https://github.com/Theoswd/Furia-de-titas.git && cd Furia-de-titas
 chmod +x *.sh
@@ -60,7 +68,7 @@ sha256sum -c .integrity --quiet && echo "Scripts integros"
 ## Instalação — iSH (iPhone / iPad)
 
 ```bash
-apk update && apk add git curl jq tzdata bash
+apk update && apk add git curl tzdata bash coreutils procps util-linux
 cd ~ && git clone https://github.com/Theoswd/Furia-de-titas.git && cd Furia-de-titas
 chmod +x *.sh
 sha256sum -c .integrity --quiet && echo "Scripts integros"
