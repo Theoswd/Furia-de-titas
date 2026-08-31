@@ -1,14 +1,4 @@
-# Fúria de Titãs
-
-Bot multi-contas para **[Fúria de Titãs](https://furiadetitas.net)**.
-
 Licença CC0 1.0
-
----
-
-## Aviso
-
-Automação viola os termos de uso do jogo e pode resultar em **banimento das contas**. Você assume esse risco.
 
 ---
 
