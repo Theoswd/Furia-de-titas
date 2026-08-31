@@ -47,23 +47,15 @@ clandmgfight_fight() {
   # inesperado), o laco ficava requisitando para sempre e a conta
   # travava naquela batalha. Teto de 10 minutos.
   FIGHT_BREAK=$(($(date +%s) + 600))
+  # SEM RELEITURA NO TOPO DO LACO (era reparse redundante; cada ramo ja rele).
   until [ -s "BREAK_LOOP" ] || [ "$(date +%s)" -gt "$FIGHT_BREAK" ]; do
-    cf_access
-    if ! grep -q -o 'txt smpl grey' "$TMP/SRC" && \
-       [ "$(($(date +%s) - $(cat last_dodge)))" -gt 20 ] && \
-       [ "$(($(date +%s) - $(cat last_dodge)))" -lt 300 ] && \
-       awk -v ush="$(cat HP)" -v oldhp="$(cat old_HP)" 'BEGIN { exit !(ush < oldhp) }'; then
-      (
-        run_curl_exec "${URL}$(cat DODGE)" > "$TMP/SRC"
-      ) </dev/null > /dev/null 2>&1 &
-      time_exit 17
-      cf_access
-      cat HP > old_HP
-      date +%s > last_dodge
-
-    elif awk -v ush="$(cat HP)" -v hlhp="$(cat HLHP)" 'BEGIN { exit !(ush < hlhp) }' && \
-         [ "$(($(date +%s) - $(cat last_heal)))" -gt 90 ] && \
-         [ "$(($(date +%s) - $(cat last_heal)))" -lt 300 ]; then
+    # Instante do INICIO da volta: o ataque marca o last_atk com ele para o
+    # tempo do request contar DENTRO da recarga (LA), e nao somar-se a ela.
+    _atk0=$(date +%s)
+    # PRIORIDADE 1 — CURA: manter a conta viva vem antes da esquiva.
+    if awk -v ush="$(cat HP)" -v hlhp="$(cat HLHP)" 'BEGIN { exit !(ush < hlhp) }' && \
+       [ "$(($(date +%s) - $(cat last_heal)))" -gt 90 ] && \
+       [ "$(($(date +%s) - $(cat last_heal)))" -lt 300 ]; then
       (
         run_curl_exec "${URL}$(cat HEAL)" > "$TMP/SRC"
       ) </dev/null > /dev/null 2>&1 &
@@ -80,6 +72,19 @@ clandmgfight_fight() {
       cat HP > old_HP
       date +%s > last_heal
 
+    # PRIORIDADE 2 — ESQUIVA: so quando a cura nao foi necessaria/possivel.
+    elif ! grep -q -o 'txt smpl grey' "$TMP/SRC" && \
+         [ "$(($(date +%s) - $(cat last_dodge)))" -gt 20 ] && \
+         [ "$(($(date +%s) - $(cat last_dodge)))" -lt 300 ] && \
+         awk -v ush="$(cat HP)" -v oldhp="$(cat old_HP)" 'BEGIN { exit !(ush < oldhp) }'; then
+      (
+        run_curl_exec "${URL}$(cat DODGE)" > "$TMP/SRC"
+      ) </dev/null > /dev/null 2>&1 &
+      time_exit 17
+      cf_access
+      cat HP > old_HP
+      date +%s > last_dodge
+
     elif awk -v latk="$(($(date +%s) - $(cat last_atk)))" -v atktime="$LA" 'BEGIN { exit !(latk != atktime) }' && \
          ! grep -q -o 'txt smpl grey' "$TMP/SRC" && \
          awk -v rhp="$(cat RHP)" -v enh="$(cat HP2)" 'BEGIN { exit !(rhp < enh) }' || \
@@ -91,7 +96,7 @@ clandmgfight_fight() {
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       cf_access
-      date +%s > last_atk
+      echo "$_atk0" > last_atk
       sleep 0.3s
 
     elif awk -v latk="$(($(date +%s) - $(cat last_atk)))" -v atktime="$LA" 'BEGIN { exit !(latk > atktime) }'; then
@@ -100,16 +105,19 @@ clandmgfight_fight() {
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       cf_access
-      date +%s > last_atk
+      echo "$_atk0" > last_atk
     else
-      (
-        run_curl_exec "${URL}/clandmgfight" > "$TMP/SRC"
-      ) </dev/null > /dev/null 2>&1 &
-      time_exit 17
-      cf_access
-      # Sleep intermediario de 0,5s (antes 1s): mantem o intervalo real
-      # entre ataques em 4-5s somado ao espacamento do time_exit.
-      sleep 0.5s
+      # RECARGA DE ATAQUE — UMA REQUISICAO POR CICLO (rele so se alvo grey).
+      if grep -q -o 'txt smpl grey' "$TMP/SRC"; then
+        (
+          run_curl_exec "${URL}/clandmgfight" > "$TMP/SRC"
+        ) </dev/null > /dev/null 2>&1 &
+        time_exit 17
+        cf_access
+      else
+        _resta=$(( LA - ( $(date +%s) - $(cat last_atk) ) ))
+        [ "$_resta" -gt 0 ] && sleep "$_resta"
+      fi
     fi
   done
 

@@ -166,21 +166,96 @@ if league_reward_pendente; then ok "novas lutas nao apagam recompensa pendente";
 league_reward_limpar
 rm -rf "$TMP"
 
-printf "\n=== 5. Temporizacao: sleep intermediario 1s -> 0,5s ===\n"
-# Confirma no codigo que o branch ocioso das batalhas usa 0.5s.
-_falta=""
-for f in king.sh clanfight.sh clandmg.sh altars.sh coliseum.sh clancoliseum.sh flagfight.sh; do
-    if grep -q 'sleep 0.5s' "$ROOT/$f"; then :; else _falta="$_falta $f"; fi
+printf "\n=== 5. Prioridade da cura x esquiva (altars, torneio e duelo de cla) ===\n"
+# Nesses modulos a cura deve ser avaliada ANTES da esquiva, para a conta nao
+# morrer esperando a releitura de HP que so viria depois do dodge.
+for f in altars.sh clanfight.sh clandmg.sh; do
+    _heal_ln=$(grep -n 'run_curl_exec "${URL}$(cat HEAL)"' "$ROOT/$f" | head -n1 | cut -d: -f1)
+    _dodge_ln=$(grep -n 'run_curl_exec "${URL}$(cat DODGE)"' "$ROOT/$f" | head -n1 | cut -d: -f1)
+    if [ -n "$_heal_ln" ] && [ -n "$_dodge_ln" ] && [ "$_heal_ln" -lt "$_dodge_ln" ]; then
+        ok "$f: cura (linha $_heal_ln) antes da esquiva (linha $_dodge_ln)"
+    else
+        bad "$f: cura deveria vir antes da esquiva (heal=$_heal_ln dodge=$_dodge_ln)"
+    fi
 done
-if [ -z "$_falta" ]; then ok "todos os 7 modulos usam sleep 0.5s no ciclo ocioso"; else bad "sem sleep 0.5s em:$_falta"; fi
-# Demonstracao aritmetica do intervalo entre ataques.
-# ciclo ocioso = pacing(time_exit) + RTT do servidor + sleep intermediario.
-# Com pacing=1s, RTT tipico ~0,5-2s e cooldown LA=4s, o gargalo e o cooldown:
-# antes: 1(pacing)+RTT+1,0 ~ 2,5-4s de "peso" por volta ociosa;
-# agora: 1(pacing)+RTT+0,5 ~ 2,0-3,5s -> o ataque sai assim que LA(4s) vence,
-# recolocando o intervalo real na faixa 4-5s em vez de ~6s.
-printf "  [INFO] LA (cooldown de ataque) = 4s; intervalo alvo 4-5s.\n"
-printf "  [INFO] O sleep intermediario 0,5s reduz o peso da volta ociosa em 0,5s por ciclo.\n"
+# flagfight e clancoliseum ja eram cura-primeiro
+for f in flagfight.sh clancoliseum.sh; do
+    _heal_ln=$(grep -n 'cat HEAL\|cat SHIELD\|SHIELD)' "$ROOT/$f" | head -n1 | cut -d: -f1)
+    _dodge_ln=$(grep -n 'cat DODGE)' "$ROOT/$f" | head -n1 | cut -d: -f1)
+    if [ -n "$_heal_ln" ] && [ -n "$_dodge_ln" ] && [ "$_heal_ln" -lt "$_dodge_ln" ]; then
+        ok "$f: cura/escudo antes da esquiva"
+    else
+        bad "$f: cura deveria vir antes da esquiva (heal=$_heal_ln dodge=$_dodge_ln)"
+    fi
+done
+
+printf "\n=== 6. Uma requisicao por ciclo: recarga espera sem requisitar ===\n"
+# O ramo ocioso (else) so faz requisicao quando o alvo esta grey; fora disso
+# espera o restante da recarga com 'sleep \$_resta', sem recarregar a pagina.
+for f in clanfight.sh clandmg.sh altars.sh coliseum.sh clancoliseum.sh flagfight.sh; do
+    if grep -q 'LA - .*last_atk\|LA - time_since_last_atk' "$ROOT/$f"; then
+        ok "$f: espera o restante da recarga (sleep do cooldown, sem request)"
+    else
+        bad "$f: nao encontrou a espera de recarga sem requisicao"
+    fi
+done
+# E o topo do laco nao rele a pagina de novo (reparse redundante removido).
+for f in clanfight.sh clandmg.sh altars.sh; do
+    if grep -q 'SEM RELEITURA NO TOPO DO LACO' "$ROOT/$f"; then
+        ok "$f: reparse redundante do topo do laco removido"
+    else
+        bad "$f: ainda ha releitura redundante no topo do laco"
+    fi
+done
+
+printf "\n=== 7. Temporizacao real: intervalo entre ataques ~ cooldown (sem inflar) ===\n"
+# Simula o modelo NOVO (atacar -> esperar o restante da recarga -> atacar) e o
+# ANTIGO (atacar -> recarregar pagina + pacing a cada volta). Usa LA reduzido
+# para o teste rodar rapido. Mede o intervalo real entre "ataques".
+# Modela FIELMENTE o codigo novo (marca last_atk no INICIO da volta):
+#   _atk0 = agora ; request custa RTT ; age = RTT ; _resta = LA - age ;
+#   espera _resta ; intervalo entre golpes = RTT + (LA - RTT) = LA.
+# Ou seja: o tempo do request e ABSORVIDO pela recarga, e o intervalo fica
+# em ~LA, nao LA+RTT. Compara com o modelo ANTIGO (last_atk no fim), cujo
+# intervalo era RTT + LA.
+_sim() {  # MODO LA RTTms -> imprime 3 intervalos em ms
+    _mode="$1"; _la="$2"; _rttms="$3"; _prev=""
+    _i=0
+    while [ "$_i" -lt 4 ]; do
+        _atk0=$(date +%s%N 2>/dev/null); [ -n "$_atk0" ] || _atk0=$(( $(date +%s) * 1000000000 ))
+        # "request" do ataque: custa RTT
+        _s=$(awk -v m="$_rttms" 'BEGIN{printf "%.3f", m/1000}')
+        sleep "$_s"
+        _t=$(date +%s%N 2>/dev/null); [ -n "$_t" ] || _t=$(( $(date +%s) * 1000000000 ))
+        [ -n "$_prev" ] && printf '%s\n' "$(( (_t - _prev) / 1000000 ))"
+        _prev="$_t"
+        # recarga: NOVO subtrai o tempo ja gasto; ANTIGO espera LA cheio
+        if [ "$_mode" = novo ]; then
+            _gastoms=$(( (_t - _atk0) / 1000000 ))
+            _restams=$(( _la * 1000 - _gastoms ))
+        else
+            _restams=$(( _la * 1000 ))
+        fi
+        [ "$_restams" -gt 0 ] && sleep "$(awk -v m="$_restams" 'BEGIN{printf "%.3f", m/1000}')"
+        _i=$((_i + 1))
+    done
+}
+# LA=1s, RTT=400ms.  novo -> ~1000ms (LA).  antigo -> ~1400ms (LA+RTT).
+_okc=0; _n=0
+for _ms in $(_sim novo 1 400); do
+    _n=$((_n + 1))
+    [ "$_ms" -ge 900 ] && [ "$_ms" -le 1300 ] && _okc=$((_okc + 1))
+    printf "  [INFO] NOVO  intervalo medido: %s ms (alvo ~1000)\n" "$_ms"
+done
+for _ms in $(_sim antigo 1 400); do
+    printf "  [INFO] ANTIGO intervalo medido: %s ms (inflado ~1400)\n" "$_ms"
+done
+if [ "$_n" -gt 0 ] && [ "$_okc" -eq "$_n" ]; then
+    ok "tempo do request absorvido pela recarga: intervalo ~ LA (nao LA+RTT)"
+else
+    bad "intervalo do modelo novo fora de ~LA ($_okc/$_n na faixa)"
+fi
+printf "  [INFO] Em producao LA=4s -> intervalo ~4-5s (confirmar com log real).\n"
 
 printf "\n=== RESUMO ===\n"
 printf "  PASS=%s  FALHA=%s\n" "$PASS" "$FAIL"

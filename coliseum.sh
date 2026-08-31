@@ -160,14 +160,21 @@ coliseum_fight() {
                 last_atk=$now
 
             else
-                (
-                    run_curl_exec "${URL}/coliseum" > "$src_ram"
-                ) </dev/null > /dev/null 2>&1 &
-                time_exit 17
-                cl_access
-                # Sleep intermediario de 0,5s (antes 1s): mantem o intervalo
-                # real entre ataques em 4-5s somado ao espacamento do time_exit.
-                sleep 0.5s
+                # RECARGA DE ATAQUE — UMA REQUISICAO POR CICLO.
+                # O ultimo golpe ja trouxe o HP. So relemos a pagina quando o
+                # alvo esta momentaneamente invulneravel (grey); fora disso
+                # apenas esperamos o restante da recarga, sem nova requisicao,
+                # para o intervalo entre golpes ficar em 4-5s.
+                if grep -q -o 'txt smpl grey' "$src_ram"; then
+                    (
+                        run_curl_exec "${URL}/coliseum" > "$src_ram"
+                    ) </dev/null > /dev/null 2>&1 &
+                    time_exit 17
+                    cl_access
+                else
+                    _resta=$(( LA - time_since_last_atk ))
+                    [ "$_resta" -gt 0 ] && sleep "$_resta"
+                fi
             fi
         done
 

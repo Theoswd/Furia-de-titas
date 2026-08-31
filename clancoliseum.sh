@@ -42,6 +42,9 @@ clancoliseum_fight() {
   # travava naquela batalha. Teto de 10 minutos.
   FIGHT_BREAK=$(($(date +%s) + 600))
   until [ -s "BREAK_LOOP" ] || [ "$(date +%s)" -gt "$FIGHT_BREAK" ]; do
+    # Instante do INICIO da volta: o ataque marca o last_atk com ele para o
+    # tempo do request contar DENTRO da recarga (LA), e nao somar-se a ela.
+    _atk0=$(date +%s)
     if awk -v ush="$(cat USH)" -v hlhp="$(cat HLHP)" 'BEGIN { exit !(ush < hlhp) }' && \
        [ "$(($(date +%s) - $(cat last_heal)))" -gt 90 ] && \
        [ "$(($(date +%s) - $(cat last_heal)))" -lt 300 ]; then
@@ -76,7 +79,7 @@ clancoliseum_fight() {
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       cf_access
-      date +%s > last_atk
+      echo "$_atk0" > last_atk
 
     elif awk -v latk="$(($(date +%s) - $(cat last_atk)))" -v atktime="$LA" 'BEGIN { exit !(latk > atktime) }'; then
       (
@@ -84,16 +87,23 @@ clancoliseum_fight() {
       ) </dev/null > /dev/null 2>&1 &
       time_exit 17
       cf_access
-      date +%s > last_atk
+      echo "$_atk0" > last_atk
     else
-      (
-        run_curl_exec "${URL}/clancoliseum" > "$src_ram"
-      ) </dev/null > /dev/null 2>&1 &
-      time_exit 17
-      cf_access
-      # Sleep intermediario de 0,5s (antes 1s): mantem o intervalo real
-      # entre ataques em 4-5s somado ao espacamento do time_exit.
-      sleep 0.5s
+      # RECARGA DE ATAQUE — UMA REQUISICAO POR CICLO.
+      # O ultimo golpe ja trouxe o HP. So relemos a pagina quando o alvo esta
+      # momentaneamente invulneravel (grey); fora disso apenas esperamos o
+      # restante da recarga, sem nova requisicao, para o intervalo entre
+      # golpes ficar em 4-5s em vez de inflar com recargas de pagina.
+      if grep -q -o 'txt smpl grey' "$src_ram"; then
+        (
+          run_curl_exec "${URL}/clancoliseum" > "$src_ram"
+        ) </dev/null > /dev/null 2>&1 &
+        time_exit 17
+        cf_access
+      else
+        _resta=$(( LA - ( $(date +%s) - $(cat last_atk) ) ))
+        [ "$_resta" -gt 0 ] && sleep "$_resta"
+      fi
     fi
   done
 
