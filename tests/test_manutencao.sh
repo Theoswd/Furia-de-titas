@@ -477,6 +477,36 @@ else
     ok "king.sh: sem spam do sniper (toda acao respeita o intervalo)"
 fi
 
+printf "\n=== 14. Vale dos Imortais: nao abandona a luta antes do fim ===\n"
+U="$ROOT/undying.sh"
+# 1) NUNCA busca a home com link vazio: o ataque so dispara com HITMANA cheio.
+if grep -q '\[ -s HITMANA \]' "$U"; then
+    ok "undying.sh: golpe so com link disponivel (-s HITMANA) — nao baixa a home"
+else
+    bad "undying.sh: pode disparar golpe com link vazio (baixaria a home e abandonaria)"
+fi
+# 2) Confirma o fim antes de desistir (nao abandona numa leitura de transicao).
+if grep -q 'luta_confirmada_fim' "$U"; then
+    ok "undying.sh: confirma o fim da luta antes de encerrar"
+else
+    bad "undying.sh: encerra a luta numa unica leitura sem out_gate"
+fi
+# 3) Recupera a pagina no inicio (desvio da arena_fullmana).
+_start_fetch=$(grep -n 'run_curl_exec "${URL}/undying" > "$TMP/SRC"' "$U" | head -n1 | cut -d: -f1)
+_loop=$(grep -n 'until \[ -s "BREAK_LOOP" \]' "$U" | head -n1 | cut -d: -f1)
+if [ -n "$_start_fetch" ] && [ -n "$_loop" ] && [ "$_start_fetch" -lt "$_loop" ]; then
+    ok "undying.sh: re-busca /undying no inicio (recupera do desvio da arena)"
+else
+    bad "undying.sh: nao recupera a pagina de batalha antes do laco"
+fi
+# 4) Relogio de 5s (nao martela a pagina; nao ataca <4s).
+grep -q '_agora - _last_act )) -ge "\$LA"' "$U" \
+    && ok "undying.sh: golpe a cada 5s (relogio unico)" \
+    || bad "undying.sh: sem intervalo de 5s entre golpes"
+grep -q 'LA - ( _agora - _last_act )' "$U" \
+    && ok "undying.sh: dentro dos 5s so espera, sem requisitar" \
+    || bad "undying.sh: pode martelar a pagina dentro do intervalo"
+
 printf "\n=== RESUMO ===\n"
 printf "  PASS=%s  FALHA=%s\n" "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]
