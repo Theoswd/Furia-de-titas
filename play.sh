@@ -267,7 +267,7 @@ printf "${CYAN}TWM Multi-contas - %s conta(s) [%s]${RESET}\n" "$total" "$TOYBOX"
 # subir lendo um arquivo antigo de outra instalacao.
 [ "$ACCOUNTS_FILE" = "$TWMDIR/accounts.conf" ] || \
     printf "${GOLD}Contas:${RESET} %s\n" "$ACCOUNTS_FILE"
-printf "${GOLD}Mod Author:${RESET} Stephenn Curry\n\n"
+printf "${GOLD}Mod Author:${RESET} SB\n\n"
 
 # Android 12+ derruba a sessao inteira com SIGKILL.
 #
