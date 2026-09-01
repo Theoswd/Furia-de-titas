@@ -507,6 +507,26 @@ grep -q 'LA - ( _agora - _last_act )' "$U" \
     && ok "undying.sh: dentro dos 5s so espera, sem requisitar" \
     || bad "undying.sh: pode martelar a pagina dentro do intervalo"
 
+printf "\n=== 15. Todas as batalhas: reconfirmam o fim antes de abandonar ===\n"
+# Um unico read sem o link de luta (transicao, soluco de rede, ou link vazio
+# que baixou a home) NAO pode encerrar a luta: cada modulo rele a pagina uma
+# vez (trava _reconf contra recursao infinita) e so desiste se confirmar.
+for f in clanfight.sh clandmg.sh altars.sh clancoliseum.sh flagfight.sh coliseum.sh; do
+    if grep -q '_reconf' "$ROOT/$f" && grep -q '\[ "${_reconf:-0}" = 0 \]' "$ROOT/$f"; then
+        ok "$f: reconfirma o fim da luta antes de encerrar"
+    else
+        bad "$f: encerra a luta numa unica leitura (risco de abandono)"
+    fi
+done
+# undying (Vale) usa a variante com funcao dedicada (luta_confirmada_fim).
+grep -q 'luta_confirmada_fim' "$ROOT/undying.sh" \
+    && ok "undying.sh: reconfirma o fim (luta_confirmada_fim)" \
+    || bad "undying.sh: nao reconfirma o fim"
+# king (Rei) confirma via re-leitura de /king (unrip) antes de encerrar.
+grep -q '/king/unrip/' "$ROOT/king.sh" \
+    && ok "king.sh: reavalia /king antes de encerrar" \
+    || bad "king.sh: encerra sem reavaliar"
+
 printf "\n=== RESUMO ===\n"
 printf "  PASS=%s  FALHA=%s\n" "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]

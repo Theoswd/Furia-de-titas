@@ -83,6 +83,7 @@ coliseum_fight() {
 
             if grep -q -o '/dodge/' "$src_ram"; then
                 # A pagina respondeu com a luta: sessao confirmada.
+                _reconf=0
                 sessao_marcar
                 printf "Em batalha - HP: %s\n" "$USH"
             else
@@ -95,9 +96,22 @@ coliseum_fight() {
                         printf "Fim de batalha detectado.\n"
                     fi
                 else
+                    # RECONFIRMA antes de desistir: uma unica leitura sem /dodge/
+                    # e sem end_fight pode ser transicao/soluco de rede ou um
+                    # link vazio ter baixado a home. Rele /coliseum uma vez e
+                    # reavalia; so encerra se realmente nao houver mais luta.
+                    if [ "${_reconf:-0}" = 0 ]; then
+                        _reconf=1
+                        (
+                            run_curl_exec "${URL}/coliseum" > "$src_ram"
+                        ) </dev/null > /dev/null 2>&1 &
+                        time_exit 17
+                        cl_access
+                        return
+                    fi
+                    _reconf=0
                     BREAK_LOOP=1
                     printf "Battle over.\n"
-                    sleep 2s
                 fi
             fi
         }

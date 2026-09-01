@@ -24,12 +24,24 @@ flagfight_fight() {
 
     if grep -q -o '/dodge/' "$src_ram"; then
       # A pagina respondeu com a luta: sessao confirmada.
+      _reconf=0
       sessao_marcar
       printf "Em batalha flagfight - HP: %s\n" "`cat USH`"
     else
+      # RECONFIRMA antes de desistir (transicao/soluco de rede/link vazio->home):
+      # rele a pagina de luta UMA vez e reavalia; so encerra se nao houver /dodge/.
+      if [ "${_reconf:-0}" = 0 ]; then
+        _reconf=1
+        (
+          run_curl_exec "${URL}/flagfight" > "$src_ram"
+        ) </dev/null > /dev/null 2>&1 &
+        time_exit 17
+        cf_access
+        return
+      fi
+      _reconf=0
       echo 1 > BREAK_LOOP
       printf "Battle over!\n"
-      sleep 2s
     fi
   }
 

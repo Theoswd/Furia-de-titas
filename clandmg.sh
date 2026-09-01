@@ -26,12 +26,24 @@ clandmgfight_fight() {
     awk -v ush="$(cat FULL)" -v hper="$HPER" 'BEGIN { printf "%.0f", ush * hper / 100 }' > HLHP
     if grep -q -o '/dodge/' "$TMP/SRC"; then
       # A pagina respondeu com a luta: sessao confirmada.
+      _reconf=0
       sessao_marcar
       printf "Em batalha clandmg - HP: %s\n" "`cat HP`"
     else
+      # RECONFIRMA antes de desistir (transicao/soluco de rede/link vazio->home):
+      # rele a pagina de luta UMA vez e reavalia; so encerra se nao houver /dodge/.
+      if [ "${_reconf:-0}" = 0 ]; then
+        _reconf=1
+        (
+          run_curl_exec "${URL}/clandmgfight" > "$TMP/SRC"
+        ) </dev/null > /dev/null 2>&1 &
+        time_exit 17
+        cf_access
+        return
+      fi
+      _reconf=0
       echo 1 > BREAK_LOOP
       printf "Battle is over!\n"
-      sleep 2s
     fi
   }
 
