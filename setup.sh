@@ -93,28 +93,44 @@ server_scheme() { echo "https"; }
 
 show_menu() {
     clear
-    _L="--------------------------------------------------------------------"
-    # Reavalia a cada abertura: o arquivo pode ter acabado de ser criado
-    # por "Adicionar conta" ou esvaziado por "Remover conta".
+
+    # LARGURA ADAPTATIVA A TELA DO CELULAR.
+    #
+    # A linha divisoria era fixa em 68 caracteres: em telas estreitas ela
+    # estourava e quebrava em duas, e o caminho do arquivo (longo) piorava.
+    # Aqui a largura vem do proprio terminal (stty size -> tput cols -> 40 de
+    # reserva), entao a moldura cabe em qualquer aparelho. O teto de 60 evita
+    # esticar demais num terminal largo de PC.
+    _cols=$(stty size 2>/dev/null | awk '{print $2}')
+    case "$_cols" in ''|*[!0-9]*) _cols=$(tput cols 2>/dev/null) ;; esac
+    case "$_cols" in ''|*[!0-9]*) _cols=40 ;; esac
+    [ "$_cols" -lt 16 ] && _cols=16
+    [ "$_cols" -gt 60 ] && _cols=60
+    _L=$(printf '%*s' "$_cols" '' | tr ' ' '-')
+
+    # Reavalia a cada abertura: o arquivo pode ter sido criado por "Adicionar"
+    # ou esvaziado por "Remover".
     ACCOUNTS_FILE=$(resolve_accounts_file)
-    n=0
-    [ -f "$ACCOUNTS_FILE" ] && n=$(grep -c -E '^[0-9]+[|]' "$ACCOUNTS_FILE" 2>/dev/null)
-    case "$n" in ''|*[!0-9]*) n=0 ;; esac
 
     printf "%b%s%b\n" "$A2" "$_L" "$RESET"
-    printf "  %bTWM%b %b· Gerenciador de Contas%b%*s%bBR%b\n" \
-           "$A1" "$RESET" "$DIM" "$RESET" 26 '' "$WHITE" "$RESET"
-printf "  %bMod Author: Stephenn Curry%b\n" "$DIM" "$RESET"
-    printf "%b%s%b\n" "$A2" "$_L" "$RESET"
-    printf "  %bContas cadastradas:%b %b%s%b\n" "$DIM" "$RESET" "$WHITE" "$n" "$RESET"
-    # O caminho e impresso sempre: um "0" sem o arquivo ao lado nao permite
-    # distinguir "nenhuma conta" de "estou lendo o arquivo errado".
-    printf "  %bArquivo:%b %b%s%b\n\n" "$DIM" "$RESET" "$DIM" "$ACCOUNTS_FILE" "$RESET"
-    printf "   %b1%b  Listar contas\n"   "$A1" "$RESET"
-    printf "   %b2%b  Adicionar conta\n" "$A1" "$RESET"
-    printf "   %b3%b  Remover conta\n"   "$A1" "$RESET"
-    printf "   %b4%b  Testar login\n\n"  "$A1" "$RESET"
-    printf "   %b0%b  Sair\n"            "$DIM" "$RESET"
+    printf "  %bTWM%b %b· Gerenciador%b   %bBR%b\n" \
+           "$A1" "$RESET" "$DIM" "$RESET" "$WHITE" "$RESET"
+    printf "  %bMod Author: Stephenn Curry%b\n" "$DIM" "$RESET"
+    printf "%b%s%b\n\n" "$A2" "$_L" "$RESET"
+
+    printf "   %b1%b - Listar contas\n"   "$A1" "$RESET"
+    printf "   %b2%b - Adicionar conta\n" "$A1" "$RESET"
+    printf "   %b3%b - Remover conta\n"   "$A1" "$RESET"
+    printf "   %b4%b - Testar login\n\n"  "$A1" "$RESET"
+    printf "   %b0%b - Sair\n\n"          "$DIM" "$RESET"
+
+    # Aviso discreto SO quando o arquivo de contas nao esta no lugar padrao
+    # (o velho diagnostico do "estou lendo o arquivo errado"). No uso normal
+    # nada aparece, e o menu fica limpo.
+    if [ "$ACCOUNTS_FILE" != "$TWMDIR/accounts.conf" ]; then
+        printf "  %b(!) contas lidas de outro local%b\n\n" "$GOLD" "$RESET"
+    fi
+
     printf "%b%s%b\n" "$A2" "$_L" "$RESET"
     printf "  %bOpcao:%b " "$WHITE" "$RESET"
 }
