@@ -527,6 +527,48 @@ grep -q '/king/unrip/' "$ROOT/king.sh" \
     && ok "king.sh: reavalia /king antes de encerrar" \
     || bad "king.sh: encerra sem reavaliar"
 
+printf "\n=== 16. Atividades fora do cronograma de batalha nao sao ignoradas ===\n"
+C="$ROOT/crono.sh"
+# Cada atividade tem de estar DEFINIDA (funcao existe) e DESPACHADA no crono.sh
+# (tarefas_livres no ocioso e/ou start() nos :00/:30). Se qualquer uma sumir do
+# despacho, a conta deixa de executa-la — e este teste quebra.
+# formato: "funcao:arquivo_de_definicao:chamada_no_crono"
+for _row in \
+    "arena_duel:arena.sh:arena_duel" \
+    "career_func:career.sh:career_func" \
+    "campaign_func:campaign.sh:campaign_func" \
+    "cave_routine:cave.sh:cave_routine" \
+    "check_missions:check.sh:check_missions" \
+    "check_rewards:check.sh:check_rewards" \
+    "clanDungeon:clanid.sh:clanDungeon" \
+    "clan_statue:clanid.sh:clan_statue"; do
+    _fn=$(echo "$_row" | cut -d: -f1)
+    _mod=$(echo "$_row" | cut -d: -f2)
+    _call=$(echo "$_row" | cut -d: -f3)
+    _def=0; grep -q "^${_fn}() \?{" "$ROOT/$_mod" && _def=1
+    _dsp=0; grep -q "[^a-zA-Z_]${_call}\b\|^${_call}\b" "$C" && _dsp=1
+    if [ "$_def" = 1 ] && [ "$_dsp" = 1 ]; then
+        ok "$_fn: definida em $_mod e despachada no crono.sh"
+    else
+        bad "$_fn: definida=$_def despachada=$_dsp (atividade pode ser ignorada)"
+    fi
+done
+# Arena/carreira/campanha/caverna/sabio tambem rodam no ocioso (tarefas_livres),
+# nao so nos :00/:30.
+for _a in carreira campanha caverna sabio; do
+    grep -q "ativ_liberada $_a" "$C" \
+        && ok "tarefas_livres: $_a roda tambem no ocioso (nao so :00/:30)" \
+        || bad "tarefas_livres: $_a nao roda no ocioso"
+done
+grep -q 'arena_liberada' "$C" && ok "tarefas_livres/start: arena com portao de 30 min" || bad "arena sem portao"
+grep -q 'masmorra_liberada' "$C" && ok "tarefas_livres/start: masmorra do cla despachada" || bad "masmorra nao despachada"
+# Estatua do cla: gated (config + lider + intervalo de 6h), roda no start().
+if grep -q 'clan_statue' "$C" && grep -q 'estatua_liberada' "$ROOT/clanid.sh" && grep -q 'clan_lider' "$ROOT/clanid.sh"; then
+    ok "estatua do cla: despachada no start() e gated (lider + intervalo)"
+else
+    bad "estatua do cla: despacho/portao ausente"
+fi
+
 printf "\n=== RESUMO ===\n"
 printf "  PASS=%s  FALHA=%s\n" "$PASS" "$FAIL"
 [ "$FAIL" -eq 0 ]
