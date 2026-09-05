@@ -961,49 +961,77 @@ while true; do
             [ "$_nw" -lt 8 ]  && _nw=8
             _aw=$((LARG - _nw - 13))
             [ "$_aw" -lt 6 ] && _aw=6
-            LISTA="${LISTA}$(printf "%b%2s %b%-*s %b%-*.*s %b%s %b%-.*s%b" \
+            # HP AO LADO DO NOME.
+            #
+            # Pedido: coração vai para o inicio da linha do nome, junto do
+            # simbolo de online. Fica visualmente ligado a conta em vez de
+            # apenas mais um dos cinco stats. Sobram quatro stats na linha de
+            # baixo — o que da folga para eles ficarem colados aos numeros.
+            #
+            # CONTA DAS COLUNAS.
+            #
+            # A linha tem cinco pedacos com largura conhecida e dois campos
+            # elasticos (nome, atividade) que dividem o que sobra.
+            #
+            #   fixos:  2 recuo + 1 idx + 1 espaco + 5 simbolo + 1 espaco
+            #         + Lcol(rotulo HP) + 6 numero HP + 1 espaco
+            #         + 3 (espaco + seta + espaco)                = 20 + Lcol
+            #
+            #   Lcol: colunas visuais do rotulo HP — 2 em emoji e texto ("❤️"
+            #         e "HP" ocupam 2 colunas), 1 em simbolo ("♥").
+            #
+            # O que sobra vai metade para o nome e metade para a atividade,
+            # com pisos de 6/6 para nao ficar so um caractere em cada.
+            _hpstr=$(printf "%b%s%b%-6s" "$C_RED" "$L_HP" "$C_RESET" "$hp")
+            case "$L_HP" in ❤️|HP) _lcol=2 ;; *) _lcol=1 ;; esac
+            _util=$(( LARG - 20 - _lcol ))
+            [ "$_util" -lt 12 ] && _util=12
+            _nw=$(( _util / 2 ))
+            [ "$_nw" -gt 18 ] && _nw=18
+            [ "$_nw" -lt 6 ]  && _nw=6
+            _aw=$(( _util - _nw ))
+            [ "$_aw" -lt 6 ] && _aw=6
+            LISTA="${LISTA}$(printf "%b%2s %b%-*s %s %b%-*.*s %b%s %b%-*.*s%b" \
                 "$C_DIM" "$idx" "$cor" "$S_W" "$sim" \
+                "$_hpstr" \
                 "$C_WHITE" "$_nw" "$_nw" "$nome" \
                 "$C_DIM" "$I_ARROW" \
-                "$C_CYAN" "$_aw" "$_aba" "$C_RESET")
+                "$C_CYAN" "$_aw" "$_aw" "$_aba" "$C_RESET")
 "
-            # NUMEROS EM COLUNAS, QUANDO CABE.
+            # STATS COLADOS AOS EMOJIS.
             #
-            # Com os valores separados por um espaco so, cada conta ficava
-            # com os campos em posicao diferente e a leitura entre linhas
-            # nao acontecia: o ouro de uma ficava sobre a energia da outra.
-            # Aqui cada valor ganha largura fixa, entao ❤️ ⚡ ▲ 💰 🥈 caem
-            # sempre na mesma coluna, conta a conta.
+            # O HP agora vive na linha do nome, entao aqui sobram QUATRO:
+            # energia, nivel, ouro e prata. Cada emoji fica encostado no seu
+            # numero — "⚡797/2125" e nao "⚡ 797/2125" — como pedido: o
+            # rotulo "do lado do numero de referencia".
             #
-            #   4 de recuo + 5 campos de (rotulo 2 + espaco + valor) + 4
-            #   separadores = 53 colunas. Abaixo disso nao cabe, e a linha
-            #   volta ao formato compacto de antes, cortado na largura.
+            # Os quatro campos ainda tem largura fixa, para o ⚡ ▲ 💰 🥈 de
+            # cada linha cairem na mesma coluna. Sao 4 de recuo + 4 campos de
+            # (rotulo 2 + valor + espacos) + 3 separadores = 42 colunas —
+            # cabe em telas de celular como as de 46 colunas do print.
             #
             # Os rotulos L_* tem EXATAMENTE 2 colunas em qualquer modo, entao
-            # o alinhamento e o mesmo com emoji, com simbolo ou com texto.
-            if [ $((LARG - 4)) -ge 53 ]; then
-                LISTA="${LISTA}$(printf "    %b%s %-6s %b%s %-9s %b%s %-3s %b%s %-6s %b%s %-6s%b" \
-                    "$C_RED"    "$L_HP" "$hp" \
+            # o alinhamento e o mesmo com emoji, simbolo ou texto.
+            if [ $((LARG - 4)) -ge 42 ]; then
+                LISTA="${LISTA}$(printf "    %b%s%-9s %b%s%-4s  %b%s%-7s %b%s%-7s%b" \
                     "$C_YELLOW" "$L_EN" "$ene" \
                     "$C_GREEN"  "$L_LV" "$lvl" \
                     "$C_GOLD"   "$L_GO" "$ouro" \
                     "$C_GRAY"   "$L_SI" "$prata" "$C_RESET")
 "
             else
-                # Tela curta demais para colunas: formato compacto, com o
-                # corte na largura. Abaixo de 56 os rotulos ja sao texto — e
-                # ai byte e coluna voltam a ser a mesma coisa, entao o
-                # I_EXTRA nao entra.
+                # Tela mais estreita ainda: sem colunas fixas, apenas cortado
+                # na largura. Preserva a leitura mesmo em terminal minusculo.
                 if [ "$LARG" -lt 56 ]; then
-                    _l1="HP"; _l2="En"; _l3="LV"; _l4="Ou"; _l5="PR"; _lx=0
+                    _l2="En"; _l3="LV"; _l4="Ou"; _l5="PR"; _lx=0
                 else
-                    _l1="$I_HP"; _l2="$I_EN"; _l3="$I_LV"; _l4="$I_GO"; _l5="$I_SI"
-                    _lx=$I_EXTRA
+                    _l2="$I_EN"; _l3="$I_LV"; _l4="$I_GO"; _l5="$I_SI"
+                    _lx=$(( I_EXTRA * 4 / 5 ))
                 fi
                 _num=$((LARG - 4 + _lx))
                 LISTA="${LISTA}$(printf "    %b%.*s%b" "$C_GRAY" "$_num" \
-                    "$(printf "%s %s %s %s %s %s %s %s %s %s" \
-                        "$_l1" "$hp" "$_l2" "$ene" "$_l3" "$lvl" \
+                    "$(printf "%s%s %s%s %s%s %s%s" \
+                        "$_l2" "$ene" "$_l3" "$lvl" \
                         "$_l4" "$ouro" "$_l5" "$prata")" "$C_RESET")
 "
             fi
